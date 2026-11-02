@@ -1,5 +1,5 @@
 import { each, escapeHTML, isFunction } from '@semantic-ui/utils';
-import { Router } from 'nav-router';
+import { Router, update } from 'nav-router';
 import preloadIntent from 'nav-router/plugins/preload-intent';
 
 import { router as app } from './routes.js';
@@ -323,13 +323,8 @@ document.addEventListener('click', (event) => {
   }
 
   if (button.dataset.toggleCompact) {
-    const params = app.current?.params ?? { org: 'acme', tab: 'overview' };
     const currentCompact = Boolean(app.current?.query?.compact);
-    app.navigate('team', {
-      params,
-      query: currentCompact ? {} : { compact: true },
-      history: 'replace',
-    });
+    update({ compact: currentCompact ? undefined : true });
   }
 });
 

@@ -1,6 +1,6 @@
 import { each, isArray, isEqual, isPlainObject, noop } from '@semantic-ui/utils';
 
-import { IS_NAVIGATOR } from './helpers/identity.js';
+import { IS_NAVIGATOR } from './internal-helpers/identity.js';
 
 // the platform seam: window.navigation projected as plain fields, the verbs, the filter, and the
 // moments handed to the router by name. nothing here decides a route or holds one

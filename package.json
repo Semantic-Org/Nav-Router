@@ -18,7 +18,8 @@
       "types": "./types/index.d.ts",
       "import": "./src/index.js"
     },
-    "./plugins/*": "./src/plugins/*.js"
+    "./plugins/*": "./src/plugins/*.js",
+    "./reactive": "./src/reactive-router.js"
   },
   "scripts": {
     "demo": "node demo/serve.js flat",

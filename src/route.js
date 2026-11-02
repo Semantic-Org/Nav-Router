@@ -8,7 +8,7 @@ import {
   isString,
 } from '@semantic-ui/utils';
 
-import { IS_ROUTE, IS_ROUTER } from './helpers/identity.js';
+import { IS_ROUTE, IS_ROUTER } from './internal-helpers/identity.js';
 
 export class Route {
 
@@ -29,6 +29,7 @@ export class Route {
     this.router = parent ? parent.router : (this[IS_ROUTER] ? this : null);
     this.children = [];
     this.indexRoute = null;
+    this.active = false;
 
     if (this.router === this) {
       this.routesByName ??= new Map();
@@ -49,6 +50,8 @@ export class Route {
     this.segments = this.path === '/' ? [] : this.path.slice(1).split('/');
     this.paramSpecs = this.buildSpecs('params');
     this.querySpecs = this.buildSpecs('query');
+    // the keys this route declared itself, the ones a navigation can move without touching its ancestors
+    this.ownKeys = { params: Object.keys(this.params ?? {}), query: Object.keys(this.query ?? {}) };
 
     if (this.name && this.router && (!this.isIndex || !this.router.routesByName.has(this.name))) {
       this.router.routesByName.set(this.name, this);
@@ -147,6 +150,36 @@ export class Route {
       || config.routes
       || (config.layout && !config.view && !config.redirect),
     );
+  }
+
+  /*******************************
+            Active Life
+  *******************************/
+
+  // a route's active life is its signal: whatever it stores while active hangs on it, and
+  // onDestroyed is where that is released
+
+  activate() {
+    this.abortController = new AbortController();
+    this.abortSignal = this.abortController.signal;
+    this.active = true;
+  }
+
+  deactivate() {
+    this.active = false;
+    this.abortController?.abort('Route destroyed');
+  }
+
+  timeout(fn, ms) {
+    const id = setTimeout(fn, ms);
+    this.abortSignal?.addEventListener('abort', () => clearTimeout(id), { once: true });
+    return id;
+  }
+
+  interval(fn, ms) {
+    const id = setInterval(fn, ms);
+    this.abortSignal?.addEventListener('abort', () => clearInterval(id), { once: true });
+    return id;
   }
 
   /*******************************

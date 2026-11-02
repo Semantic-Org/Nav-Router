@@ -3,10 +3,11 @@ import {
   each,
   extend,
   inArray,
-  isClassConstructor,
   isFunction,
+  isEqual,
   isPlainObject,
   isPromise,
+  isString,
   noop,
   toBoolean,
   toDate,
@@ -16,7 +17,9 @@ import {
   wait,
 } from '@semantic-ui/utils';
 
-import { IS_ROUTER } from './helpers/identity.js';
+import { IS_ROUTER } from './internal-helpers/identity.js';
+import { isLazy } from './helpers/lazy.js';
+import { setRouter } from './helpers/router.js';
 import { Navigator } from './navigator.js';
 import { Route } from './route.js';
 
@@ -29,7 +32,8 @@ export class Router extends Route {
   static [Symbol.hasInstance](value) { return !!value?.[IS_ROUTER]; }
 
   // the day.js shape: a plugin is a function of (options, Router, Navigator) that patches a prototype.
-  // the moments are the hooks, and a plugin wraps a moment and calls through, never replaces it
+  // it wraps a moment and calls through, never replaces one, or adds a method the core would
+  // otherwise make every page carry. installed between navigations it takes effect on the next
   static extend(plugin, options) {
     if (!installed.has(plugin)) {
       installed.add(plugin);
@@ -46,19 +50,20 @@ export class Router extends Route {
     loadingDelay: '200ms',
     loadingMin: '500ms',
     restoreScroll: null,
+    attachGlobal: 'router',
   };
 
   constructor(options = {}) {
     super(extend({}, Router.defaults, options));
 
+    // the resolved settings in one place, for the console and for anything that introspects
+    this.config = extend({}, Router.defaults, options);
     this.base = this.normalizeBase(this.base);
     this.views = { ...Router.defaults.views, ...options.views };
     this.layout ??= this.views.layout;
 
     this.routesByName ??= new Map();
     this.leaves ??= [];
-    this.activeRoutes = new Map();
-    this.currentRoute = null;
 
     this.current = null;
     this.page = null;
@@ -87,6 +92,12 @@ export class Router extends Route {
 
   async start() {
     this.navigator.attach();
+    // the helpers reach the started router. one per document is the common case, so it also lives
+    // on window under this name for the console; a second router names itself otherwise
+    setRouter(this);
+    if (this.attachGlobal && globalThis.window) {
+      globalThis[this.attachGlobal] = this;
+    }
 
     const initialUrl = this.navigator.entry?.url
       ?? globalThis.location?.href
@@ -94,6 +105,9 @@ export class Router extends Route {
 
     const matched = this.match(initialUrl);
     if (!matched) {
+      this.page = { view: this.views?.notFound ?? null, status: 'notFound', url: initialUrl };
+      await this.renderView(this.page);
+      this.notify();
       return this;
     }
 
@@ -102,36 +116,44 @@ export class Router extends Route {
     const controller = new AbortController();
     this.activeAbort = controller;
 
-    const resolved = await this.runCascade(matched, controller.signal);
-    if (controller.signal.aborted) {
-      return this;
+    // the one navigation the platform fires no event for: the same entering flow, a stand-in event
+    const event = {
+      initial: true,
+      navigationType: this.navigator.activation?.navigationType ?? 'push',
+      destination: { key: null },
+      signal: controller.signal,
+    };
+    this.setPending(matched, event.navigationType);
+    try {
+      await this.afterCommit(this.begin(matched, event), event, false);
     }
-
-    if (resolved.status === 'redirect' && resolved.redirect) {
-      this.navigate(resolved.redirect, { history: 'replace' });
-      return this;
+    catch (error) {
+      if (!controller.signal.aborted) {
+        this.failed(error, event);
+      }
     }
-
-    await this.applyCascade(matched, resolved);
+    if (!controller.signal.aborted) {
+      this.pending = null;
+      this.notify();
+    }
     return this;
   }
 
   stop() {
     this.navigator.detach();
+    setRouter(null);
+    if (this.attachGlobal && globalThis[this.attachGlobal] === this) {
+      delete globalThis[this.attachGlobal];
+    }
     this.activeAbort?.abort();
     this.activeAbort = null;
 
     each(this.timers, (timer) => clearTimeout(timer));
     this.timers.clear();
 
-    const activeEntries = [...this.activeRoutes.entries()].reverse();
-    each(activeEntries, ([routeId, route]) => {
-      this.activeRoutes.delete(routeId);
-      this.onRouteDestroyed(routeId, route, { router: this });
-    });
-
-    this.currentRoute = null;
-    this.entryCache.clear();
+    each([...(this.page?.chain ?? [])].reverse(), (route) => this.destroyRoute(route, this.lifecycleContext(route, null)));
+    this.page = null;
+    this.entryCache?.clear();
   }
 
   /*******************************
@@ -179,9 +201,6 @@ export class Router extends Route {
 
     const query = this.coerceQuery(bestLeaf, parsed.searchParams);
     const currentRoutes = [...bestLeaf.ancestors];
-    const createdRoutes = currentRoutes.filter((route) => !this.activeRoutes.has(route.id));
-    const updatedRoutes = currentRoutes.filter((route) => this.activeRoutes.has(route.id));
-    const removedRoutes = [...this.activeRoutes.values()].filter((route) => !inArray(route, currentRoutes));
 
     return {
       route: bestLeaf,
@@ -193,9 +212,6 @@ export class Router extends Route {
       query,
       chain: currentRoutes,
       currentRoutes,
-      createdRoutes,
-      updatedRoutes,
-      removedRoutes,
       redirect: bestLeaf.redirect ?? null,
     };
   }
@@ -321,41 +337,33 @@ export class Router extends Route {
     return toString(rawValue);
   }
 
-  urlFor(nameOrPath, { params = {}, query = {} } = {}) {
-    if (!nameOrPath) {
-      return this.base || '/';
-    }
-
-    const namedRoute = this.routesByName.get(nameOrPath);
-    const targetRoute = namedRoute ? (namedRoute.indexRoute ?? namedRoute) : null;
-    const rawPath = targetRoute ? targetRoute.path : String(nameOrPath);
-    const paramSpecs = targetRoute ? targetRoute.paramSpecs : {};
-
-    if (!targetRoute && rawPath.includes('?') && !Object.keys(params).length && !Object.keys(query).length) {
-      return this.prependBase(rawPath);
+  // a route by name, a Route, or a literal path. args is one flat bag: a key the route declares as a
+  // param fills the path, every other key is query. the fragment and the origin are options
+  href(target, args = {}, { hash, absolute = false, keepQuery = false } = {}) {
+    const route = this.routeFor(target);
+    const rawPath = route ? route.path : (isString(target) && target ? target : '/');
+    const { params, query } = this.splitArgs(route, args);
+    if (keepQuery) {
+      extend(query, this.current?.query ?? {}, query);
     }
 
     const segments = rawPath === '/' ? [] : rawPath.replace(/^\//, '').split('/');
     const resolvedSegments = [];
-
     for (let index = 0; index < segments.length; index++) {
       const segment = segments[index];
       if (!segment.startsWith(':')) {
         resolvedSegments.push(segment);
         continue;
       }
-
       const isOptionalFlag = segment.endsWith('?');
       const paramName = segment.slice(1).replace(/\?$/, '');
-      const value = params[paramName] ?? paramSpecs[paramName]?.default;
-
+      const value = params[paramName] ?? route?.paramSpecs[paramName]?.default;
       if (value === undefined || value === null) {
         if (isOptionalFlag && index === segments.length - 1) {
           continue;
         }
-        throw new Error(`Router.urlFor: missing required param "${paramName}" for "${nameOrPath}".`);
+        throw new Error(`Router.href: missing required param "${paramName}" for "${route?.name ?? target}".`);
       }
-
       resolvedSegments.push(encodeURIComponent(this.formatParamValue(value)));
     }
 
@@ -366,9 +374,48 @@ export class Router extends Route {
         searchParams.set(key, this.formatParamValue(value));
       }
     });
-
     const search = searchParams.toString();
-    return this.prependBase(search ? `${pathname}?${search}` : pathname);
+    const path = this.prependBase(search ? `${pathname}?${search}` : pathname) + (hash ? `#${hash}` : '');
+    return absolute && globalThis.location ? new URL(path, globalThis.location.origin).href : path;
+  }
+
+  // the names people reach for; one implementation
+  urlFor(...args) { return this.href(...args); }
+  url(...args) { return this.href(...args); }
+
+  // a name, a Route, or nothing: a literal path has no route and keeps every arg as query
+  routeFor(target) {
+    if (target instanceof Route) {
+      return target;
+    }
+    const named = isString(target) ? this.routesByName.get(target) : null;
+    return named ? (named.indexRoute ?? named) : null;
+  }
+
+  splitArgs(route, args = {}) {
+    const params = {};
+    const query = {};
+    each(args, (value, key) => {
+      if (route && key in route.paramSpecs) {
+        params[key] = value;
+      }
+      else {
+        query[key] = value;
+      }
+    });
+    return { params, query };
+  }
+
+  // the args a redirect carries: the current params the target also declares
+  paramsFor(target, params = {}) {
+    const route = this.routeFor(target);
+    const carried = {};
+    each(params, (value, key) => {
+      if (route && key in route.paramSpecs) {
+        carried[key] = value;
+      }
+    });
+    return carried;
   }
 
   formatParamValue(value) {
@@ -379,6 +426,12 @@ export class Router extends Route {
     if (!this.base) { return path; }
     if (path === '/') { return this.base; }
     return path.startsWith('/') ? `${this.base}${path}` : `${this.base}/${path}`;
+  }
+
+  argsMatch(route, args) {
+    const { params, query } = this.splitArgs(route, args);
+    return Object.keys(params).every((key) => isEqual(this.current.params[key], params[key]))
+      && Object.keys(query).every((key) => isEqual(this.current.query[key], query[key]));
   }
 
   get canGoBack() {
@@ -398,18 +451,16 @@ export class Router extends Route {
               Writes
   *******************************/
 
-  navigate(nameOrUrl, { params, query, state, info, history = 'auto', resetScroll = true, resetFocus = true } = {}) {
-    const url = this.urlFor(nameOrUrl, { params, query });
-    return this.navigator.navigate(url, { state, info, history, resetScroll, resetFocus });
+  navigate(target, args = {}, { history = 'auto', state, info, resetScroll = true, resetFocus = true } = {}) {
+    return this.navigator.navigate(this.href(target, args), { state, info, history, resetScroll, resetFocus });
   }
 
   reload(options) {
     return this.navigator.reload(options);
   }
 
-  back({ fallback = this.name, params, query } = {}) {
-    const fallbackUrl = fallback ? this.urlFor(fallback, { params, query }) : (this.base || '/');
-    return this.navigator.back(fallbackUrl);
+  back(fallback = this.name, args = {}) {
+    return this.navigator.back(fallback ? this.href(fallback, args) : (this.base || '/'));
   }
 
   forward() {
@@ -430,15 +481,21 @@ export class Router extends Route {
     // the initial load is the one navigation the platform holds no signal for
     this.activeAbort?.abort();
     this.activeAbort = null;
-    this.pending = {
+    this.setPending(matched, event.navigationType);
+    this.notify();
+  }
+
+  // the platform runs one navigation at a time, so pending is one match
+  setPending(matched, navigationType) {
+    this.pending = matched ? {
       route: matched.route,
       url: matched.url,
       params: matched.params,
       query: matched.query,
-      navigationType: event.navigationType,
+      chain: matched.chain,
+      navigationType,
       loading: false,
-    };
-    this.notify();
+    } : null;
   }
 
   entryChanged(entry, event) {
@@ -472,16 +529,22 @@ export class Router extends Route {
       from: globalThis.navigation?.transition?.from ?? null,
       url: pending?.url ?? this.navigator.entry?.url ?? null,
     };
-    if (this.errorRoute) {
-      this.navigator.deferNavigate(this.urlFor(this.errorRoute), { history: 'replace' });
+    // a failure before commit left the standing page in place; only a committed one is shown as an error
+    const committed = !pending || this.navigator.entry?.url === pending.url;
+    if (committed && this.errorRoute) {
+      this.navigator.deferNavigate(this.href(this.errorRoute), { history: 'replace' });
     }
-    else {
+    else if (committed) {
       const view = this.views?.error ?? null;
       if (!view) {
         console.error(error);
       }
-      this.page = { ...(pending ? this.pageFor(pending) : (this.page ?? {})), view, status: 'error', error };
+      // the routes on screen stay active under the error page, so the chain carries over
+      this.page = { ...(pending ? this.pageFor(pending) : (this.page ?? {})), chain: this.page?.chain ?? [], slices: this.page?.slices ?? [], view, status: 'error', error };
       this.renderView(this.page).catch(noop);
+    }
+    else {
+      console.error(error);
     }
     this.notify();
   }
@@ -496,7 +559,7 @@ export class Router extends Route {
 
   disposed(entry) {
     if (entry?.key) {
-      this.entryCache.delete(entry.key);
+      this.entryCache?.delete(entry.key);
     }
   }
 
@@ -508,10 +571,18 @@ export class Router extends Route {
   begin(matched, event) {
     const entryKey = event.navigationType === 'traverse' ? event.destination.key : null;
     // the visit's result rides its entry: a traverse back shows what was seen, reload() refreshes it
-    const cached = entryKey ? this.entryCache.get(entryKey) : null;
-    const work = { matched, settled: false, result: null, redirected: null };
-    work.guards = this.runGuards(matched, event.signal);
-    work.ready = work.guards.then((guard) => guard ?? cached ?? this.runData(matched, event.signal));
+    const cached = entryKey ? this.entryCache?.get(entryKey) : null;
+    const work = {
+      matched,
+      signal: event.signal,
+      reload: event.navigationType === 'reload',
+      previous: this.page,
+      settled: false,
+      result: null,
+      redirected: null,
+    };
+    work.guards = this.runGuards(matched, work);
+    work.ready = work.guards.then((guard) => guard ?? cached ?? this.runData(matched, work));
     work.ready.then(
       (result) => {
         work.settled = true;
@@ -542,6 +613,8 @@ export class Router extends Route {
       if (!redirectedMatch) {
         break;
       }
+      this.setPending(redirectedMatch, event.navigationType);
+      this.navigator.transition.url = redirectedMatch.url;
       active = work.redirected = this.begin(redirectedMatch, event);
     }
 
@@ -578,8 +651,8 @@ export class Router extends Route {
         if (this.views?.loading) {
           const loadingView = await this.resolveView(this.views.loading);
           if (!active.settled && !event.signal.aborted) {
-            this.page = { ...this.pageFor(matched), view: loadingView, status: 'loading' };
-            await this.renderView(this.page, event);
+            // page stays the settled page: a loading view is rendered over it, pending.loading says so
+            await this.renderView({ ...this.pageFor(matched), view: loadingView, status: 'loading' }, event);
           }
         }
         this.notify();
@@ -616,64 +689,48 @@ export class Router extends Route {
               Cascade
   *******************************/
 
-  evaluate(fn, context) {
+  // the base seam: a plain call. the reactive scaffold overrides it
+  evaluate(route, fn, context) {
     return isFunction(fn) ? fn(context) : fn;
   }
 
-  async runCascade(matched, signal) {
-    return (await this.runGuards(matched, signal)) ?? this.runData(matched, signal);
+  async runCascade(matched, work) {
+    return (await this.runGuards(matched, work)) ?? this.runData(matched, work);
+  }
+
+  contextFor(route, matched, data, signal = route.abortSignal) {
+    return { params: matched.params, query: matched.query, signal, user: this.user, route, router: this, data };
   }
 
   // null when the route may be entered, otherwise the redirect or forbidden result
-  async runGuards(matched, signal) {
+  async runGuards(matched, work) {
     if (!matched) {
       return null;
     }
 
     const { route, params, query, currentRoutes } = matched;
-    const baseContext = { params, query, signal, user: this.user, route, router: this };
 
     for (const ancestor of currentRoutes) {
       if (ancestor.redirect) {
-        const target = await this.evaluate(ancestor.redirect, baseContext);
-        return {
-          status: 'redirect',
-          redirect: this.urlFor(target, { params, query }),
-          route,
-          params,
-          query,
-        };
+        const target = await this.evaluate(ancestor, ancestor.redirect, this.contextFor(ancestor, matched, {}, work.signal));
+        return { status: 'redirect', redirect: this.href(target, this.paramsFor(target, params)), route, params, query };
       }
     }
 
     for (const ancestor of currentRoutes) {
       if (ancestor.permission !== undefined) {
-        const allowed = await this.evaluate(ancestor.permission, baseContext);
+        const allowed = await this.evaluate(ancestor, ancestor.permission, this.contextFor(ancestor, matched, {}, work.signal));
         if (!allowed) {
           if ((!this.user || !this.views?.forbidden) && this.signInRoute) {
-            return {
-              status: 'redirect',
-              redirect: this.urlFor(this.signInRoute),
-              route,
-              params,
-              query,
-            };
+            return { status: 'redirect', redirect: this.href(this.signInRoute), route, params, query };
           }
           const [view, layouts, slots, { title, titles }] = await Promise.all([
             this.resolveView(this.views?.forbidden),
             this.resolveLayouts(currentRoutes),
             this.resolveSlots(currentRoutes),
-            this.evaluateTitles(currentRoutes, { ...baseContext, data: {} }),
+            this.evaluateTitles(currentRoutes, matched, {}, work.signal),
           ]);
-          return this.buildCascadeResult(matched, {
-            status: 'forbidden',
-            view,
-            layouts,
-            slots,
-            data: {},
-            title,
-            titles,
-          });
+          return this.buildCascadeResult(matched, { status: 'forbidden', view, layouts, slots, data: {}, slices: [], title, titles });
         }
       }
     }
@@ -681,9 +738,11 @@ export class Router extends Route {
     return null;
   }
 
-  async runData(matched, signal) {
-    const { route, params, query, currentRoutes } = matched;
-    const baseContext = { params, query, signal, user: this.user, route, router: this };
+  // one slice per route in chain order. an ancestor whose own keys did not move keeps its slice and
+  // never runs; from the first route that moved, everything below it runs with fresh data above it
+  async runData(matched, work) {
+    const { route, currentRoutes } = matched;
+    const previous = work?.previous;
 
     const [view, layouts, slots] = await Promise.all([
       this.resolveView(route.view),
@@ -692,6 +751,8 @@ export class Router extends Route {
     ]);
 
     const data = {};
+    const slices = [];
+    let changed = !previous || work?.reload || previous.user !== this.user;
     let flaggedNotFound = false;
     const notFoundSymbol = Symbol('notFound');
     const notFound = () => {
@@ -700,56 +761,61 @@ export class Router extends Route {
     };
 
     for (const ancestor of currentRoutes) {
-      if (ancestor.data === undefined) {
+      const kept = !changed && previous.slices?.find((slice) => slice.route === ancestor);
+      if (kept && this.ownKeysUnchanged(ancestor, previous, matched)) {
+        slices.push(kept);
+        extend(data, kept.data);
         continue;
       }
-      const rawData = await this.evaluate(ancestor.data, {
-        ...baseContext,
-        data: { ...data },
-        notFound,
-      });
+      changed = true;
 
-      if (flaggedNotFound || rawData === notFoundSymbol) {
-        const [notFoundView, { title, titles }] = await Promise.all([
-          this.resolveView(this.views?.notFound),
-          this.evaluateTitles(currentRoutes, { ...baseContext, data }),
-        ]);
-        return this.buildCascadeResult(matched, {
-          status: 'notFound',
-          view: notFoundView,
-          layouts,
-          slots,
-          data,
-          title,
-          titles,
-        });
+      const slice = { route: ancestor, data: {}, title: null };
+      if (ancestor.data !== undefined) {
+        const rawData = await this.evaluate(ancestor, ancestor.data, { ...this.contextFor(ancestor, matched, { ...data }, work.signal), notFound });
+        if (flaggedNotFound || rawData === notFoundSymbol) {
+          const [notFoundView, { title, titles }] = await Promise.all([
+            this.resolveView(this.views?.notFound),
+            this.evaluateTitles(currentRoutes, matched, data, work.signal),
+          ]);
+          return this.buildCascadeResult(matched, { status: 'notFound', view: notFoundView, layouts, slots, data, slices, title, titles });
+        }
+        if (isPlainObject(rawData)) {
+          slice.data = await this.resolveDataSlice(rawData);
+          extend(data, slice.data);
+        }
       }
-
-      if (isPlainObject(rawData)) {
-        extend(data, await this.resolveDataSlice(rawData));
+      if (ancestor.title !== undefined) {
+        slice.title = await this.evaluateTitle(ancestor, matched, { ...data }, work.signal);
       }
+      slices.push(slice);
     }
 
-    const { title, titles } = await this.evaluateTitles(currentRoutes, { ...baseContext, data });
-    return this.buildCascadeResult(matched, {
-      status: 'ok',
-      view,
-      layouts,
-      slots,
-      data,
-      title,
-      titles,
-    });
+    const titles = slices.map((slice) => slice.title).filter((title) => title !== null);
+    return this.buildCascadeResult(matched, { status: 'ok', view, layouts, slots, data, slices, title: titles.at(-1) ?? '', titles });
   }
 
-  // the chunks a link may need, warmed on intent; the module cache is the cache
-  preloadViews(matched) {
-    const { route, currentRoutes } = matched;
-    return Promise.all([
-      this.resolveView(route.view),
-      this.resolveLayouts(currentRoutes),
-      this.resolveSlots(currentRoutes),
-    ]);
+  ownKeysUnchanged(route, previous, matched) {
+    const { params, query } = route.ownKeys;
+    return params.every((key) => isEqual(previous.params?.[key], matched.params[key]))
+      && query.every((key) => isEqual(previous.query?.[key], matched.query[key]));
+  }
+
+  async evaluateTitle(route, matched, data, signal) {
+    const value = await this.evaluate(route, route.title, this.contextFor(route, matched, data, signal));
+    return value === undefined || value === null || value === '' ? null : String(value);
+  }
+
+  async evaluateTitles(currentRoutes, matched, data, signal) {
+    const titles = [];
+    for (const ancestor of currentRoutes) {
+      if (ancestor.title !== undefined) {
+        const title = await this.evaluateTitle(ancestor, matched, data, signal);
+        if (title !== null) {
+          titles.push(title);
+        }
+      }
+    }
+    return { title: titles.at(-1) ?? '', titles };
   }
 
   buildCascadeResult({ route, params, query }, resolved) {
@@ -762,20 +828,17 @@ export class Router extends Route {
     };
   }
 
+  // a value, a class, a module object, a promise, or a lazy thunk. a plain function is a view
   async resolveView(target) {
     if (!target) {
       return null;
     }
+    if (isLazy(target)) {
+      return target();
+    }
     if (isPromise(target)) {
       const resolved = await target;
       return resolved?.default ?? resolved;
-    }
-    if (isFunction(target) && !isClassConstructor(target) && target.length === 0) {
-      const result = target();
-      if (isPromise(result)) {
-        const resolved = await result;
-        return resolved?.default ?? resolved;
-      }
     }
     return target?.default ?? target;
   }
@@ -822,52 +885,13 @@ export class Router extends Route {
     return resolved;
   }
 
-  async evaluateTitles(currentRoutes, context) {
-    const titles = [];
-    for (const ancestor of currentRoutes) {
-      if (ancestor.title !== undefined) {
-        const value = await this.evaluate(ancestor.title, context);
-        if (value !== undefined && value !== null && value !== '') {
-          titles.push(String(value));
-        }
-      }
-    }
-    return { title: titles.at(-1) ?? '', titles };
-  }
-
   commitRoute(matched) {
     if (!matched) {
       return null;
     }
 
     const snapshot = this.getEntrySnapshot();
-    const previous = this.current;
-    const lifecycleContext = {
-      router: this,
-      matched,
-      previous,
-      params: matched.params,
-      query: matched.query,
-      entry: snapshot.entry,
-    };
-
-    each([...(matched.removedRoutes ?? [])].reverse(), (route) => {
-      this.activeRoutes.delete(route.id);
-      this.onRouteDestroyed(route.id, route, lifecycleContext);
-    });
-
-    each(matched.currentRoutes, (route) => {
-      if (this.activeRoutes.has(route.id)) {
-        this.onRouteUpdated(route.id, route, lifecycleContext);
-      }
-      else {
-        this.activeRoutes.set(route.id, route);
-        this.onRouteCreated(route.id, route, lifecycleContext);
-      }
-    });
-
     // the committed match and its entry, nothing of the page: the page is written at settle
-    this.currentRoute = matched.route;
     this.current = { ...matched, ...snapshot };
 
     this.notify();
@@ -880,10 +904,12 @@ export class Router extends Route {
       return;
     }
     const { key } = this.getEntrySnapshot();
-    this.page = { ...this.pageFor(matched), ...resolved, key };
+    const previous = this.page;
+    this.page = { ...this.pageFor(matched), ...resolved, chain: matched.chain, key, user: this.user };
+    this.settleRoutes(previous, this.page);
 
-    if (key) {
-      this.entryCache.set(key, resolved);
+    if (key && resolved.status === 'ok') {
+      this.entryCache?.set(key, resolved);
     }
     if (globalThis.document && resolved.title) {
       globalThis.document.title = resolved.title;
@@ -911,16 +937,116 @@ export class Router extends Route {
           Route Lifecycles
   *******************************/
 
-  onRouteCreated(routeId, route, context) {
+  // the page's chain is the active set. settle diffs it against the page before: destroyed in
+  // reverse, then created and updated in chain order
+  settleRoutes(previous, page) {
+    const before = previous?.chain ?? [];
+    const after = page.chain ?? [];
+
+    each([...before].reverse(), (route) => {
+      if (!inArray(route, after)) {
+        this.destroyRoute(route, this.lifecycleContext(route, page, previous));
+      }
+    });
+    each(after, (route) => {
+      if (inArray(route, before)) {
+        this.onRouteUpdated(route, this.lifecycleContext(route, page, previous));
+      }
+      else {
+        route.activate();
+        this.onRouteCreated(route, this.lifecycleContext(route, page, previous));
+      }
+    });
+  }
+
+  destroyRoute(route, context) {
+    this.onRouteDestroyed(route, context);
+    route.deactivate();
+  }
+
+  // what a route's lifecycle callback sees, in the template's shape
+  lifecycleContext(route, page, previous = null) {
+    return {
+      router: this,
+      route,
+      params: page?.params ?? {},
+      query: page?.query ?? {},
+      data: page?.data ?? {},
+      previous,
+      abortSignal: route.abortSignal,
+      abortController: route.abortController,
+      timeout: route.timeout.bind(route),
+      interval: route.interval.bind(route),
+    };
+  }
+
+  onRouteCreated(route, context) {
     return route.onCreated?.(context);
   }
 
-  onRouteUpdated(routeId, route, context) {
+  onRouteUpdated(route, context) {
     return route.onUpdated?.(context);
   }
 
-  onRouteDestroyed(routeId, route, context) {
+  onRouteDestroyed(route, context) {
     return route.onDestroyed?.(context);
+  }
+
+  // what the routes above this one settled, merged, as a data function sees it
+  dataAbove(route) {
+    const data = {};
+    for (const slice of this.page?.slices ?? []) {
+      if (slice.route === route) {
+        break;
+      }
+      extend(data, slice.data);
+    }
+    return data;
+  }
+
+  // a route's slice recomputed outside a navigation: the routes below it run again with fresh data
+  // above them, the page re-merges, and it renders through the same moment a navigation uses
+  async replaceSlice(route, value) {
+    const page = this.page;
+    if (!page?.slices || !inArray(route, page.chain)) {
+      return;
+    }
+    const index = page.chain.indexOf(route);
+    const matched = { route: page.route, params: page.params, query: page.query, chain: page.chain, currentRoutes: page.chain };
+    const data = {};
+    each(page.slices.slice(0, index), (slice) => extend(data, slice.data));
+
+    const slices = page.slices.slice(0, index);
+    const fresh = { route, data: isPlainObject(await value) ? await this.resolveDataSlice(await value) : {}, title: null };
+    extend(data, fresh.data);
+    fresh.title = route.title !== undefined ? await this.evaluateTitle(route, matched, { ...data }, route.abortSignal) : null;
+    slices.push(fresh);
+
+    for (const below of page.chain.slice(index + 1)) {
+      const slice = { route: below, data: {}, title: null };
+      if (below.data !== undefined) {
+        const rawData = await this.evaluate(below, below.data, this.contextFor(below, matched, { ...data }));
+        if (isPlainObject(rawData)) {
+          slice.data = await this.resolveDataSlice(rawData);
+          extend(data, slice.data);
+        }
+      }
+      if (below.title !== undefined) {
+        slice.title = await this.evaluateTitle(below, matched, { ...data });
+      }
+      slices.push(slice);
+    }
+    if (this.page !== page) {
+      return;
+    }
+
+    const titles = slices.map((slice) => slice.title).filter((title) => title !== null);
+    this.page = { ...page, data, slices, title: titles.at(-1) ?? '', titles };
+    if (globalThis.document && this.page.title) {
+      globalThis.document.title = this.page.title;
+    }
+    await this.renderView(this.page);
+    this.notify();
   }
 
   // awaited, so the platform's focus reset and scroll find the new dom
