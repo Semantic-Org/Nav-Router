@@ -1,14 +1,22 @@
-import { each, isFunction } from '@semantic-ui/utils';
+import { each, extend, isFunction } from '@semantic-ui/utils';
 
 import { Router } from './router.js';
 
-// the scaffolding every reactive provider would otherwise repeat. a route function runs inside
-// the provider's tracker; the first run is the cascade's, so dependencies are learned without
-// computing twice, and a later run, when something it read changes, recomputes the route's slice
-// with a context built fresh at that moment. a run born while its navigation is in flight ends
-// with that navigation's signal; once the route is active it ends with the route's. a route has
-// as many runs as functions it declares, kept together. a provider supplies track() and nothing else
+// the scaffolding every reactive provider would otherwise repeat. each hook runs inside the
+// provider's reaction; the first run is the cascade's, so dependencies are learned without
+// computing twice, and a later run, when something it read moves, lands the way that hook lands
+// at navigation: a redirect moves the page, a refused permission redirects or shows forbidden,
+// data updates its slice, a title its title. a route's slice holds a signal, a run reads the
+// slices above it, so a slice that moves reaches the routes that read it and no others. a run
+// born while its navigation is in flight ends with that navigation's signal; once the route is
+// active it ends with the route's. a provider supplies the four primitives below and nothing else
 export class ReactiveRouter extends Router {
+
+  static defaults = {
+    ...Router.defaults,
+    // the signal's own equality decides whether anything moved
+    dataChanged: () => true,
+  };
 
   constructor(options) {
     super(options);
@@ -16,39 +24,92 @@ export class ReactiveRouter extends Router {
     this.entryCache = null;
     this.born = [];
     this.runs = new Map();
-    this.rerunning = null;
   }
 
-  // run fn now and again whenever what it read changes; return the function that stops it
-  track(fn) {
-    throw new Error('ReactiveRouter: a provider supplies track(fn)');
+  /*******************************
+            Provider
+  *******************************/
+
+  // { get, set, peek }, equal values leaving dependents alone
+  createSignal(initialValue) {
+    throw new Error('ReactiveRouter: a provider supplies createSignal(value)');
   }
 
-  evaluate(route, fn, context) {
+  // runs fn(isFirst) now and again whenever what it read moves; returns the dispose
+  createReaction(fn) {
+    throw new Error('ReactiveRouter: a provider supplies createReaction(fn)');
+  }
+
+  untrack(fn) {
+    return fn();
+  }
+
+  batch(fn) {
+    return fn();
+  }
+
+  /*******************************
+              Slices
+  *******************************/
+
+  sliceOf(route, data) {
+    const slice = super.sliceOf(route, data);
+    slice.signal = this.createSignal(data);
+    return slice;
+  }
+
+  setSlice(slice, data) {
+    super.setSlice(slice, data);
+    slice.signal?.set(data);
+  }
+
+  /*******************************
+               Hooks
+  *******************************/
+
+  evaluateRedirect(route, fn, context) {
+    return this.tracked({ route, fn, context, onRerun: (target) => this.redirectChanged(route, target) });
+  }
+
+  evaluatePermission(route, fn, context) {
+    return this.tracked({ route, fn, context, onRerun: (allowed) => this.permissionChanged(route, allowed) });
+  }
+
+  evaluateData(route, fn, context) {
+    return this.tracked({ route, fn, context, onRerun: (value) => this.updateData(route, value) });
+  }
+
+  evaluateTitle(route, fn, context) {
+    return this.tracked({ route, fn, context, onRerun: (value) => this.updateTitle(route, value) });
+  }
+
+  // runs fn inside the provider's reaction and hands each later run's value to onRerun. the signal
+  // the hook was given is the life its run belongs to: the navigation's while one is in flight, the
+  // route's own when the standing page runs it. the slices it was given are read inside the run,
+  // which is how the run comes to depend on them
+  tracked({ route, fn, context, onRerun }) {
     if (!isFunction(fn)) {
       return fn;
     }
+    const { signal, slices } = context;
     let first;
-    let firstRun = true;
-    const stop = this.track(() => {
-      if (firstRun) {
-        firstRun = false;
+    const stop = this.createReaction((isFirst) => {
+      const data = {};
+      each(slices, (slice) => extend(data, slice.signal ? slice.signal.get() : slice.data));
+      if (isFirst) {
         first = fn(context);
         return;
       }
       if (route.active) {
-        this.rerunning = stop;
-        this.replaceSlice(route, fn(this.contextFor(route, this.page, this.dataAbove(route))));
-        this.rerunning = null;
+        onRerun(fn({ ...context, data }));
       }
     });
-    if (route.active && context.signal === route.abortSignal) {
-      // born outside a navigation, by replaceSlice: the route is already its home
+    if (signal === route.abortSignal) {
       this.runsOf(route).add(stop);
     }
     else {
       const born = { route, stop, adopted: false };
-      context.signal?.addEventListener('abort', () => {
+      signal?.addEventListener('abort', () => {
         if (!born.adopted) {
           stop();
         }
@@ -58,6 +119,10 @@ export class ReactiveRouter extends Router {
     return first;
   }
 
+  /*******************************
+               Runs
+  *******************************/
+
   runsOf(route) {
     if (!this.runs.has(route.id)) {
       this.runs.set(route.id, new Set());
@@ -65,13 +130,9 @@ export class ReactiveRouter extends Router {
     return this.runs.get(route.id);
   }
 
-  stopRuns(route, except = null) {
-    each(this.runsOf(route), (stop) => {
-      if (stop !== except) {
-        stop();
-        this.runsOf(route).delete(stop);
-      }
-    });
+  stopRuns(route) {
+    each(this.runsOf(route), (stop) => stop());
+    this.runsOf(route).clear();
   }
 
   // the runs born for the route in the navigation that settled replace the last run's
@@ -85,6 +146,14 @@ export class ReactiveRouter extends Router {
     });
   }
 
+  // after settle nothing is left unborn: what was not adopted belonged to a branch this navigation
+  // abandoned, a precommit redirect's first chain among them
+  settleRoutes(previous, page) {
+    super.settleRoutes(previous, page);
+    each(this.born, (born) => born.stop());
+    this.born = [];
+  }
+
   onRouteCreated(route, context) {
     route.abortSignal.addEventListener('abort', () => this.stopRuns(route), { once: true });
     this.adopt(route);
@@ -94,17 +163,5 @@ export class ReactiveRouter extends Router {
   onRouteUpdated(route, context) {
     this.adopt(route);
     return super.onRouteUpdated(route, context);
-  }
-
-  // the route's other functions and every route below run again, so their old runs end first
-  async replaceSlice(route, value) {
-    const chain = this.page?.chain ?? [];
-    const index = chain.indexOf(route);
-    if (index < 0) {
-      return;
-    }
-    this.stopRuns(route, this.rerunning);
-    each(chain.slice(index + 1), (below) => this.stopRuns(below));
-    return super.replaceSlice(route, value);
   }
 }

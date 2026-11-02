@@ -9,8 +9,12 @@ export default ({
   reload = (url) => globalThis.location?.assign?.(url),
 } = {}, Router) => {
   const proto = Router.prototype;
-  const { resolveView, settled, failed } = proto;
-  const chunkErrors = new WeakSet();
+  const { intercepted, resolveView, settled, failed, stop } = proto;
+
+  proto.intercepted = function (matched, event) {
+    this.chunkError = null;
+    return intercepted.call(this, matched, event);
+  };
 
   proto.resolveView = async function (target) {
     const tracked = isLazy(target) || isPromise(target);
@@ -18,14 +22,15 @@ export default ({
       return await resolveView.call(this, target);
     }
     catch (error) {
-      if (tracked && isObject(error) && error.name !== 'AbortError') {
-        chunkErrors.add(error);
+      if (tracked && this.pending && isObject(error) && error.name !== 'AbortError') {
+        this.chunkError ??= error;
       }
       throw error;
     }
   };
 
   proto.settled = function (event) {
+    this.chunkError = null;
     try {
       globalThis.sessionStorage?.removeItem(storageKey);
     }
@@ -34,12 +39,13 @@ export default ({
   };
 
   proto.failed = function (error, event) {
+    const isChunkError = Boolean(error && this.chunkError === error);
+    this.chunkError = null;
     const url = this.pending?.url ?? globalThis.location?.href ?? null;
-    if (isObject(error) && chunkErrors.has(error) && globalThis.navigator?.onLine !== false && url) {
+    if (isChunkError && globalThis.navigator?.onLine !== false && url) {
       try {
         if (globalThis.sessionStorage?.getItem(storageKey) !== url) {
           globalThis.sessionStorage?.setItem(storageKey, url);
-          this.dropPending();
           this.pending = null;
           reload(url);
           return;
@@ -49,5 +55,10 @@ export default ({
       catch {}
     }
     return failed.call(this, error, event);
+  };
+
+  proto.stop = function () {
+    this.chunkError = null;
+    return stop.call(this);
   };
 };

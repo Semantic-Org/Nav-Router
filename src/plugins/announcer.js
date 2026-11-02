@@ -10,44 +10,33 @@ export default ({
 } = {}, Router) => {
   const proto = Router.prototype;
   const { start, intercepted, applyCascade, settled, failed, stop } = proto;
-  const states = new WeakMap();
-
-  const getState = (router) => {
-    let state = states.get(router);
-    if (!state) {
-      state = { element: null, queued: null, lastText: '' };
-      states.set(router, state);
-    }
-    return state;
-  };
 
   // mounted empty ahead of time so screen readers register the live region before its text mutates
-  const ensureRegion = (router) => {
-    const state = getState(router);
-    if (!state.element && globalThis.document?.body) {
+  proto.ensureAnnouncer = function () {
+    this.announcer ??= { element: null, queued: null, lastText: '' };
+    if (!this.announcer.element && globalThis.document?.body) {
       const element = globalThis.document.createElement('div');
       element.setAttribute('aria-live', politeness);
       element.setAttribute('aria-atomic', 'true');
       element.setAttribute('data-router-announcer', '');
       element.style.cssText = LIVE_REGION_STYLE;
       globalThis.document.body.appendChild(element);
-      state.element = element;
+      this.announcer.element = element;
     }
-    return state.element;
+    return this.announcer;
   };
 
   proto.start = function () {
-    ensureRegion(this);
+    this.ensureAnnouncer();
     return start.call(this);
   };
 
   proto.intercepted = function (matched, event) {
-    const state = getState(this);
-    state.queued = null;
-    ensureRegion(this);
+    const announcer = this.ensureAnnouncer();
+    announcer.queued = null;
     // clearing on departure makes back-to-back routes with identical titles announce again on settle
-    if (state.element) {
-      state.element.textContent = '';
+    if (announcer.element) {
+      announcer.element.textContent = '';
     }
     return intercepted.call(this, matched, event);
   };
@@ -63,43 +52,40 @@ export default ({
     if (!text) {
       return;
     }
-    const state = getState(this);
+    const announcer = this.ensureAnnouncer();
     const routeMoved = previous.route !== this.page?.route
       || !isEqual(previous.params, this.page?.params)
       || event.navigationType === 'reload';
 
-    if (routeMoved || text !== state.lastText) {
-      state.queued = text;
+    if (routeMoved || text !== announcer.lastText) {
+      announcer.queued = text;
     }
   };
 
   proto.settled = function (event) {
     const result = settled.call(this, event);
-    const state = states.get(this);
-    if (state?.queued) {
-      const region = ensureRegion(this);
-      if (region) {
-        region.textContent = state.queued;
-        state.lastText = state.queued;
+    if (this.announcer?.queued) {
+      const announcer = this.ensureAnnouncer();
+      if (announcer.element) {
+        announcer.element.textContent = announcer.queued;
+        announcer.lastText = announcer.queued;
       }
-      state.queued = null;
+      announcer.queued = null;
     }
     return result;
   };
 
   proto.failed = function (error, event) {
-    const state = states.get(this);
-    if (state) {
-      state.queued = null;
+    if (this.announcer) {
+      this.announcer.queued = null;
     }
     return failed.call(this, error, event);
   };
 
   proto.stop = function () {
-    const state = states.get(this);
-    if (state) {
-      state.element?.remove();
-      states.delete(this);
+    if (this.announcer) {
+      this.announcer.element?.remove();
+      this.announcer = null;
     }
     return stop.call(this);
   };

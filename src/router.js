@@ -51,15 +51,18 @@ export class Router extends Route {
     loadingMin: '500ms',
     restoreScroll: null,
     attachGlobal: 'router',
+    // whether data recomputed outside a navigation moved. plain data has one way to know, a deep
+    // compare, and a render costs more than the walk; a reactive router's signals decide instead
+    dataChanged: (previous, next) => !isEqual(next, previous),
   };
 
   constructor(options = {}) {
-    super(extend({}, Router.defaults, options));
+    super(extend({}, new.target.defaults, options));
 
     // the resolved settings in one place, for the console and for anything that introspects
-    this.config = extend({}, Router.defaults, options);
+    this.config = extend({}, new.target.defaults, options);
     this.base = this.normalizeBase(this.base);
-    this.views = { ...Router.defaults.views, ...options.views };
+    this.views = { ...new.target.defaults.views, ...options.views };
     this.layout ??= this.views.layout;
 
     this.routesByName ??= new Map();
@@ -572,17 +575,11 @@ export class Router extends Route {
     const entryKey = event.navigationType === 'traverse' ? event.destination.key : null;
     // the visit's result rides its entry: a traverse back shows what was seen, reload() refreshes it
     const cached = entryKey ? this.entryCache?.get(entryKey) : null;
-    const work = {
-      matched,
-      signal: event.signal,
-      reload: event.navigationType === 'reload',
-      previous: this.page,
-      settled: false,
-      result: null,
-      redirected: null,
-    };
-    work.guards = this.runGuards(matched, work);
-    work.ready = work.guards.then((guard) => guard ?? cached ?? this.runData(matched, work));
+    // what the cascade knows of the navigation: its signal, whether it is a reload, the page it leaves
+    const navigation = { signal: event.signal, reload: event.navigationType === 'reload', previous: this.page };
+    const work = { matched, settled: false, result: null, redirected: null };
+    work.guards = this.runGuards(matched, navigation);
+    work.ready = work.guards.then((guard) => guard ?? cached ?? this.runData(matched, navigation));
     work.ready.then(
       (result) => {
         work.settled = true;
@@ -689,21 +686,43 @@ export class Router extends Route {
               Cascade
   *******************************/
 
-  // the base seam: a plain call. the reactive scaffold overrides it
+  // the plain seam
   evaluate(route, fn, context) {
     return isFunction(fn) ? fn(context) : fn;
   }
 
-  async runCascade(matched, work) {
-    return (await this.runGuards(matched, work)) ?? this.runData(matched, work);
+  // one seam per hook, each a plain call here. the reactive scaffold wraps each in its own way,
+  // because each has its own consequence when what it read moves: a redirect moves the page, a
+  // refused permission lands as it would at navigation, data replaces its slice, a title its title
+  evaluateRedirect(route, fn, context) {
+    return this.evaluate(route, fn, context);
   }
 
-  contextFor(route, matched, data, signal = route.abortSignal) {
-    return { params: matched.params, query: matched.query, signal, user: this.user, route, router: this, data };
+  evaluatePermission(route, fn, context) {
+    return this.evaluate(route, fn, context);
+  }
+
+  evaluateData(route, fn, context) {
+    return this.evaluate(route, fn, context);
+  }
+
+  evaluateTitle(route, fn, context) {
+    return this.evaluate(route, fn, context);
+  }
+
+  async runCascade(matched, navigation) {
+    return (await this.runGuards(matched, navigation)) ?? this.runData(matched, navigation);
+  }
+
+  // what a hook sees. data is what the routes above settled, merged, and slices the same route by
+  // route, none before the data phase; the signal is the navigation's while one is in flight and
+  // the route's own otherwise
+  contextFor(route, matched, { data = {}, slices = [], signal = route.abortSignal } = {}) {
+    return { params: matched.params, query: matched.query, signal, user: this.user, route, router: this, data, slices };
   }
 
   // null when the route may be entered, otherwise the redirect or forbidden result
-  async runGuards(matched, work) {
+  async runGuards(matched, { signal }) {
     if (!matched) {
       return null;
     }
@@ -712,14 +731,14 @@ export class Router extends Route {
 
     for (const ancestor of currentRoutes) {
       if (ancestor.redirect) {
-        const target = await this.evaluate(ancestor, ancestor.redirect, this.contextFor(ancestor, matched, {}, work.signal));
+        const target = await this.evaluateRedirect(ancestor, ancestor.redirect, this.contextFor(ancestor, matched, { signal }));
         return { status: 'redirect', redirect: this.href(target, this.paramsFor(target, params)), route, params, query };
       }
     }
 
     for (const ancestor of currentRoutes) {
       if (ancestor.permission !== undefined) {
-        const allowed = await this.evaluate(ancestor, ancestor.permission, this.contextFor(ancestor, matched, {}, work.signal));
+        const allowed = await this.evaluatePermission(ancestor, ancestor.permission, this.contextFor(ancestor, matched, { signal }));
         if (!allowed) {
           if ((!this.user || !this.views?.forbidden) && this.signInRoute) {
             return { status: 'redirect', redirect: this.href(this.signInRoute), route, params, query };
@@ -728,7 +747,7 @@ export class Router extends Route {
             this.resolveView(this.views?.forbidden),
             this.resolveLayouts(currentRoutes),
             this.resolveSlots(currentRoutes),
-            this.evaluateTitles(currentRoutes, matched, {}, work.signal),
+            this.evaluateTitles(currentRoutes, matched, { signal }),
           ]);
           return this.buildCascadeResult(matched, { status: 'forbidden', view, layouts, slots, data: {}, slices: [], title, titles });
         }
@@ -738,11 +757,11 @@ export class Router extends Route {
     return null;
   }
 
-  // one slice per route in chain order. an ancestor whose own keys did not move keeps its slice and
-  // never runs; from the first route that moved, everything below it runs with fresh data above it
-  async runData(matched, work) {
+  // one slice per route in chain order. a route runs when the url as it sees it moved, the params
+  // and query keys it can see with its ancestors' included, on a reload, or for another user;
+  // otherwise it keeps its slice and never runs
+  async runData(matched, { signal, reload = false, previous = null }) {
     const { route, currentRoutes } = matched;
-    const previous = work?.previous;
 
     const [view, layouts, slots] = await Promise.all([
       this.resolveView(route.view),
@@ -752,7 +771,7 @@ export class Router extends Route {
 
     const data = {};
     const slices = [];
-    let changed = !previous || work?.reload || previous.user !== this.user;
+    const everyRoute = !previous || reload || previous.user !== this.user;
     let flaggedNotFound = false;
     const notFoundSymbol = Symbol('notFound');
     const notFound = () => {
@@ -761,31 +780,32 @@ export class Router extends Route {
     };
 
     for (const ancestor of currentRoutes) {
-      const kept = !changed && previous.slices?.find((slice) => slice.route === ancestor);
-      if (kept && this.ownKeysUnchanged(ancestor, previous, matched)) {
+      const kept = !everyRoute && previous.slices?.find((slice) => slice.route === ancestor);
+      if (kept && !this.keysMoved(ancestor, previous, matched)) {
         slices.push(kept);
         extend(data, kept.data);
         continue;
       }
-      changed = true;
 
-      const slice = { route: ancestor, data: {}, title: null };
+      let sliceData = {};
       if (ancestor.data !== undefined) {
-        const rawData = await this.evaluate(ancestor, ancestor.data, { ...this.contextFor(ancestor, matched, { ...data }, work.signal), notFound });
+        const rawData = await this.evaluateData(ancestor, ancestor.data, { ...this.contextFor(ancestor, matched, { data: { ...data }, slices: [...slices], signal }), notFound });
         if (flaggedNotFound || rawData === notFoundSymbol) {
           const [notFoundView, { title, titles }] = await Promise.all([
             this.resolveView(this.views?.notFound),
-            this.evaluateTitles(currentRoutes, matched, data, work.signal),
+            this.evaluateTitles(currentRoutes, matched, { data, slices, signal }),
           ]);
           return this.buildCascadeResult(matched, { status: 'notFound', view: notFoundView, layouts, slots, data, slices, title, titles });
         }
         if (isPlainObject(rawData)) {
-          slice.data = await this.resolveDataSlice(rawData);
-          extend(data, slice.data);
+          sliceData = await this.resolveDataSlice(rawData);
         }
       }
+      // the slice exists before the title and the routes below run, so they can read it
+      const slice = this.sliceOf(ancestor, sliceData);
+      extend(data, slice.data);
       if (ancestor.title !== undefined) {
-        slice.title = await this.evaluateTitle(ancestor, matched, { ...data }, work.signal);
+        slice.title = await this.titleOf(ancestor, matched, { data: { ...data }, slices: [...slices, slice], signal });
       }
       slices.push(slice);
     }
@@ -794,22 +814,31 @@ export class Router extends Route {
     return this.buildCascadeResult(matched, { status: 'ok', view, layouts, slots, data, slices, title: titles.at(-1) ?? '', titles });
   }
 
-  ownKeysUnchanged(route, previous, matched) {
-    const { params, query } = route.ownKeys;
-    return params.every((key) => isEqual(previous.params?.[key], matched.params[key]))
-      && query.every((key) => isEqual(previous.query?.[key], matched.query[key]));
+  // a route's share of the page. the reactive scaffold gives it a signal the routes below read
+  sliceOf(route, data) {
+    return { route, data, title: null };
   }
 
-  async evaluateTitle(route, matched, data, signal) {
-    const value = await this.evaluate(route, route.title, this.contextFor(route, matched, data, signal));
+  // the url as this route sees it: every param and query key in its specs, ancestors' included
+  keysMoved(route, previous, matched) {
+    return Object.keys(route.paramSpecs).some((key) => !isEqual(previous.params?.[key], matched.params[key]))
+      || Object.keys(route.querySpecs).some((key) => !isEqual(previous.query?.[key], matched.query[key]));
+  }
+
+  async titleOf(route, matched, { data = {}, slices = [], signal } = {}) {
+    const value = await this.evaluateTitle(route, route.title, this.contextFor(route, matched, { data, slices, signal }));
+    return this.titleText(value);
+  }
+
+  titleText(value) {
     return value === undefined || value === null || value === '' ? null : String(value);
   }
 
-  async evaluateTitles(currentRoutes, matched, data, signal) {
+  async evaluateTitles(currentRoutes, matched, { data = {}, slices = [], signal } = {}) {
     const titles = [];
     for (const ancestor of currentRoutes) {
       if (ancestor.title !== undefined) {
-        const title = await this.evaluateTitle(ancestor, matched, data, signal);
+        const title = await this.titleOf(ancestor, matched, { data, slices, signal });
         if (title !== null) {
           titles.push(title);
         }
@@ -938,10 +967,12 @@ export class Router extends Route {
   *******************************/
 
   // the page's chain is the active set. settle diffs it against the page before: destroyed in
-  // reverse, then created and updated in chain order
+  // reverse, then created and updated in chain order. a retained route whose slice is the one it
+  // had did not move and hears nothing
   settleRoutes(previous, page) {
     const before = previous?.chain ?? [];
     const after = page.chain ?? [];
+    const sliceOf = (of, route) => of?.slices?.find((slice) => slice.route === route) ?? null;
 
     each([...before].reverse(), (route) => {
       if (!inArray(route, after)) {
@@ -949,12 +980,12 @@ export class Router extends Route {
       }
     });
     each(after, (route) => {
-      if (inArray(route, before)) {
-        this.onRouteUpdated(route, this.lifecycleContext(route, page, previous));
-      }
-      else {
+      if (!inArray(route, before)) {
         route.activate();
         this.onRouteCreated(route, this.lifecycleContext(route, page, previous));
+      }
+      else if (sliceOf(page, route) !== sliceOf(previous, route)) {
+        this.onRouteUpdated(route, this.lifecycleContext(route, page, previous));
       }
     });
   }
@@ -992,56 +1023,80 @@ export class Router extends Route {
     return route.onDestroyed?.(context);
   }
 
-  // what the routes above this one settled, merged, as a data function sees it
-  dataAbove(route) {
-    const data = {};
-    for (const slice of this.page?.slices ?? []) {
-      if (slice.route === route) {
-        break;
-      }
-      extend(data, slice.data);
+  // what a moved hook does to the standing page, each the same landing as at navigation
+
+  async redirectChanged(route, target) {
+    const resolved = await target;
+    if (resolved && inArray(route, this.page?.chain ?? [])) {
+      this.navigator.navigate(this.href(resolved, this.paramsFor(resolved, this.page.params)), { history: 'replace' });
     }
-    return data;
   }
 
-  // a route's slice recomputed outside a navigation: the routes below it run again with fresh data
-  // above them, the page re-merges, and it renders through the same moment a navigation uses
-  async replaceSlice(route, value) {
-    const page = this.page;
-    if (!page?.slices || !inArray(route, page.chain)) {
+  async permissionChanged(route, allowed) {
+    if (!inArray(route, this.page?.chain ?? [])) {
       return;
     }
-    const index = page.chain.indexOf(route);
-    const matched = { route: page.route, params: page.params, query: page.query, chain: page.chain, currentRoutes: page.chain };
+    if (await allowed) {
+      // a forbidden page whose guard now allows enters the route, as a fresh navigation would
+      if (this.page.status === 'forbidden') {
+        this.navigator.reload();
+      }
+      return;
+    }
+    if ((!this.user || !this.views?.forbidden) && this.signInRoute) {
+      this.navigator.navigate(this.href(this.signInRoute), { history: 'replace' });
+      return;
+    }
+    this.page = { ...this.page, view: await this.resolveView(this.views?.forbidden), status: 'forbidden' };
+    await this.renderView(this.page);
+    this.notify();
+  }
+
+  async updateTitle(route, value) {
+    const slices = this.page?.slices;
+    const slice = slices?.find((item) => item.route === route);
+    if (!slice) {
+      return;
+    }
+    const title = this.titleText(await value);
+    // a navigation settled meanwhile, and this title belongs to the page before it
+    if (this.page?.slices !== slices || title === slice.title) {
+      return;
+    }
+    slice.title = title;
+    await this.updatePage();
+  }
+
+  // a route's data recomputed outside a navigation: the slice is set, the page re-reads itself and
+  // renders. anything that read the slice follows on its own
+  async updateData(route, value) {
+    const slices = this.page?.slices;
+    const slice = slices?.find((item) => item.route === route);
+    if (!slice) {
+      return;
+    }
+    const resolved = await value;
+    const data = isPlainObject(resolved) ? await this.resolveDataSlice(resolved) : {};
+    // a navigation settled meanwhile, and this slice belongs to the page before it
+    if (this.page?.slices !== slices || !this.dataChanged(slice.data, data)) {
+      return;
+    }
+    this.setSlice(slice, data);
+    await this.updatePage();
+  }
+
+  setSlice(slice, data) {
+    slice.data = data;
+  }
+
+  // the page re-read from its slices, which several updates in one tick share, so none of them
+  // writes over another's
+  async updatePage() {
+    const { slices } = this.page;
     const data = {};
-    each(page.slices.slice(0, index), (slice) => extend(data, slice.data));
-
-    const slices = page.slices.slice(0, index);
-    const fresh = { route, data: isPlainObject(await value) ? await this.resolveDataSlice(await value) : {}, title: null };
-    extend(data, fresh.data);
-    fresh.title = route.title !== undefined ? await this.evaluateTitle(route, matched, { ...data }, route.abortSignal) : null;
-    slices.push(fresh);
-
-    for (const below of page.chain.slice(index + 1)) {
-      const slice = { route: below, data: {}, title: null };
-      if (below.data !== undefined) {
-        const rawData = await this.evaluate(below, below.data, this.contextFor(below, matched, { ...data }));
-        if (isPlainObject(rawData)) {
-          slice.data = await this.resolveDataSlice(rawData);
-          extend(data, slice.data);
-        }
-      }
-      if (below.title !== undefined) {
-        slice.title = await this.evaluateTitle(below, matched, { ...data });
-      }
-      slices.push(slice);
-    }
-    if (this.page !== page) {
-      return;
-    }
-
+    each(slices, (slice) => extend(data, slice.data));
     const titles = slices.map((slice) => slice.title).filter((title) => title !== null);
-    this.page = { ...page, data, slices, title: titles.at(-1) ?? '', titles };
+    this.page = { ...this.page, data, title: titles.at(-1) ?? '', titles };
     if (globalThis.document && this.page.title) {
       globalThis.document.title = this.page.title;
     }

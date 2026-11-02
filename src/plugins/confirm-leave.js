@@ -11,58 +11,6 @@ export default ({
   const { onNavigate } = navProto;
 
   const bypassKey = Symbol('nav-router/bypass-confirm');
-  const states = new WeakMap();
-  const pendingDecisions = new WeakMap();
-
-  const getState = (router) => {
-    let state = states.get(router);
-    if (!state) {
-      state = { guards: new Set(), unloadHandler: null };
-      states.set(router, state);
-    }
-    return state;
-  };
-
-  const hasBlockers = (router) => Boolean(
-    states.get(router)?.guards.size
-    || router.page?.chain?.some((route) => route.canLeave !== undefined),
-  );
-
-  const syncUnloadListener = (router) => {
-    if (!globalThis.window) {
-      return;
-    }
-    const state = getState(router);
-    const needed = hasBlockers(router);
-    if (needed && !state.unloadHandler) {
-      // attached only while a blocker is live so idle pages stay eligible for bfcache
-      state.unloadHandler = (event) => {
-        const context = { router, from: router.page, destination: null, navigationType: 'unload', event };
-        let blocked = false;
-        each([...(router.page?.chain ?? [])].reverse(), (route) => {
-          if (!blocked && route.canLeave !== undefined) {
-            const result = isFunction(route.canLeave) ? route.canLeave({ ...context, route }) : route.canLeave;
-            blocked = result === false || (isString(result) && result.length > 0);
-          }
-        });
-        each(state.guards, (guard) => {
-          if (!blocked) {
-            const result = guard(context);
-            blocked = result === false || (isString(result) && result.length > 0);
-          }
-        });
-        if (blocked) {
-          event.preventDefault();
-          event.returnValue = '';
-        }
-      };
-      globalThis.window.addEventListener('beforeunload', state.unloadHandler);
-    }
-    else if (!needed && state.unloadHandler) {
-      globalThis.window.removeEventListener('beforeunload', state.unloadHandler);
-      state.unloadHandler = null;
-    }
-  };
 
   const resolveDecision = (raw, context) => {
     if (isPromise(raw)) {
@@ -87,17 +35,61 @@ export default ({
     return true;
   };
 
+  routerProto.hasLeaveBlockers = function () {
+    return Boolean(
+      this.leaveGuards?.size
+      || this.page?.chain?.some((route) => route.canLeave !== undefined),
+    );
+  };
+
+  routerProto.onBeforeUnload = function (event) {
+    const context = { router: this, from: this.page, destination: null, navigationType: 'unload', event };
+    let blocked = false;
+    each([...(this.page?.chain ?? [])].reverse(), (route) => {
+      if (!blocked && route.canLeave !== undefined) {
+        const result = isFunction(route.canLeave) ? route.canLeave({ ...context, route }) : route.canLeave;
+        blocked = result === false || (isString(result) && result.length > 0);
+      }
+    });
+    each(this.leaveGuards ?? [], (guard) => {
+      if (!blocked) {
+        const result = guard(context);
+        blocked = result === false || (isString(result) && result.length > 0);
+      }
+    });
+    if (blocked) {
+      event.preventDefault();
+      event.returnValue = '';
+    }
+  };
+
+  // attached only while a blocker is live so idle pages stay eligible for bfcache
+  routerProto.syncBeforeUnload = function () {
+    if (!globalThis.window) {
+      return;
+    }
+    const needed = this.hasLeaveBlockers();
+    if (needed && !this.handleBeforeUnload) {
+      this.handleBeforeUnload = (event) => this.onBeforeUnload(event);
+      globalThis.window.addEventListener('beforeunload', this.handleBeforeUnload);
+    }
+    else if (!needed && this.handleBeforeUnload) {
+      globalThis.window.removeEventListener('beforeunload', this.handleBeforeUnload);
+      this.handleBeforeUnload = null;
+    }
+  };
+
   routerProto.confirmLeave = function (guard, { signal } = {}) {
     if (!isFunction(guard)) {
       throw new TypeError('Router.confirmLeave: expected a guard function');
     }
-    const state = getState(this);
-    state.guards.add(guard);
-    syncUnloadListener(this);
+    this.leaveGuards ??= new Set();
+    this.leaveGuards.add(guard);
+    this.syncBeforeUnload();
 
     const dispose = () => {
-      state.guards.delete(guard);
-      syncUnloadListener(this);
+      this.leaveGuards?.delete(guard);
+      this.syncBeforeUnload();
     };
     signal?.addEventListener('abort', dispose, { once: true });
     return dispose;
@@ -128,12 +120,12 @@ export default ({
       if (route.canLeave === undefined) {
         return;
       }
-      const leaving = !matched || !inArray(route, matched.chain) || !router.ownKeysUnchanged(route, router.page, matched);
+      const leaving = !matched || !inArray(route, matched.chain) || router.keysMoved(route, router.page, matched);
       if (leaving) {
         checks.push(() => (isFunction(route.canLeave) ? route.canLeave({ ...context, route }) : route.canLeave));
       }
     });
-    each(states.get(router)?.guards ?? [], (guard) => {
+    each(router.leaveGuards ?? [], (guard) => {
       checks.push(() => guard(context));
     });
 
@@ -142,6 +134,7 @@ export default ({
     }
 
     const fromKey = this.entry?.key ?? null;
+    const fromUrl = this.entry?.url ?? router.page?.url ?? null;
     const decision = runChecks(checks, context);
 
     if (!isPromise(decision)) {
@@ -163,25 +156,31 @@ export default ({
       return;
     }
 
-    if (event.signal) {
-      pendingDecisions.set(event.signal, { decision, fromKey });
-    }
+    const pending = { signal: event.signal ?? null, decision, fromKey, fromUrl };
+    router.pendingLeave = pending;
+    event.signal?.addEventListener('abort', () => {
+      if (router.pendingLeave === pending) {
+        router.pendingLeave = null;
+      }
+    }, { once: true });
     return onNavigate.call(this, event);
   };
 
   // hold destination guards and data until an open async leave prompt answers
-  routerProto.runGuards = async function (matched, work) {
-    const pending = work?.signal ? pendingDecisions.get(work.signal) : null;
-    if (pending && !(await pending.decision)) {
-      return { status: 'cancelled' };
+  routerProto.runGuards = async function (matched, navigation) {
+    const pending = this.pendingLeave;
+    if (pending && (!navigation?.signal || pending.signal === navigation.signal)) {
+      if (!(await pending.decision)) {
+        return { status: 'cancelled' };
+      }
     }
-    return runGuards.call(this, matched, work);
+    return runGuards.call(this, matched, navigation);
   };
 
   routerProto.beforeCommit = async function (work, event, controller) {
-    const pending = event?.signal ? pendingDecisions.get(event.signal) : null;
-    if (pending) {
-      pendingDecisions.delete(event.signal);
+    const pending = this.pendingLeave;
+    if (pending && (!event?.signal || pending.signal === event.signal)) {
+      this.pendingLeave = null;
       if (!(await pending.decision)) {
         throw new DOMException('Navigation cancelled', 'AbortError');
       }
@@ -190,17 +189,20 @@ export default ({
   };
 
   routerProto.afterCommit = async function (work, event, precommitRan) {
-    const pending = !precommitRan && event?.signal ? pendingDecisions.get(event.signal) : null;
-    if (pending) {
-      pendingDecisions.delete(event.signal);
+    const pending = !precommitRan ? this.pendingLeave : null;
+    if (pending && (!event?.signal || pending.signal === event.signal)) {
+      this.pendingLeave = null;
       if (!(await pending.decision)) {
-        if (pending.fromKey) {
-          const timer = setTimeout(() => {
-            this.timers.delete(timer);
+        const timer = setTimeout(() => {
+          this.timers.delete(timer);
+          if (pending.fromKey && pending.fromKey !== this.entry?.key) {
             this.navigator.traverseTo(pending.fromKey, { info: { [bypassKey]: true } });
-          }, 0);
-          this.timers.add(timer);
-        }
+          }
+          else if (pending.fromUrl) {
+            this.navigator.navigate(pending.fromUrl, { history: 'replace', info: { [bypassKey]: true } });
+          }
+        }, 0);
+        this.timers.add(timer);
         throw new DOMException('Navigation cancelled', 'AbortError');
       }
     }
@@ -209,18 +211,17 @@ export default ({
 
   routerProto.applyCascade = async function (matched, resolved, event = null) {
     await applyCascade.call(this, matched, resolved, event);
-    syncUnloadListener(this);
+    this.syncBeforeUnload();
   };
 
   routerProto.stop = function () {
-    const state = states.get(this);
-    if (state) {
-      if (state.unloadHandler && globalThis.window) {
-        globalThis.window.removeEventListener('beforeunload', state.unloadHandler);
-      }
-      state.guards.clear();
-      states.delete(this);
+    if (this.handleBeforeUnload && globalThis.window) {
+      globalThis.window.removeEventListener('beforeunload', this.handleBeforeUnload);
+      this.handleBeforeUnload = null;
     }
+    this.leaveGuards?.clear();
+    this.leaveGuards = null;
+    this.pendingLeave = null;
     return stop.call(this);
   };
 };

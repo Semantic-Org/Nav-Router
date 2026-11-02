@@ -1,4 +1,4 @@
-import { each, extend, isFunction, isPlainObject } from '@semantic-ui/utils';
+import { each, extend, isArray, isFunction, isPlainObject } from '@semantic-ui/utils';
 
 const PROPERTY_PREFIX = /^(og|article|profile|book|fb):/;
 
@@ -10,16 +10,6 @@ export default ({
 } = {}, Router) => {
   const proto = Router.prototype;
   const { renderView, stop } = proto;
-  const managed = new WeakMap();
-
-  const getRecords = (router) => {
-    let records = managed.get(router);
-    if (!records) {
-      records = new Map();
-      managed.set(router, records);
-    }
-    return records;
-  };
 
   const findExistingTag = (head, key) => {
     if (key === 'canonical') {
@@ -63,14 +53,15 @@ export default ({
     }
   };
 
-  const syncHead = async (router, page) => {
+  proto.syncHead = async function (page) {
     const doc = globalThis.document;
     if (!page || page.status === 'loading') {
       return;
     }
 
     if (isFunction(formatTitle)) {
-      const formatted = formatTitle(page.title ?? '', page.titles ?? [], page);
+      const baseTitle = isArray(page.titles) ? (page.titles.at(-1) ?? '') : (page.title ?? '');
+      const formatted = formatTitle(baseTitle, page.titles ?? [], page);
       if (formatted != null) {
         page.title = String(formatted);
         if (doc) {
@@ -90,9 +81,9 @@ export default ({
           params: page.params ?? {},
           query: page.query ?? {},
           data: page.data ?? {},
-          user: router.user,
+          user: this.user,
           route: ancestor,
-          router,
+          router: this,
         };
         const raw = isFunction(ancestor.meta) ? await ancestor.meta(context) : ancestor.meta;
         if (isPlainObject(raw)) {
@@ -102,11 +93,11 @@ export default ({
     }
 
     // bail if a newer navigation replaced the page while an async meta function was settling
-    if (router.page && router.page !== page) {
+    if (this.page && this.page !== page) {
       return;
     }
 
-    const records = getRecords(router);
+    const records = (this.headTags ??= new Map());
     const activeKeys = new Set();
 
     each(merged, (value, key) => {
@@ -139,18 +130,17 @@ export default ({
   };
 
   proto.renderView = async function (page, event = null) {
-    await syncHead(this, page);
+    await this.syncHead(page);
     return renderView.call(this, page, event);
   };
 
   proto.stop = function () {
-    const records = managed.get(this);
-    if (records) {
-      for (const [key, record] of records.entries()) {
+    if (this.headTags) {
+      for (const [key, record] of this.headTags.entries()) {
         restoreEntry(key, record);
       }
-      records.clear();
-      managed.delete(this);
+      this.headTags.clear();
+      this.headTags = null;
     }
     return stop.call(this);
   };

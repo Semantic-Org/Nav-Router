@@ -50,8 +50,6 @@ export class Route {
     this.segments = this.path === '/' ? [] : this.path.slice(1).split('/');
     this.paramSpecs = this.buildSpecs('params');
     this.querySpecs = this.buildSpecs('query');
-    // the keys this route declared itself, the ones a navigation can move without touching its ancestors
-    this.ownKeys = { params: Object.keys(this.params ?? {}), query: Object.keys(this.query ?? {}) };
 
     if (this.name && this.router && (!this.isIndex || !this.router.routesByName.has(this.name))) {
       this.router.routesByName.set(this.name, this);
