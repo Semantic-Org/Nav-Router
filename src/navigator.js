@@ -1,5 +1,9 @@
+import { each, isArray, isEqual, isPlainObject, noop } from '@semantic-ui/utils';
+
 import { IS_NAVIGATOR } from './helpers/identity.js';
 
+// the platform seam: window.navigation projected as plain fields, the verbs, the filter, and the
+// moments handed to the router by name. nothing here decides a route or holds one
 export class Navigator {
 
   // brand navigator
@@ -7,7 +11,22 @@ export class Navigator {
   static [Symbol.hasInstance](value) { return !!value?.[IS_NAVIGATOR]; }
 
   constructor(router) {
-    // store router reference, internal info identity symbol, and precommit support flag
+    this.router = router;
+    // per instance, so two routers on one page never claim each other's navigations
+    this.infoKey = Symbol('nav-router/info');
+    this.attached = false;
+    this.boundEntries = new WeakSet();
+
+    this.entry = null;
+    this.entries = [];
+    this.activation = null;
+    this.transition = null;
+
+    this.handleNavigate = (event) => this.onNavigate(event);
+    this.handleEntryChange = (event) => this.onEntryChange(event);
+    this.handleSuccess = (event) => this.onSuccess(event);
+    this.handleError = (event) => this.onError(event);
+    this.handlePageShow = (event) => this.onPageShow(event);
   }
 
   /*******************************
@@ -15,24 +34,86 @@ export class Navigator {
   *******************************/
 
   attach() {
-    // add single listeners for navigate, currententrychange, navigatesuccess, navigateerror, pageshow
-    // detect pre-hydration traversal mismatch between activation.entry.key and currentEntry.key
+    if (this.attached) {
+      return;
+    }
+
+    const nav = globalThis.navigation;
+    if (nav) {
+      nav.addEventListener('navigate', this.handleNavigate);
+      nav.addEventListener('currententrychange', this.handleEntryChange);
+      nav.addEventListener('navigatesuccess', this.handleSuccess);
+      nav.addEventListener('navigateerror', this.handleError);
+    }
+    if (globalThis.window) {
+      globalThis.window.addEventListener('pageshow', this.handlePageShow);
+    }
+    this.attached = true;
+    this.project();
+
+    // a back or forward pressed before this listener existed left activation and currentEntry apart
+    if (nav?.activation?.entry?.key && nav.currentEntry?.key && nav.activation.entry.key !== nav.currentEntry.key) {
+      this.onEntryChange({ navigationType: 'traverse', from: nav.activation.entry });
+    }
   }
 
   detach() {
-    // remove all window.navigation and window event listeners
+    if (!this.attached) {
+      return;
+    }
+
+    const nav = globalThis.navigation;
+    if (nav) {
+      nav.removeEventListener('navigate', this.handleNavigate);
+      nav.removeEventListener('currententrychange', this.handleEntryChange);
+      nav.removeEventListener('navigatesuccess', this.handleSuccess);
+      nav.removeEventListener('navigateerror', this.handleError);
+    }
+    if (globalThis.window) {
+      globalThis.window.removeEventListener('pageshow', this.handlePageShow);
+    }
+    this.attached = false;
   }
 
   /*******************************
            Platform Reads
   *******************************/
 
+  // the platform's current truth, re-read at every moment that can move it
+  project() {
+    const nav = globalThis.navigation;
+    this.entry = nav?.currentEntry ?? null;
+    this.entries = nav?.entries?.() ?? [];
+    this.activation = nav?.activation ?? null;
+    each(this.entries, (entry) => {
+      if (entry && !this.boundEntries.has(entry)) {
+        this.boundEntries.add(entry);
+        entry.addEventListener?.('dispose', () => this.onDispose(entry), { once: true });
+      }
+    });
+  }
+
+  // back inside the app: the previous entry is same-document and one of ours
   get canGoBack() {
-    // return true if navigation.canGoBack and previous entry is same-document
+    const nav = globalThis.navigation;
+    if (!nav?.canGoBack) {
+      return false;
+    }
+    const currentIndex = nav.currentEntry?.index ?? -1;
+    if (currentIndex > 0) {
+      const previous = (nav.entries?.() ?? [])[currentIndex - 1];
+      if (!previous || previous.sameDocument === false) {
+        return false;
+      }
+      if (previous.url && !this.router.match(previous.url)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   get canGoForward() {
-    // return navigation.canGoForward
+    return Boolean(globalThis.navigation?.canGoForward);
   }
 
   /*******************************
@@ -40,30 +121,126 @@ export class Navigator {
   *******************************/
 
   navigate(url, { state, info, history = 'auto', resetScroll = true, resetFocus = true } = {}) {
-    // tag info with navigator identity and per-navigation resetScroll/resetFocus booleans
-    // call navigation.navigate(url, { state, info, history }) and attach catch to committed/finished
+    const nav = globalThis.navigation;
+    if (!nav) {
+      return this.documentLoad(() => (history === 'replace' ? globalThis.location.replace(url) : globalThis.location.assign(url)));
+    }
+    // a replace without state would wipe the entry's memory
+    const resolvedState = state === undefined && history === 'replace'
+      ? nav.currentEntry?.getState?.()
+      : state;
+
+    return this.catchNavigation(
+      nav.navigate(url, {
+        state: resolvedState,
+        info: this.tagInfo(info, { resetScroll, resetFocus }),
+        history,
+      }),
+    );
   }
 
   reload({ state, info } = {}) {
-    // tag info with navigator identity so onNavigate intercepts the reload
-    // call navigation.reload({ state, info }) and catch promises
+    const nav = globalThis.navigation;
+    if (!nav) {
+      return this.documentLoad(() => globalThis.location.reload());
+    }
+    const resolvedState = state === undefined ? nav.currentEntry?.getState?.() : state;
+    return this.catchNavigation(
+      nav.reload({
+        state: resolvedState,
+        info: this.tagInfo(info, { reload: true, resetScroll: false, resetFocus: false }),
+      }),
+    );
   }
 
   back(fallbackUrl) {
-    // call navigation.back() if canGoBack, otherwise navigate(fallbackUrl, { history: 'replace' })
+    if (this.canGoBack) {
+      return this.catchNavigation(globalThis.navigation.back());
+    }
+    return this.navigate(fallbackUrl ?? (this.router.base || '/'), { history: 'push' });
   }
 
   forward() {
-    // call navigation.forward() if canGoForward and catch promises
+    if (this.canGoForward) {
+      return this.catchNavigation(globalThis.navigation.forward());
+    }
+    return this.catchNavigation();
   }
 
   traverseTo(key, { info } = {}) {
-    // call navigation.traverseTo(key, { info }) and catch promises
+    return this.catchNavigation(
+      globalThis.navigation?.traverseTo?.(key, {
+        info: this.tagInfo(info, { traverse: true }),
+      }),
+    );
   }
 
+  tagInfo(info, meta) {
+    return {
+      ...(isPlainObject(info) ? info : (info !== undefined ? { value: info } : {})),
+      [this.infoKey]: meta,
+    };
+  }
+
+  // the platform marks finished as handled and committed not, so both are caught here
+  catchNavigation(result) {
+    if (!result) {
+      return { committed: Promise.resolve(), finished: Promise.resolve() };
+    }
+    result.committed?.catch(noop);
+    result.finished?.catch(noop);
+    return result;
+  }
+
+  // the platform's own shape for a navigation that leaves the document: promises that never settle
+  documentLoad(load) {
+    load();
+    return { committed: new Promise(noop), finished: new Promise(noop) };
+  }
+
+  deferNavigate(url, options) {
+    const timer = setTimeout(() => {
+      this.router.timers.delete(timer);
+      this.navigate(url, options);
+    }, 0);
+    this.router.timers.add(timer);
+  }
+
+  /*******************************
+           Scroll Memory
+  *******************************/
+
+  // the platform restores the viewport and nothing else. the containers router.restoreScroll
+  // names ride the entry's state, saved on the way out and put back on a traverse
+
   saveScroll() {
-    // read scroll offsets for router.restoreScroll selectors
-    // merge into currentEntry.getState() via navigation.updateCurrentEntry
+    const selectors = this.router.restoreScroll;
+    const nav = globalThis.navigation;
+    if (!selectors || !globalThis.document || !nav?.currentEntry) {
+      return;
+    }
+    const offsets = {};
+    each(isArray(selectors) ? selectors : [selectors], (selector) => {
+      const element = globalThis.document.querySelector(selector);
+      if (element) {
+        offsets[selector] = { top: element.scrollTop, left: element.scrollLeft };
+      }
+    });
+    nav.updateCurrentEntry({ state: { ...(nav.currentEntry.getState?.() ?? {}), scroll: offsets } });
+  }
+
+  restoreScroll(entry) {
+    const saved = entry?.getState?.()?.scroll;
+    if (!saved || !globalThis.document) {
+      return;
+    }
+    each(saved, (offset, selector) => {
+      const element = globalThis.document.querySelector(selector);
+      if (element && offset) {
+        element.scrollTop = offset.top ?? 0;
+        element.scrollLeft = offset.left ?? 0;
+      }
+    });
   }
 
   /*******************************
@@ -71,25 +248,87 @@ export class Navigator {
   *******************************/
 
   onNavigate(event) {
-    // return if !shouldIntercept(event) or if same-route hashChange
-    // resolve router.match(event.destination.url) and start router.runCascade(matched, event.signal)
-    // disable resetScroll/resetFocus when only query changes on same route, then call event.intercept
+    if (!this.shouldIntercept(event)) {
+      return;
+    }
+
+    const matched = this.router.match(event.destination.url);
+    if (!matched) {
+      return;
+    }
+
+    const { current } = this.router;
+    const isSameRoute = current?.route === matched.route && isEqual(current?.params, matched.params);
+    if (event.hashChange && isSameRoute && isEqual(current?.query, matched.query)) {
+      return;
+    }
+
+    // the entry being left is still currentEntry here and not after commit
+    this.saveScroll();
+
+    const meta = event.info?.[this.infoKey];
+    const isQueryOnlyChange = isSameRoute && !isEqual(current?.query, matched.query);
+    const resetScroll = isQueryOnlyChange ? false : (meta?.resetScroll ?? true);
+    const resetFocus = isQueryOnlyChange ? false : (meta?.resetFocus ?? true);
+
+    this.transition = {
+      navigationType: event.navigationType,
+      from: this.entry,
+      destination: event.destination,
+      url: matched.url,
+    };
+    this.router.intercepted(matched, event);
+
+    let work = null;
+    let precommitRan = false;
+    const getWork = () => (work ??= this.router.begin(matched, event));
+
+    const interceptOptions = {
+      scroll: resetScroll ? 'after-transition' : 'manual',
+      focusReset: resetFocus ? 'after-transition' : 'manual',
+      handler: () => this.router.afterCommit(getWork(), event, precommitRan),
+    };
+
+    if (event.cancelable) {
+      interceptOptions.precommitHandler = (controller) => {
+        precommitRan = true;
+        return this.router.beforeCommit(getWork(), event, controller);
+      };
+    }
+
+    // intercept before any route code runs, so a throwing cascade can never leave the navigation to the browser
+    event.intercept(interceptOptions);
+    getWork();
   }
 
   shouldIntercept(event) {
-    // reject if !canIntercept, downloadRequest, cross-origin, or unflagged reload / third-party info
-    // return true if destination matches router or carries navigator's noop-sync info tag
-  }
+    if (!event?.canIntercept || event.downloadRequest != null || event.formData != null) {
+      return false;
+    }
 
-  async onPrecommit(controller, event, matched, work) {
-    // mark precommit supported; if cascade resolved to a redirect, call controller.redirect(targetUrl)
-    // race work.ready against router.holdCommit timer so fast loads settle before URL commits
-  }
+    const origin = globalThis.location?.origin;
+    if (origin) {
+      try {
+        if (new URL(event.destination.url, origin).origin !== origin) {
+          return false;
+        }
+      }
+      catch {
+        return false;
+      }
+    }
 
-  async onHandle(event, matched, work, precommitRan) {
-    // if !precommitRan (Safari), handle redirect/signInRoute check now via replace or back()
-    // if work still pending after holdCommit, schedule views.loading after loadingDelay and enforce loadingMin
-    // await work completion (or views.notFound / views.forbidden swap), render view + title, and restoreScroll
+    const meta = event.info?.[this.infoKey];
+    if (event.navigationType === 'reload' && !meta?.reload) {
+      return false;
+    }
+    // a same-url write tagged by someone else is theirs to intercept, React's transition indicator among them
+    const isForeign = event.info !== undefined && event.info !== null && !meta;
+    if (isForeign && event.destination.url === globalThis.location?.href) {
+      return false;
+    }
+
+    return true;
   }
 
   /*******************************
@@ -97,26 +336,35 @@ export class Navigator {
   *******************************/
 
   onEntryChange(event) {
-    // sole writer of current: match navigation.currentEntry.url and call router.commitRoute(matched)
-    // project navigation.entries() snapshot and bind onDispose to new entries
+    this.project();
+    this.router.entryChanged(this.entry, event);
   }
 
   onSuccess(event) {
-    // clear pending transition state and record lastSuccessfulEntry
-    // restore custom container scroll from entry state if navigationType === 'traverse'
+    const { navigationType } = this.transition ?? {};
+    this.transition = null;
+    this.router.settled(event);
+    if (navigationType === 'traverse') {
+      this.restoreScroll(this.entry);
+    }
   }
 
   onError(event) {
-    // clear pending state and ignore if event.error.name === 'AbortError'
-    // set router error state and schedule replace navigation to error view on next task
+    this.transition = null;
+    this.router.failed(event?.error ?? event, event);
   }
 
   onPageShow(event) {
-    // if event.persisted (bfcache restore), re-sync activation, currentEntry, and entries()
+    if (!event?.persisted) {
+      return;
+    }
+    // the document came back intact: re-read the platform, re-run nothing
+    this.project();
+    this.router.restored();
   }
 
   onDispose(entry) {
-    // evict router's cached cascade data and scroll state for entry.key
+    this.router.disposed(entry);
   }
 }
 

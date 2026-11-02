@@ -1,12 +1,20 @@
-import { router } from '../router.js'
+import { wait } from '@semantic-ui/utils';
 
-const team = router.section({
+import { MEMBERS } from '../data.js';
+import { router } from '../router.js';
+import { MemberPage } from './views/member-page.js';
+import { SettingsPage } from './views/settings-page.js';
+import { TeamLayout } from './views/team-layout.js';
+import { TeamOverviewPage } from './views/team-overview-page.js';
+import { TeamSidebar } from './views/team-sidebar.js';
+
+export const team = router.section({
   name: 'team',
   path: '/team/:org',
   params: { org: 'acme' },
   title: ({ params }) => `Team ${params.org.toUpperCase()}`,
-  layout: views.TeamLayout,
-  slots: { sidebar: views.TeamSidebar },
+  layout: TeamLayout,
+  slots: { sidebar: TeamSidebar },
 });
 
 team.index({
@@ -19,10 +27,10 @@ team.index({
   },
   title: ({ params }) => `${params.tab[0].toUpperCase()}${params.tab.slice(1)}`,
   data: () => ({ members: Object.values(MEMBERS) }),
-  view: views.TeamOverviewPage,
+  view: TeamOverviewPage,
 });
 
-const member = team.route({
+export const member = team.route({
   name: 'member',
   path: '/team/:org/:userId',
   params: {
@@ -37,26 +45,26 @@ const member = team.route({
       : notFound()
   ),
   title: ({ data }) => data.member?.name ?? 'Member',
-  view: views.MemberPage,
+  view: MemberPage,
 });
 
-const analytics = team.route({
+export const analytics = team.route({
   name: 'analytics',
   path: '/team/:org/analytics',
   title: 'Analytics',
   data: ({ params, signal }) => ({
     org: params.org,
-    latency: wait(400, { signal }).then(() => '14ms'),
-    uptime: wait(900, { signal }).then(() => '99.98%'),
-    throughput: wait(1500, { signal }).then(() => '18.4k req/s'),
+    latency: wait(400, { abortController: signal }).then(() => '14ms'),
+    uptime: wait(900, { abortController: signal }).then(() => '99.98%'),
+    throughput: wait(1500, { abortController: signal }).then(() => '18.4k req/s'),
   }),
-  view: () => Promise.resolve({ default: views.AnalyticsPage }),
+  view: () => import('./views/analytics-page.js'),
 });
 
-const settings = team.route({
+export const settings = team.route({
   name: 'settings',
   path: '/team/:org/settings',
   title: 'Settings',
   permission: ({ user }) => user?.role === 'admin',
-  view: views.SettingsPage,
+  view: SettingsPage,
 });

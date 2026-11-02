@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Acme Console — Flat Pattern</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="/styles.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "nav-router": "/src/index.js",
+        "nav-router/plugins/preload-intent": "/src/plugins/preload-intent.js",
+        "@semantic-ui/utils": "/node_modules/@semantic-ui/utils/dist/cdn/utils.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="router-inspector" aria-label="Live Router Inspector"></div>
+  <div id="app-mount"></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
