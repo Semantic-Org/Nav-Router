@@ -62,7 +62,7 @@ function renderApp(state = app.page) {
     }
     : null;
 
-  const currentRoutes = state.currentRoutes ?? state.route?.ancestors ?? [];
+  const currentRoutes = state.chain ?? state.route?.ancestors ?? [];
   const layouts = state.layouts?.length
     ? state.layouts
     : currentRoutes.map((route) => route.layout).filter(Boolean);
@@ -71,8 +71,10 @@ function renderApp(state = app.page) {
     ? state.slots
     : Object.assign({}, ...currentRoutes.map((route) => route.slots).filter(Boolean));
 
+  // the page carries its url; the views read the parts
+  const url = state.url ? new URL(state.url, window.location.origin) : null;
   const baseContext = {
-    state,
+    state: { ...state, pathname: url?.pathname ?? '', search: url?.search ?? '', hash: url?.hash ?? '' },
     route: state.route,
     params: state.params ?? {},
     query: state.query ?? {},
@@ -140,15 +142,17 @@ function renderInspector() {
   }
 
   const current = app.current;
-  const route = app.currentRoute ?? current?.route;
+  const page = app.page;
+  const route = current?.route;
   const pending = app.pending;
-  const activeRouteIds = [...app.activeRoutes.keys()];
+  // the page's chain is the active set
+  const activeRouteIds = (page?.chain ?? []).map((item) => item.id);
   const entries = globalThis.navigation?.entries?.() ?? app.entries ?? [];
   const currentEntryKey = globalThis.navigation?.currentEntry?.key ?? current?.key;
 
   const statusValue = pending?.loading
     ? 'loading'
-    : (lastRenderedState?.status === 'loading' && pending ? 'loading' : (current?.status ?? 'idle'));
+    : (lastRenderedState?.status === 'loading' && pending ? 'loading' : (page?.status ?? 'idle'));
 
   const pendingLabel = pending
     ? `${pending.navigationType ?? 'nav'} → ${new URL(pending.url, window.location.origin).pathname}${pending.loading ? ' (loading)' : ' (holding)'}`
@@ -221,7 +225,7 @@ function renderInspector() {
         </div>
         <div class="insp-cell">
           <span class="insp-label">titles</span>
-          <code id="insp-titles">${escapeHTML(JSON.stringify(current?.titles ?? []))}</code>
+          <code id="insp-titles">${escapeHTML(JSON.stringify(page?.titles ?? []))}</code>
         </div>
         <div class="insp-cell">
           <span class="insp-label">user</span>

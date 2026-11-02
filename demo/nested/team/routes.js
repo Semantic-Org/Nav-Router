@@ -1,4 +1,5 @@
 import { wait } from '@semantic-ui/utils';
+import { lazy } from 'nav-router';
 
 import { MEMBERS } from '../data.js';
 import { router } from '../router.js';
@@ -58,7 +59,7 @@ export const analytics = team.route({
     uptime: wait(900, { abortController: signal }).then(() => '99.98%'),
     throughput: wait(1500, { abortController: signal }).then(() => '18.4k req/s'),
   }),
-  view: () => import('./views/analytics-page.js'),
+  view: lazy(() => import('./views/analytics-page.js')),
 });
 
 export const settings = team.route({

@@ -1,5 +1,5 @@
 import { wait } from '@semantic-ui/utils';
-import { router } from 'nav-router';
+import { lazy, router } from 'nav-router';
 
 import { MEMBERS } from './data.js';
 import { ForbiddenPage } from './views/forbidden-page.js';
@@ -91,7 +91,7 @@ export const app = router({
             uptime: wait(900, { abortController: signal }).then(() => '99.98%'),
             throughput: wait(1500, { abortController: signal }).then(() => '18.4k req/s'),
           }),
-          view: () => import('./views/analytics-page.js'),
+          view: lazy(() => import('./views/analytics-page.js')),
         },
 
         settings: {

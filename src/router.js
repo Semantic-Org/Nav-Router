@@ -540,16 +540,22 @@ export class Router extends Route {
     else if (committed) {
       const view = this.views?.error ?? null;
       if (!view) {
-        console.error(error);
+        this.logError(error);
       }
       // the routes on screen stay active under the error page, so the chain carries over
       this.page = { ...(pending ? this.pageFor(pending) : (this.page ?? {})), chain: this.page?.chain ?? [], slices: this.page?.slices ?? [], view, status: 'error', error };
       this.renderView(this.page).catch(noop);
     }
     else {
-      console.error(error);
+      this.logError(error);
     }
     this.notify();
+  }
+
+  // the one place core logs. an integration that wants its own namespace replaces this, the way
+  // the timeline plugin wraps a moment
+  logError(error) {
+    console.error(error);
   }
 
   // back from bfcache with the dom intact: the route lifecycle sees an update, the page stays
