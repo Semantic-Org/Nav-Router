@@ -73,7 +73,13 @@ export default ({
       this.handleBeforeUnload = (event) => this.onBeforeUnload(event);
       globalThis.window.addEventListener('beforeunload', this.handleBeforeUnload);
     }
-    else if (!needed && this.handleBeforeUnload) {
+    else if (!needed) {
+      this.disarmBeforeUnload();
+    }
+  };
+
+  routerProto.disarmBeforeUnload = function () {
+    if (this.handleBeforeUnload && globalThis.window) {
       globalThis.window.removeEventListener('beforeunload', this.handleBeforeUnload);
       this.handleBeforeUnload = null;
     }
@@ -98,7 +104,7 @@ export default ({
   navProto.onNavigate = function (event) {
     const router = this.router;
     // a leave the modal already approved comes back as a plain document load of the same url
-    if (event?.info?.[bypassKey] || (router.leaveApproved && router.leaveApproved === event?.destination?.url)) {
+    if (event?.info?.[bypassKey] || event?.downloadRequest != null || (router.leaveApproved && router.leaveApproved === event?.destination?.url)) {
       router.leaveApproved = null;
       return onNavigate.call(this, event);
     }
@@ -145,6 +151,9 @@ export default ({
         return;
       }
       if (decision) {
+        if (!this.shouldIntercept(event) || !matched) {
+          router.disarmBeforeUnload();
+        }
         return onNavigate.call(this, event);
       }
     }
@@ -160,10 +169,7 @@ export default ({
       answer.then((allowed) => {
         if (allowed && event.destination?.url && globalThis.location) {
           router.leaveApproved = event.destination.url;
-          if (router.handleBeforeUnload && globalThis.window) {
-            globalThis.window.removeEventListener('beforeunload', router.handleBeforeUnload);
-            router.handleBeforeUnload = null;
-          }
+          router.disarmBeforeUnload();
           globalThis.location.assign(event.destination.url);
         }
       });
@@ -229,10 +235,7 @@ export default ({
   };
 
   routerProto.stop = function () {
-    if (this.handleBeforeUnload && globalThis.window) {
-      globalThis.window.removeEventListener('beforeunload', this.handleBeforeUnload);
-      this.handleBeforeUnload = null;
-    }
+    this.disarmBeforeUnload();
     this.leaveGuards?.clear();
     this.leaveGuards = null;
     this.pendingLeave = null;

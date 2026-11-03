@@ -348,9 +348,20 @@ export class Router extends Route {
   // param fills the path, every other key is query. the fragment and the origin are options
   href(target, args = {}, { hash, absolute = false, keepQuery = false } = {}) {
     const route = this.routeFor(target);
-    const rawPath = route ? route.path : (isString(target) && target ? target : '/');
-    const { params } = this.splitArgs(route, args);
-    const query = keepQuery ? { ...this.current?.query, ...this.splitArgs(route, args).query } : this.splitArgs(route, args).query;
+    const { params, query: own } = this.splitArgs(route, args);
+    const query = keepQuery ? { ...this.current?.query, ...own } : own;
+    let rawPath = route ? route.path : '/';
+    // a literal is a url: another origin passes through whole, and its own query and fragment ride
+    if (!route && isString(target) && target) {
+      const origin = globalThis.location?.origin ?? 'http://localhost';
+      const literal = new URL(target, origin);
+      if (literal.origin !== origin) {
+        return target;
+      }
+      rawPath = literal.pathname;
+      literal.searchParams.forEach((value, key) => { query[key] ??= value; });
+      hash ??= literal.hash.slice(1) || undefined;
+    }
 
     const segments = rawPath === '/' ? [] : rawPath.replace(/^\//, '').split('/');
     const resolvedSegments = [];
@@ -547,7 +558,7 @@ export class Router extends Route {
       this.navigator.deferNavigate(this.href(this.errorRoute), { history: 'replace' });
     }
     else if (committed) {
-      const view = await this.resolveView(this.views?.error);
+      const view = await this.resolveView(this.views?.error).catch(() => null);
       if (!view) {
         this.logError(error);
       }
@@ -620,7 +631,7 @@ export class Router extends Route {
       if (!isRewrite || !redirectedMatch) {
         // a traverse or reload cannot be redirected before commit, and a target outside the routes is
         // the browser's: stay put, then go where the guard says
-        this.navigator.deferNavigate(guard.redirect);
+        this.navigator.deferNavigate(guard.redirect, { history: event.navigationType === 'push' ? 'push' : 'replace' });
         throw new DOMException('Navigation refused', 'AbortError');
       }
       controller.redirect(guard.redirect);
@@ -1134,7 +1145,7 @@ export class Router extends Route {
   // containers back here, at the swap, which a view transition's update is part of
   async renderView(page, event = null) {
     await this.onRender?.(page, event);
-    if (event?.navigationType === 'traverse' && this.restoreScroll) {
+    if (event?.navigationType === 'traverse' && this.restoreScroll && page.status !== 'loading') {
       this.navigator.restoreScroll(this.navigator.entry);
     }
   }
