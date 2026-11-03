@@ -110,7 +110,8 @@ export class Router extends Route {
 
     const matched = this.match(initialUrl);
     if (!matched) {
-      this.page = { view: await this.resolveView(this.views?.notFound), status: 'notFound', url: initialUrl };
+      const [view, layouts, slots] = await Promise.all([this.resolveView(this.views?.notFound), this.resolveLayouts([this]), this.resolveSlots([this])]);
+      this.page = { view, layouts, slots, status: 'notFound', url: initialUrl };
       await this.renderView(this.page);
       this.notify();
       return this;
