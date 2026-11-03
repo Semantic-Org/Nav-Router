@@ -1167,13 +1167,13 @@ export class Router extends Route {
 
   // a route's data recomputed outside a navigation: the slice is set, the page re-reads itself and
   // renders, and anything that read the slice follows on its own. notFound() lands as it does at
-  // navigation, the not-found view in place, and data arriving on a page standing on not-found
-  // enters the route as a fresh navigation would
+  // navigation: the not-found view in place, and the route's slice leaves with it, as the route
+  // that said not-found never has one. so data arriving for a route without a slice enters it as
+  // a fresh navigation would, while an ancestor's data moving on a not-found page only keeps it current
   async updateData(route, value) {
     const slices = this.page?.slices;
     const slice = slices?.find((item) => item.route === route);
     if (!slice) {
-      // the route that said not-found at navigation has no slice, so its arrival is the reload
       if (this.page?.status === 'notFound' && inArray(route, this.page.chain) && (await value) !== NOT_FOUND) {
         this.navigator.reload();
       }
@@ -1185,13 +1185,8 @@ export class Router extends Route {
     if (this.page?.slices !== slices || slice.version !== version) {
       return;
     }
-    if (this.page.status === 'notFound') {
-      if (resolved !== NOT_FOUND) {
-        this.navigator.reload();
-      }
-      return;
-    }
     if (resolved === NOT_FOUND) {
+      slices.splice(slices.indexOf(slice), 1);
       this.page = { ...this.page, view: await this.resolveView(this.views?.notFound), status: 'notFound' };
       await this.renderView(this.page);
       this.notify();
