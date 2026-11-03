@@ -777,23 +777,30 @@ export class Router extends Route {
     return isFunction(fn) ? fn(context) : fn;
   }
 
-  // one seam per hook, each a plain call here. the reactive scaffold wraps each in its own way,
-  // because each has its own consequence when what it read moves: a redirect moves the page, a
-  // refused permission lands as it would at navigation, data replaces its slice, a title its title
-  evaluateRedirect(route, fn, context) {
+  // the door a hook rides, with what to do should its answer change. nothing here, since plain
+  // data never moves on its own; the reactive scaffold runs the hook again when what it read moves
+  // and hands each later answer to changed. kind is guard or slice: a guard runs every navigation,
+  // a slice only when its route does. a plugin's own hook rides the same door
+  evaluateHook(route, fn, context, { kind, changed }) {
     return this.evaluate(route, fn, context);
+  }
+
+  // one seam per hook, each naming its consequence: a redirect moves the page, a refused
+  // permission lands as it would at navigation, data replaces its slice, a title its title
+  evaluateRedirect(route, fn, context) {
+    return this.evaluateHook(route, fn, context, { kind: 'guard', changed: (target) => this.redirectChanged(route, target) });
   }
 
   evaluatePermission(route, fn, context) {
-    return this.evaluate(route, fn, context);
+    return this.evaluateHook(route, fn, context, { kind: 'guard', changed: (allowed) => this.permissionChanged(route, allowed) });
   }
 
   evaluateData(route, fn, context) {
-    return this.evaluate(route, fn, context);
+    return this.evaluateHook(route, fn, context, { kind: 'slice', changed: (value) => this.updateData(route, value) });
   }
 
   evaluateTitle(route, fn, context) {
-    return this.evaluate(route, fn, context);
+    return this.evaluateHook(route, fn, context, { kind: 'slice', changed: (value) => this.updateTitle(route, value) });
   }
 
   async runCascade(matched, navigation) {

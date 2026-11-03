@@ -109,27 +109,11 @@ export class ReactiveRouter extends Router {
                Hooks
   *******************************/
 
-  evaluateRedirect(route, fn, context) {
-    return this.tracked({ route, fn, context, kind: 'guard', onRerun: (target) => this.redirectChanged(route, target) });
-  }
-
-  evaluatePermission(route, fn, context) {
-    return this.tracked({ route, fn, context, kind: 'guard', onRerun: (allowed) => this.permissionChanged(route, allowed) });
-  }
-
-  evaluateData(route, fn, context) {
-    return this.tracked({ route, fn, context, kind: 'slice', onRerun: (value) => this.updateData(route, value) });
-  }
-
-  evaluateTitle(route, fn, context) {
-    return this.tracked({ route, fn, context, kind: 'slice', onRerun: (value) => this.updateTitle(route, value) });
-  }
-
-  // runs fn inside the provider's reaction and hands each later run's value to onRerun. the signal
+  // runs fn inside the provider's reaction and hands each later run's value to changed. the signal
   // the hook was given is the life its run belongs to: the navigation's while one is in flight, the
   // route's own when the standing page runs it. what the function reads of the slices above it is
   // its own dependency, through the data the provider makes readable
-  tracked({ route, fn, context, kind, onRerun }) {
+  evaluateHook(route, fn, context, { kind, changed }) {
     if (!isFunction(fn)) {
       return fn;
     }
@@ -154,7 +138,7 @@ export class ReactiveRouter extends Router {
         return;
       }
       if (route.active) {
-        onRerun(value);
+        changed(value);
       }
     });
     const run = { stop, kind };
@@ -162,7 +146,7 @@ export class ReactiveRouter extends Router {
       this.runsOf(route).add(run);
     }
     else {
-      born = { route, run, adopted: false, onRerun, latest: null };
+      born = { route, run, adopted: false, changed, latest: null };
       signal?.addEventListener('abort', () => {
         if (!born.adopted) {
           stop();
@@ -201,7 +185,7 @@ export class ReactiveRouter extends Router {
       born.adopted = true;
       this.runsOf(route).add(born.run);
       if (born.latest) {
-        born.onRerun(born.latest.value);
+        born.changed(born.latest.value);
       }
     });
   }
