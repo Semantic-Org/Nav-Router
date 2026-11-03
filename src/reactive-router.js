@@ -99,7 +99,7 @@ export class ReactiveRouter extends Router {
       each({ ...previous, ...data }, (_, key) => {
         const before = slice.store.peek(key);
         slice.store.set(key, data[key]);
-        moved ||= slice.store.peek(key) !== before;
+        moved ||= !Object.is(slice.store.peek(key), before);
       });
     });
     return moved;
