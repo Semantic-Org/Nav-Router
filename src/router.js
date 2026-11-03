@@ -51,8 +51,8 @@ export class Router extends Route {
     loadingMin: '500ms',
     restoreScroll: null,
     attachGlobal: 'router',
-    // whether data recomputed outside a navigation moved. plain data has one way to know, a deep
-    // compare, and a render costs more than the walk; a reactive router's signals decide instead
+    // whether data recomputed outside a navigation moved: a deep compare, since a render costs more
+    // than the walk. plain data asks it of the whole slice, the reactive scaffold of each key
     dataChanged: (previous, next) => !isEqual(next, previous),
   };
 
@@ -1116,8 +1116,8 @@ export class Router extends Route {
     await this.updatePage();
   }
 
-  // sets the slice and says whether it moved. plain data asks the dataChanged option, one compare;
-  // the reactive router asks its signal, whose set already compared
+  // sets the slice and says whether it moved, one dataChanged compare; the reactive scaffold
+  // compares per key and writes only the keys that moved
   setSlice(slice, data) {
     if (!this.dataChanged(slice.data, data)) {
       return false;

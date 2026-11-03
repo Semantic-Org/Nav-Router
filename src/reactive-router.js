@@ -61,7 +61,9 @@ export class ReactiveRouter extends Router {
     };
   }
 
-  // merges ancestor slices behind per-key getters, so reading data.team tracks team's cell alone
+  // merges ancestor slices behind per-key getters, so reading data.team tracks team's cell alone.
+  // a getter exists for the keys a slice holds, so a key a run returns only sometimes is read plain
+  // on the runs it is absent: a data() returns every key every run, undefined when it has none
   dataFor(slices) {
     const data = {};
     each(slices, (slice) => {
@@ -136,14 +138,22 @@ export class ReactiveRouter extends Router {
     }
     const { signal, slices } = context;
     let first;
+    let born = null;
     const stop = this.createReaction((isFirst) => {
       const data = this.dataFor(slices);
       if (isFirst) {
         first = fn({ ...context, data });
         return;
       }
+      const value = fn({ ...context, data, signal: route.abortSignal });
+      // a run born for a navigation in flight lands nothing on the standing page, whose route may be
+      // the same one: its latest value waits for adopt
+      if (born && !born.adopted) {
+        born.latest = { value };
+        return;
+      }
       if (route.active) {
-        onRerun(fn({ ...context, data, signal: route.abortSignal }));
+        onRerun(value);
       }
     });
     const run = { stop, kind };
@@ -151,7 +161,7 @@ export class ReactiveRouter extends Router {
       this.runsOf(route).add(run);
     }
     else {
-      const born = { route, run, adopted: false };
+      born = { route, run, adopted: false, onRerun, latest: null };
       signal?.addEventListener('abort', () => {
         if (!born.adopted) {
           stop();
@@ -187,6 +197,9 @@ export class ReactiveRouter extends Router {
     each(mine, (born) => {
       born.adopted = true;
       this.runsOf(route).add(born.run);
+      if (born.latest) {
+        born.onRerun(born.latest.value);
+      }
     });
   }
 
