@@ -6,10 +6,12 @@ import { Router } from './router.js';
 // provider's reaction, learning its dependencies on the cascade's first pass without computing
 // twice. when something it read moves, a later run lands the way that hook lands at navigation:
 // a redirect moves the page, a refused permission redirects or shows forbidden, data updates its
-// slice, and a title updates its title. each key on merged data reads through its slice's signal on
-// access, so a moving slice wakes only the functions that read from it. a run born while its
-// navigation is in flight ends with that navigation's signal, and once active it ends with the
-// route's. a provider supplies the four primitives below and nothing else
+// slice, and a title updates its title. a slice is a store with a cell per key, and merged data
+// reads each key through its cell, so a key that moved wakes only the functions that read it, and
+// a key a run returned equal is never written. a run born while its navigation is in flight ends
+// with that navigation's signal, and once active it ends with the route's. a provider supplies the
+// four primitives below; the fifth, the per-key store, is built from signals unless the provider
+// has a native one ($state, a store, reactive())
 export class ReactiveRouter extends Router {
 
   constructor(options) {
@@ -42,13 +44,30 @@ export class ReactiveRouter extends Router {
     return fn();
   }
 
-  // merges ancestor slices behind per-key getters so reading data.team tracks only team's slice
+  // { get(key), set(key, value), peek(key) }: a cell per key, made on first touch so a reader of a
+  // key that arrives later is woken when it does. a provider with a native per-key object overrides it
+  createStore(initialValue = {}) {
+    const cells = new Map();
+    const cell = (key) => {
+      if (!cells.has(key)) {
+        cells.set(key, this.createSignal(initialValue[key]));
+      }
+      return cells.get(key);
+    };
+    return {
+      get: (key) => cell(key).get(),
+      set: (key, value) => cell(key).set(value),
+      peek: (key) => cell(key).peek(),
+    };
+  }
+
+  // merges ancestor slices behind per-key getters, so reading data.team tracks team's cell alone
   dataFor(slices) {
     const data = {};
     each(slices, (slice) => {
-      each(slice.signal ? slice.signal.peek() : slice.data, (_, key) => {
+      each(slice.data, (_, key) => {
         Object.defineProperty(data, key, {
-          get: () => (slice.signal ? slice.signal.get()?.[key] : slice.data[key]),
+          get: () => (slice.store ? slice.store.get(key) : slice.data[key]),
           enumerable: true,
           configurable: true,
         });
@@ -63,19 +82,27 @@ export class ReactiveRouter extends Router {
 
   sliceOf(route, data) {
     const slice = super.sliceOf(route, data);
-    slice.signal = this.createSignal(data);
+    slice.store = this.createStore(data);
     return slice;
   }
 
-  // updates slice.data before set() for sync signals and checks peek() identity for equality
+  // writes the keys that moved, dataChanged deciding per key, in one batch. the plain mirror is
+  // written first so a synchronous reaction reads the new value through either door
   setSlice(slice, data) {
-    const previous = slice.signal.peek();
-    slice.data = data;
-    slice.signal.set(data);
-    if (slice.signal.peek() === previous) {
-      slice.data = previous;
+    const previous = slice.data;
+    const moved = [];
+    each({ ...previous, ...data }, (_, key) => {
+      if (this.dataChanged(previous[key], data[key])) {
+        moved.push(key);
+      }
+    });
+    if (!moved.length) {
       return false;
     }
+    slice.data = data;
+    this.batch(() => {
+      each(moved, (key) => slice.store.set(key, data[key]));
+    });
     return true;
   }
 
