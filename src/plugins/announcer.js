@@ -1,19 +1,22 @@
 import { isEqual } from '@semantic-ui/utils';
 
 const LIVE_REGION_STYLE = 'position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0';
+const STATUS_WORDS = { forbidden: 'Access denied', notFound: 'Not found', error: 'Error' };
 
-// announces settled navigations through a live region, covering webkit's silence on intercepted
-// navigations while staying quiet on initial load, hash jumps and same-title query keystrokes
+// announces each page through a live region, covering webkit's silence on intercepted navigations.
+// a render during a navigation is announced once it settles, a render of the standing page at once:
+// a guard refusing in place or an error page. the initial load, hash jumps and same-title query
+// keystrokes stay quiet
 export default ({
   politeness = 'polite',
-  format = (page) => page?.title || page?.url || '',
+  format = (page) => [STATUS_WORDS[page.status], page.title || page.url].filter(Boolean).join(', '),
 } = {}, Router) => {
   const proto = Router.prototype;
-  const { start, intercepted, applyCascade, settled, failed, stop } = proto;
+  const { start, intercepted, renderView, settled, failed, stop } = proto;
 
   // mounted empty ahead of time so screen readers register the live region before its text mutates
   proto.ensureAnnouncer = function () {
-    this.announcer ??= { element: null, queued: null, lastText: '' };
+    this.announcer ??= { element: null, queued: null, lastText: '', lastPage: null };
     if (!this.announcer.element && globalThis.document?.body) {
       const element = globalThis.document.createElement('div');
       element.setAttribute('aria-live', politeness);
@@ -24,6 +27,13 @@ export default ({
       this.announcer.element = element;
     }
     return this.announcer;
+  };
+
+  const speak = (announcer, text) => {
+    if (announcer.element) {
+      announcer.element.textContent = text;
+    }
+    announcer.lastText = text;
   };
 
   proto.start = function () {
@@ -41,36 +51,32 @@ export default ({
     return intercepted.call(this, matched, event);
   };
 
-  proto.applyCascade = async function (matched, resolved, event = null) {
-    const previous = this.page;
-    await applyCascade.call(this, matched, resolved, event);
-
-    if (!previous || !event || event.initial || event.signal?.aborted) {
-      return;
-    }
-    const text = String(format(this.page) ?? '');
-    if (!text) {
+  proto.renderView = async function (page, event = null) {
+    await renderView.call(this, page, event);
+    if (!page || page.status === 'loading') {
       return;
     }
     const announcer = this.ensureAnnouncer();
-    const routeMoved = previous.route !== this.page?.route
-      || !isEqual(previous.params, this.page?.params)
-      || event.navigationType === 'reload';
-
-    if (routeMoved || text !== announcer.lastText) {
+    const { lastPage } = announcer;
+    const moved = !lastPage || lastPage.route !== page.route || !isEqual(lastPage.params, page.params) || event?.navigationType === 'reload';
+    announcer.lastPage = { route: page.route, params: page.params };
+    const text = String(format(page) ?? '');
+    if (!lastPage || event?.initial || !text || (!moved && text === announcer.lastText)) {
+      return;
+    }
+    if (this.pending) {
       announcer.queued = text;
+    }
+    else {
+      speak(announcer, text);
     }
   };
 
   proto.settled = function (event) {
     const result = settled.call(this, event);
     if (this.announcer?.queued) {
-      const announcer = this.ensureAnnouncer();
-      if (announcer.element) {
-        announcer.element.textContent = announcer.queued;
-        announcer.lastText = announcer.queued;
-      }
-      announcer.queued = null;
+      speak(this.announcer, this.announcer.queued);
+      this.announcer.queued = null;
     }
     return result;
   };
