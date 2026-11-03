@@ -1,15 +1,18 @@
-import { each, extend, isArray, isFunction, isPlainObject } from '@semantic-ui/utils';
+import { each, extend, isArray, isFunction, isPlainObject, isPromise } from '@semantic-ui/utils';
 
 const PROPERTY_PREFIX = /^(og|article|profile|book|fb):/;
 
 // cascades route.meta across the active chain into document.head and formats document.title.
+// meta is a hook on the router's door: evaluated when its route is created or updated, and on a
+// reactive router again when what it read moves, so the tags follow live data. the merge and the
+// writes are synchronous at render, off the swap path, and an async answer lands when it resolves.
 // existing static tags are updated in place and restored when a later route clears them
 export default ({
   defaults = {},
   formatTitle = null,
 } = {}, Router) => {
   const proto = Router.prototype;
-  const { renderView, stop } = proto;
+  const { renderView, onRouteCreated, onRouteUpdated, onRouteDestroyed, stop } = proto;
 
   const findExistingTag = (head, key) => {
     if (key === 'canonical') {
@@ -53,7 +56,50 @@ export default ({
     }
   };
 
-  proto.syncHead = async function (page) {
+  // the hook sees what the other hooks see, with the page's data and slices, so a reactive router
+  // tracks what it reads. a sync answer waits for the render's write, an async one lands on its own
+  proto.evaluateMeta = function (route) {
+    const context = this.contextFor(route, this.page, { data: this.page.data, slices: this.page.slices });
+    const value = this.evaluateHook(route, route.meta, context, { kind: 'slice', changed: (answer) => this.metaChanged(route, answer) });
+    if (isPromise(value)) {
+      this.metaChanged(route, value);
+    }
+    else {
+      this.storeMeta(route, value);
+    }
+  };
+
+  proto.storeMeta = function (route, value) {
+    (this.headMeta ??= new Map()).set(route, isPlainObject(value) ? value : {});
+  };
+
+  proto.metaChanged = async function (route, value) {
+    this.storeMeta(route, await value);
+    if (route.active && this.page) {
+      this.writeHead(this.page);
+    }
+  };
+
+  proto.onRouteCreated = function (route, context) {
+    if (route.meta !== undefined) {
+      this.evaluateMeta(route);
+    }
+    return onRouteCreated.call(this, route, context);
+  };
+
+  proto.onRouteUpdated = function (route, context) {
+    if (route.meta !== undefined) {
+      this.evaluateMeta(route);
+    }
+    return onRouteUpdated.call(this, route, context);
+  };
+
+  proto.onRouteDestroyed = function (route, context) {
+    this.headMeta?.delete(route);
+    return onRouteDestroyed.call(this, route, context);
+  };
+
+  proto.writeHead = function (page) {
     const doc = globalThis.document;
     if (!page || page.status === 'loading') {
       return;
@@ -75,27 +121,12 @@ export default ({
     }
 
     const merged = extend({}, defaults);
-    for (const ancestor of page.chain ?? []) {
-      if (ancestor.meta !== undefined) {
-        const context = {
-          params: page.params ?? {},
-          query: page.query ?? {},
-          data: page.data ?? {},
-          user: this.user,
-          route: ancestor,
-          router: this,
-        };
-        const raw = isFunction(ancestor.meta) ? await ancestor.meta(context) : ancestor.meta;
-        if (isPlainObject(raw)) {
-          extend(merged, raw);
-        }
+    each(page.chain ?? [], (route) => {
+      const meta = this.headMeta?.get(route);
+      if (meta) {
+        extend(merged, meta);
       }
-    }
-
-    // bail if a newer navigation replaced the page while an async meta function was settling
-    if (this.page && this.page !== page) {
-      return;
-    }
+    });
 
     const records = (this.headTags ??= new Map());
     const activeKeys = new Set();
@@ -130,7 +161,7 @@ export default ({
   };
 
   proto.renderView = async function (page, event = null) {
-    await this.syncHead(page);
+    this.writeHead(page);
     return renderView.call(this, page, event);
   };
 
@@ -142,6 +173,7 @@ export default ({
       this.headTags.clear();
       this.headTags = null;
     }
+    this.headMeta = null;
     return stop.call(this);
   };
 };
