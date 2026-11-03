@@ -480,6 +480,11 @@ export class Router extends Route {
     return path.startsWith('/') ? `${this.base}${path}` : `${this.base}/${path}`;
   }
 
+  // the address a sign-in redirect carries back: a path under base, so the sign-in page can navigate to it
+  returnAddress({ pathname, search, hash }) {
+    return `${this.prependBase(pathname)}${search}${hash}`;
+  }
+
   argsMatch(route, args) {
     const { params, query } = this.splitArgs(route, args);
     return Object.keys(params).every((key) => isEqual(this.current.params[key], params[key]))
@@ -820,7 +825,7 @@ export class Router extends Route {
         if (!allowed) {
           if ((!this.user || !this.views?.forbidden) && this.signInRoute) {
             // the return address rides to the sign-in page, which reads it as query.returnTo
-            return { status: 'redirect', redirect: this.href(this.signInRoute, { returnTo: `${matched.pathname}${matched.search}${matched.hash}` }), route, params, query };
+            return { status: 'redirect', redirect: this.href(this.signInRoute, { returnTo: this.returnAddress(matched) }), route, params, query };
           }
           const [view, layouts, slots, { title, titles }] = await Promise.all([
             this.resolveView(this.views?.forbidden),
@@ -1127,7 +1132,7 @@ export class Router extends Route {
       return;
     }
     if ((!this.user || !this.views?.forbidden) && this.signInRoute) {
-      this.navigator.navigate(this.href(this.signInRoute, { returnTo: `${this.current.pathname}${this.current.search}${this.current.hash}` }), { history: 'replace' });
+      this.navigator.navigate(this.href(this.signInRoute, { returnTo: this.returnAddress(this.current) }), { history: 'replace' });
       return;
     }
     this.page = { ...this.page, view: await this.resolveView(this.views?.forbidden), status: 'forbidden' };
