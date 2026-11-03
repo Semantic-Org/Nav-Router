@@ -4,9 +4,11 @@ import { isLazy } from '../helpers/lazy.js';
 
 // recovers once per url when a fresh deploy invalidates an old lazy view chunk.
 // hover preloads swallow rejections, so only an actual failed navigation triggers a document load
+// the reload is the platform's own, a reload event the router declines, since an assign() of the
+// same url is a navigation it would intercept and the chunk would only fail again
 export default ({
   storageKey = 'nav-router:chunk-reload',
-  reload = (url) => globalThis.location?.assign?.(url),
+  reload = () => globalThis.location?.reload?.(),
 } = {}, Router) => {
   const proto = Router.prototype;
   const { intercepted, resolveView, settled, failed, stop } = proto;
