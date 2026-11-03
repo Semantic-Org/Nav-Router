@@ -49,7 +49,9 @@ export function TeamOverviewPage(context) {
         </div>
       </div>
 
-      ${tab === 'overview' ? `
+      ${
+    tab === 'overview'
+      ? `
         <div class="kpi-strip">
           <div class="kpi-box">
             <span class="kpi-label">Organization</span>
@@ -64,59 +66,84 @@ export function TeamOverviewPage(context) {
             <strong class="kpi-val">${compact ? 'Compact Rows' : 'Detailed Cards'}</strong>
           </div>
         </div>
-      ` : ''}
+      `
+      : ''
+  }
 
-      ${tab === 'activity' ? `
+      ${
+    tab === 'activity'
+      ? `
         <div class="activity-feed ${compact ? 'is-compact' : ''}">
-          ${members.map((member) => `
+          ${
+        members.map((member) => `
             <div class="activity-row">
               <div class="activity-meta">
                 <a href="/team/${escapeHTML(org)}/${escapeHTML(member.id)}" class="member-link">
                   <strong>${escapeHTML(member.name)}</strong>
                 </a>
-                <span class="badge ${member.access === 'admin' ? 'badge-admin' : 'badge-member'}">${escapeHTML(member.access)}</span>
+                <span class="badge ${member.access === 'admin' ? 'badge-admin' : 'badge-member'}">${
+          escapeHTML(member.access)
+        }</span>
                 <span class="muted">${escapeHTML(member.team)}</span>
               </div>
               <p class="activity-text">${escapeHTML(member.activity)}</p>
             </div>
-          `).join('')}
+          `).join('')
+      }
         </div>
-      ` : `
+      `
+      : `
         <div class="members-collection ${compact ? 'members-compact-table' : 'members-card-grid'}">
-          ${members.map((member) => (compact ? `
+          ${
+        members.map((member) => (compact
+          ? `
             <div class="member-compact-row">
               <a href="/team/${escapeHTML(org)}/${escapeHTML(member.id)}" class="member-link">
                 <strong>${escapeHTML(member.name)}</strong>
                 <span class="muted">${escapeHTML(member.handle)}</span>
               </a>
               <span class="muted">${escapeHTML(member.role)}</span>
-              <span class="badge ${member.access === 'admin' ? 'badge-admin' : 'badge-member'}">${escapeHTML(member.access)}</span>
+              <span class="badge ${member.access === 'admin' ? 'badge-admin' : 'badge-member'}">${
+            escapeHTML(member.access)
+          }</span>
               <a href="/team/${escapeHTML(org)}/${escapeHTML(member.id)}?section=commits" class="btn-tiny">Commits →</a>
             </div>
-          ` : `
+          `
+          : `
             <article class="member-card">
               <div class="member-card-top">
                 <div>
                   <h4>
-                    <a href="/team/${escapeHTML(org)}/${escapeHTML(member.id)}" class="member-link">${escapeHTML(member.name)}</a>
+                    <a href="/team/${escapeHTML(org)}/${escapeHTML(member.id)}" class="member-link">${
+            escapeHTML(member.name)
+          }</a>
                   </h4>
                   <span class="member-role">${escapeHTML(member.role)} · ${escapeHTML(member.team)}</span>
                 </div>
-                <span class="badge ${member.access === 'admin' ? 'badge-admin' : 'badge-member'}">${escapeHTML(member.access)}</span>
+                <span class="badge ${member.access === 'admin' ? 'badge-admin' : 'badge-member'}">${
+            escapeHTML(member.access)
+          }</span>
               </div>
               <p class="member-bio">${escapeHTML(member.bio)}</p>
               <div class="member-card-footer">
                 <span class="muted">${escapeHTML(member.location)}</span>
                 <div class="card-links">
                   <a href="/team/${escapeHTML(org)}/${escapeHTML(member.id)}" class="btn-tiny">Profile</a>
-                  <a href="/team/${escapeHTML(org)}/${escapeHTML(member.id)}?section=commits" class="btn-tiny">Commits</a>
-                  <a href="/team/${escapeHTML(org)}/${escapeHTML(member.id)}?section=permissions" class="btn-tiny">Permissions</a>
+                  <a href="/team/${escapeHTML(org)}/${
+            escapeHTML(member.id)
+          }?section=commits" class="btn-tiny">Commits</a>
+                  <a href="/team/${escapeHTML(org)}/${
+            escapeHTML(member.id)
+          }?section=permissions" class="btn-tiny">Permissions</a>
                 </div>
               </div>
             </article>
-          `)).join('')}
+          `)
+        ).join('')
+      }
         </div>
-      `}
+      `
+  }
     </div>
   `;
 }

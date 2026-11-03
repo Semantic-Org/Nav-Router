@@ -29,10 +29,11 @@ export function TeamSidebar(context) {
       <div id="sidebar-scroll" class="sidebar-scroll-area" tabindex="0" aria-label="Team Members and Shortcuts">
         <div class="sidebar-group-label">Team Members (<code>/team/:org/:userId</code>)</div>
         <ul class="sidebar-list">
-          ${members.map((member) => {
-            const href = `/team/${org}/${member.id}`;
-            const isSelected = activeUserId === member.id;
-            return `
+          ${
+    members.map((member) => {
+      const href = `/team/${org}/${member.id}`;
+      const isSelected = activeUserId === member.id;
+      return `
               <li>
                 <a href="${escapeHTML(href)}" class="sidebar-item ${isSelected ? 'is-active' : ''}">
                   <div class="sidebar-item-main">
@@ -43,9 +44,12 @@ export function TeamSidebar(context) {
                 </a>
               </li>
             `;
-          }).join('')}
+    }).join('')
+  }
           <li>
-            <a href="/team/${escapeHTML(org)}/unknown-user" class="sidebar-item sidebar-item-danger ${activeUserId === 'unknown-user' ? 'is-active' : ''}">
+            <a href="/team/${escapeHTML(org)}/unknown-user" class="sidebar-item sidebar-item-danger ${
+    activeUserId === 'unknown-user' ? 'is-active' : ''
+  }">
               <div class="sidebar-item-main">
                 <span class="status-dot status-danger"></span>
                 <span class="sidebar-item-name">unknown-user</span>
@@ -57,10 +61,11 @@ export function TeamSidebar(context) {
 
         <div class="sidebar-group-label">Deep-Link Shortcuts (Scrollable Area)</div>
         <ul class="sidebar-list">
-          ${sidebarShortcuts.map((item) => {
-            const href = item.path(org);
-            const isSelected = fullPath === href;
-            return `
+          ${
+    sidebarShortcuts.map((item) => {
+      const href = item.path(org);
+      const isSelected = fullPath === href;
+      return `
               <li>
                 <a href="${escapeHTML(href)}" class="sidebar-item ${isSelected ? 'is-active' : ''}">
                   <div class="sidebar-item-main">
@@ -70,7 +75,8 @@ export function TeamSidebar(context) {
                 </a>
               </li>
             `;
-          }).join('')}
+    }).join('')
+  }
         </ul>
       </div>
     </div>

@@ -21,7 +21,8 @@ export const sitemap = (...args) => router().sitemap(...args);
 
 // verbs
 export const navigate = (...args) => router().navigate(...args);
-export const replace = (target, args = {}, options = {}) => router().navigate(target, args, { ...options, history: 'replace' });
+export const replace = (target, args = {}, options = {}) =>
+  router().navigate(target, args, { ...options, history: 'replace' });
 export const reload = (...args) => router().reload(...args);
 export const back = (...args) => router().back(...args);
 export const forward = (...args) => router().forward(...args);

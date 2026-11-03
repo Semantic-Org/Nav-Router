@@ -1,18 +1,29 @@
 // classes
-export { Navigator, createNavigator } from './navigator.js';
+export { createNavigator, Navigator } from './navigator.js';
 export { Route, route } from './route.js';
 export { Router, router, site } from './router.js';
 
 // helpers
-export { lazy, isLazy } from './helpers/lazy.js';
-export {
-  setRouter,
-  href, urlFor, url, match, sitemap,
-  navigate, replace, reload, back, forward, traverseTo, preload, confirmLeave,
-} from './helpers/router.js';
+export { canAccess } from './helpers/can-access.js';
 export { isActive } from './helpers/is-active.js';
 export { isCurrent } from './helpers/is-current.js';
-export { canAccess } from './helpers/can-access.js';
+export { isLazy, lazy } from './helpers/lazy.js';
+export {
+  back,
+  confirmLeave,
+  forward,
+  href,
+  match,
+  navigate,
+  preload,
+  reload,
+  replace,
+  setRouter,
+  sitemap,
+  traverseTo,
+  url,
+  urlFor,
+} from './helpers/router.js';
 export { update } from './helpers/update.js';
 
 // identity

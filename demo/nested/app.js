@@ -155,7 +155,9 @@ function renderInspector() {
     : (lastRenderedState?.status === 'loading' && pending ? 'loading' : (page?.status ?? 'idle'));
 
   const pendingLabel = pending
-    ? `${pending.navigationType ?? 'nav'} → ${new URL(pending.url, window.location.origin).pathname}${pending.loading ? ' (loading)' : ' (holding)'}`
+    ? `${pending.navigationType ?? 'nav'} → ${new URL(pending.url, window.location.origin).pathname}${
+      pending.loading ? ' (loading)' : ' (holding)'
+    }`
     : 'null';
 
   inspectorEl.innerHTML = `
@@ -209,7 +211,9 @@ function renderInspector() {
         </div>
         <div class="insp-cell">
           <span class="insp-label">status</span>
-          <code id="insp-status" class="status-tag status-tag-${escapeHTML(statusValue)}">${escapeHTML(statusValue)}</code>
+          <code id="insp-status" class="status-tag status-tag-${escapeHTML(statusValue)}">${
+    escapeHTML(statusValue)
+  }</code>
         </div>
         <div class="insp-cell">
           <span class="insp-label">pending</span>
@@ -236,13 +240,14 @@ function renderInspector() {
       <div class="inspector-entries-row">
         <span class="insp-label">navigation.entries() (${entries.length}) — click to <code>traverseTo(key)</code>:</span>
         <div class="entries-strip" id="insp-entries-list">
-          ${entries.map((entry) => {
-            const parsedUrl = entry.url ? new URL(entry.url, window.location.origin) : null;
-            const labelPath = parsedUrl ? `${parsedUrl.pathname}${parsedUrl.search}` : '(unrouted)';
-            const isCurrent = entry.key === currentEntryKey;
-            const isCached = Boolean(entry.key && app.entryCache.has(entry.key));
-            const savedScroll = entry.getState?.()?.scroll?.['#sidebar-scroll']?.top;
-            return `
+          ${
+    entries.map((entry) => {
+      const parsedUrl = entry.url ? new URL(entry.url, window.location.origin) : null;
+      const labelPath = parsedUrl ? `${parsedUrl.pathname}${parsedUrl.search}` : '(unrouted)';
+      const isCurrent = entry.key === currentEntryKey;
+      const isCached = Boolean(entry.key && app.entryCache.has(entry.key));
+      const savedScroll = entry.getState?.()?.scroll?.['#sidebar-scroll']?.top;
+      return `
               <button
                 type="button"
                 class="entry-chip ${isCurrent ? 'is-current' : ''}"
@@ -257,7 +262,8 @@ function renderInspector() {
                 ${savedScroll !== undefined ? `<span class="entry-scroll">⇅${Math.round(savedScroll)}px</span>` : ''}
               </button>
             `;
-          }).join('')}
+    }).join('')
+  }
         </div>
       </div>
     </div>

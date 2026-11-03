@@ -58,9 +58,12 @@ export default ({
 
   // the hook sees what the other hooks see, with the page's data and slices, so a reactive router
   // tracks what it reads. a sync answer waits for the render's write, an async one lands on its own
-  proto.evaluateMeta = function (route) {
+  proto.evaluateMeta = function(route) {
     const context = this.contextFor(route, this.page, { data: this.page.data, slices: this.page.slices });
-    const value = this.evaluateHook(route, route.meta, context, { kind: 'slice', changed: (answer) => this.metaChanged(route, answer) });
+    const value = this.evaluateHook(route, route.meta, context, {
+      kind: 'slice',
+      changed: (answer) => this.metaChanged(route, answer),
+    });
     if (isPromise(value)) {
       this.metaChanged(route, value);
     }
@@ -69,37 +72,37 @@ export default ({
     }
   };
 
-  proto.storeMeta = function (route, value) {
+  proto.storeMeta = function(route, value) {
     (this.headMeta ??= new Map()).set(route, isPlainObject(value) ? value : {});
   };
 
-  proto.metaChanged = async function (route, value) {
+  proto.metaChanged = async function(route, value) {
     this.storeMeta(route, await value);
     if (route.active && this.page) {
       this.writeHead(this.page);
     }
   };
 
-  proto.onRouteCreated = function (route, context) {
+  proto.onRouteCreated = function(route, context) {
     if (route.meta !== undefined) {
       this.evaluateMeta(route);
     }
     return onRouteCreated.call(this, route, context);
   };
 
-  proto.onRouteUpdated = function (route, context) {
+  proto.onRouteUpdated = function(route, context) {
     if (route.meta !== undefined) {
       this.evaluateMeta(route);
     }
     return onRouteUpdated.call(this, route, context);
   };
 
-  proto.onRouteDestroyed = function (route, context) {
+  proto.onRouteDestroyed = function(route, context) {
     this.headMeta?.delete(route);
     return onRouteDestroyed.call(this, route, context);
   };
 
-  proto.writeHead = function (page) {
+  proto.writeHead = function(page) {
     const doc = globalThis.document;
     if (!page || page.status === 'loading') {
       return;
@@ -160,12 +163,12 @@ export default ({
     }
   };
 
-  proto.renderView = async function (page, event = null) {
+  proto.renderView = async function(page, event = null) {
     this.writeHead(page);
     return renderView.call(this, page, event);
   };
 
-  proto.stop = function () {
+  proto.stop = function() {
     if (this.headTags) {
       for (const [key, record] of this.headTags.entries()) {
         restoreEntry(key, record);

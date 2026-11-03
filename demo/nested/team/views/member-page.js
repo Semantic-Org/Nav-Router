@@ -31,9 +31,13 @@ export function MemberPage(context) {
           <div class="member-title-line">
             <h3>${escapeHTML(member.name)}</h3>
             <span class="muted">${escapeHTML(member.handle ?? `@${member.id}`)}</span>
-            <span class="badge ${member.access === 'admin' ? 'badge-admin' : 'badge-member'}">${escapeHTML(member.access)}</span>
+            <span class="badge ${member.access === 'admin' ? 'badge-admin' : 'badge-member'}">${
+    escapeHTML(member.access)
+  }</span>
           </div>
-          <p class="member-sub">${escapeHTML(member.role)} · ${escapeHTML(member.team)} · ${escapeHTML(member.location)}</p>
+          <p class="member-sub">${escapeHTML(member.role)} · ${escapeHTML(member.team)} · ${
+    escapeHTML(member.location)
+  }</p>
         </div>
 
         <div class="member-nav-actions">
@@ -43,46 +47,65 @@ export function MemberPage(context) {
       </div>
 
       <div class="section-subtabs" role="tablist" aria-label="Member Section Query Tabs">
-        <a href="/team/${escapeHTML(org)}/${escapeHTML(member.id)}?section=profile" class="subtab ${section === 'profile' ? 'is-active' : ''}">
+        <a href="/team/${escapeHTML(org)}/${escapeHTML(member.id)}?section=profile" class="subtab ${
+    section === 'profile' ? 'is-active' : ''
+  }">
           Profile (<code>?section=profile</code>)
         </a>
-        <a href="/team/${escapeHTML(org)}/${escapeHTML(member.id)}?section=commits" class="subtab ${section === 'commits' ? 'is-active' : ''}">
+        <a href="/team/${escapeHTML(org)}/${escapeHTML(member.id)}?section=commits" class="subtab ${
+    section === 'commits' ? 'is-active' : ''
+  }">
           Commits (<code>?section=commits</code>)
         </a>
-        <a href="/team/${escapeHTML(org)}/${escapeHTML(member.id)}?section=permissions" class="subtab ${section === 'permissions' ? 'is-active' : ''}">
+        <a href="/team/${escapeHTML(org)}/${escapeHTML(member.id)}?section=permissions" class="subtab ${
+    section === 'permissions' ? 'is-active' : ''
+  }">
           Permissions (<code>?section=permissions</code>)
         </a>
-        <a href="/team/${escapeHTML(org)}/${escapeHTML(member.id)}?section=invalid-value" class="subtab" title="Invalid value falls back to default 'profile'">
+        <a href="/team/${escapeHTML(org)}/${
+    escapeHTML(member.id)
+  }?section=invalid-value" class="subtab" title="Invalid value falls back to default 'profile'">
           Test Invalid Query (<code>?section=invalid-value</code>)
         </a>
       </div>
 
       <div class="member-section-body">
-        ${section === 'commits' ? `
+        ${
+    section === 'commits'
+      ? `
           <div class="commits-list">
             <h4>Recent Commits by ${escapeHTML(member.name)}</h4>
-            ${(member.commits ?? []).map((commit) => `
+            ${
+        (member.commits ?? []).map((commit) => `
               <div class="commit-row">
                 <code class="commit-sha">${escapeHTML(commit.sha)}</code>
                 <span class="commit-msg">${escapeHTML(commit.message)}</span>
                 <span class="commit-meta">${escapeHTML(commit.branch)} · ${escapeHTML(commit.time)}</span>
               </div>
-            `).join('')}
+            `).join('')
+      }
           </div>
-        ` : (section === 'permissions' ? `
+        `
+      : (section === 'permissions'
+        ? `
           <div class="permissions-list">
             <h4>Access Matrix for ${escapeHTML(member.name)}</h4>
-            ${(member.permissions ?? []).map((perm) => `
+            ${
+          (member.permissions ?? []).map((perm) => `
               <div class="permission-row">
                 <div>
                   <code>${escapeHTML(perm.scope)}</code>
                   <p class="muted">${escapeHTML(perm.description)}</p>
                 </div>
-                <span class="badge ${perm.level === 'No Access' ? 'badge-anon' : 'badge-admin'}">${escapeHTML(perm.level)}</span>
+                <span class="badge ${perm.level === 'No Access' ? 'badge-anon' : 'badge-admin'}">${
+            escapeHTML(perm.level)
+          }</span>
               </div>
-            `).join('')}
+            `).join('')
+        }
           </div>
-        ` : `
+        `
+        : `
           <div class="profile-details">
             <h4>Biography &amp; Responsibilities</h4>
             <p>${escapeHTML(member.bio)}</p>
@@ -105,7 +128,8 @@ export function MemberPage(context) {
               </div>
             </div>
           </div>
-        `)}
+        `)
+  }
       </div>
     </div>
   `;

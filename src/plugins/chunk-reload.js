@@ -13,12 +13,12 @@ export default ({
   const proto = Router.prototype;
   const { intercepted, resolveView, settled, failed, stop } = proto;
 
-  proto.intercepted = function (matched, event) {
+  proto.intercepted = function(matched, event) {
     this.chunkError = null;
     return intercepted.call(this, matched, event);
   };
 
-  proto.resolveView = async function (target) {
+  proto.resolveView = async function(target) {
     const tracked = isLazy(target) || isPromise(target);
     try {
       return await resolveView.call(this, target);
@@ -31,7 +31,7 @@ export default ({
     }
   };
 
-  proto.settled = function (event) {
+  proto.settled = function(event) {
     this.chunkError = null;
     try {
       globalThis.sessionStorage?.removeItem(storageKey);
@@ -40,7 +40,7 @@ export default ({
     return settled.call(this, event);
   };
 
-  proto.failed = function (error, event) {
+  proto.failed = function(error, event) {
     const isChunkError = Boolean(error && this.chunkError === error);
     this.chunkError = null;
     const url = this.pending?.url ?? globalThis.location?.href ?? null;
@@ -59,7 +59,7 @@ export default ({
     return failed.call(this, error, event);
   };
 
-  proto.stop = function () {
+  proto.stop = function() {
     this.chunkError = null;
     return stop.call(this);
   };

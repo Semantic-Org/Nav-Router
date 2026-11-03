@@ -16,34 +16,36 @@ export default ({ trackGroup = 'router' } = {}, Router) => {
     tooltipText,
   });
 
-  proto.closeNavigationSpan = function (status, color, tooltipText = 0) {
+  proto.closeNavigationSpan = function(status, color, tooltipText = 0) {
     const span = this.navigationSpan;
     if (!span) {
       return;
     }
     this.navigationSpan = null;
     span.close({
-      detail: () => detail(
-        'navigation',
-        color,
-        [['route', span.label], ['status', status]],
-        tooltipText,
-      ),
+      detail: () =>
+        detail(
+          'navigation',
+          color,
+          [['route', span.label], ['status', status]],
+          tooltipText,
+        ),
     });
   };
 
-  proto.start = async function () {
+  proto.start = async function() {
     const close = measureTimeline('router:start');
     try {
       const result = await start.call(this);
       const label = routeLabel(this.page);
       close({
-        detail: () => detail(
-          'navigation',
-          'primary',
-          [['route', label], ['status', this.page?.status ?? 'ok']],
-          isDevelopment ? `Initial load (${label})` : 0,
-        ),
+        detail: () =>
+          detail(
+            'navigation',
+            'primary',
+            [['route', label], ['status', this.page?.status ?? 'ok']],
+            isDevelopment ? `Initial load (${label})` : 0,
+          ),
       });
       return result;
     }
@@ -53,16 +55,17 @@ export default ({ trackGroup = 'router' } = {}, Router) => {
     }
   };
 
-  proto.intercepted = function (matched, event) {
+  proto.intercepted = function(matched, event) {
     const label = routeLabel(matched);
     const type = event?.navigationType ?? 'push';
     markTimeline('router:intercepted', {
-      detail: () => detail(
-        'navigation',
-        'primary',
-        [['route', label], ['type', type]],
-        isDevelopment ? `Intercepted ${label}` : 0,
-      ),
+      detail: () =>
+        detail(
+          'navigation',
+          'primary',
+          [['route', label], ['type', type]],
+          isDevelopment ? `Intercepted ${label}` : 0,
+        ),
     });
     if (this.navigationSpan) {
       this.closeNavigationSpan('aborted', 'tertiary', isDevelopment ? `Aborted ${this.navigationSpan.label}` : 0);
@@ -75,7 +78,7 @@ export default ({ trackGroup = 'router' } = {}, Router) => {
     return intercepted.call(this, matched, event);
   };
 
-  proto.settled = function (event) {
+  proto.settled = function(event) {
     if (this.navigationSpan) {
       const status = this.page?.status ?? 'ok';
       this.closeNavigationSpan(status, 'primary', isDevelopment ? `Settled ${this.navigationSpan.label}` : 0);
@@ -83,7 +86,7 @@ export default ({ trackGroup = 'router' } = {}, Router) => {
     return settled.call(this, event);
   };
 
-  proto.failed = function (error, event) {
+  proto.failed = function(error, event) {
     const span = this.navigationSpan;
     if (span && (!event?.signal || !span.signal || span.signal === event.signal)) {
       const aborted = error?.name === 'AbortError';
@@ -96,18 +99,19 @@ export default ({ trackGroup = 'router' } = {}, Router) => {
     return failed.call(this, error, event);
   };
 
-  proto.runGuards = async function (matched, navigation) {
+  proto.runGuards = async function(matched, navigation) {
     const label = routeLabel(matched);
     const close = measureTimeline('router:guards');
     try {
       const outcome = await runGuards.call(this, matched, navigation);
       close({
-        detail: () => detail(
-          'cascade',
-          outcome ? 'secondary' : 'primary',
-          [['route', label], ['outcome', outcome?.status ?? 'allow']],
-          isDevelopment ? `Guards (${label})` : 0,
-        ),
+        detail: () =>
+          detail(
+            'cascade',
+            outcome ? 'secondary' : 'primary',
+            [['route', label], ['outcome', outcome?.status ?? 'allow']],
+            isDevelopment ? `Guards (${label})` : 0,
+          ),
       });
       return outcome;
     }
@@ -117,18 +121,19 @@ export default ({ trackGroup = 'router' } = {}, Router) => {
     }
   };
 
-  proto.runData = async function (matched, navigation) {
+  proto.runData = async function(matched, navigation) {
     const label = routeLabel(matched);
     const close = measureTimeline('router:data');
     try {
       const outcome = await runData.call(this, matched, navigation);
       close({
-        detail: () => detail(
-          'cascade',
-          outcome?.status === 'ok' ? 'primary' : 'secondary',
-          [['route', label], ['status', outcome?.status ?? 'ok']],
-          isDevelopment ? `Data (${label})` : 0,
-        ),
+        detail: () =>
+          detail(
+            'cascade',
+            outcome?.status === 'ok' ? 'primary' : 'secondary',
+            [['route', label], ['status', outcome?.status ?? 'ok']],
+            isDevelopment ? `Data (${label})` : 0,
+          ),
       });
       return outcome;
     }
@@ -138,7 +143,7 @@ export default ({ trackGroup = 'router' } = {}, Router) => {
     }
   };
 
-  proto.renderView = async function (page, event = null) {
+  proto.renderView = async function(page, event = null) {
     const status = page?.status ?? 'ok';
     const close = measureTimeline('router:render');
     try {
@@ -146,17 +151,18 @@ export default ({ trackGroup = 'router' } = {}, Router) => {
     }
     finally {
       close({
-        detail: () => detail(
-          'cascade',
-          'primary',
-          [['status', status]],
-          isDevelopment ? `Render (${status})` : 0,
-        ),
+        detail: () =>
+          detail(
+            'cascade',
+            'primary',
+            [['status', status]],
+            isDevelopment ? `Render (${status})` : 0,
+          ),
       });
     }
   };
 
-  proto.updateData = async function (route, value) {
+  proto.updateData = async function(route, value) {
     const label = route?.name || route?.path || 'slice';
     const close = measureTimeline('router:recompute');
     try {
@@ -164,17 +170,18 @@ export default ({ trackGroup = 'router' } = {}, Router) => {
     }
     finally {
       close({
-        detail: () => detail(
-          'cascade',
-          'tertiary',
-          [['route', label]],
-          isDevelopment ? `Recompute (${label})` : 0,
-        ),
+        detail: () =>
+          detail(
+            'cascade',
+            'tertiary',
+            [['route', label]],
+            isDevelopment ? `Recompute (${label})` : 0,
+          ),
       });
     }
   };
 
-  proto.stop = function () {
+  proto.stop = function() {
     if (this.navigationSpan) {
       this.closeNavigationSpan('aborted', 'tertiary', isDevelopment ? `Aborted ${this.navigationSpan.label}` : 0);
     }

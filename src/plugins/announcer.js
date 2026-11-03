@@ -1,6 +1,7 @@
 import { isEqual } from '@semantic-ui/utils';
 
-const LIVE_REGION_STYLE = 'position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0';
+const LIVE_REGION_STYLE =
+  'position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0';
 const STATUS_WORDS = { forbidden: 'Access denied', notFound: 'Not found', error: 'Error' };
 
 // announces each page through a live region, covering webkit's silence on intercepted navigations.
@@ -9,13 +10,15 @@ const STATUS_WORDS = { forbidden: 'Access denied', notFound: 'Not found', error:
 // initial load, hash jumps and same-title query keystrokes stay quiet
 export default ({
   politeness = 'polite',
-  format = (page) => [STATUS_WORDS[page.status], page.title || (page.url ? new URL(page.url, 'http://x').pathname : '')].filter(Boolean).join(', '),
+  format = (page) =>
+    [STATUS_WORDS[page.status], page.title || (page.url ? new URL(page.url, 'http://x').pathname : '')].filter(Boolean)
+      .join(', '),
 } = {}, Router) => {
   const proto = Router.prototype;
   const { start, intercepted, renderView, settled, failed, stop } = proto;
 
   // mounted empty ahead of time so screen readers register the live region before its text mutates
-  proto.ensureAnnouncer = function () {
+  proto.ensureAnnouncer = function() {
     this.announcer ??= { element: null, queued: null, lastText: '', lastPage: null };
     if (!this.announcer.element && globalThis.document?.body) {
       const element = globalThis.document.createElement('div');
@@ -36,12 +39,12 @@ export default ({
     announcer.lastText = text;
   };
 
-  proto.start = function () {
+  proto.start = function() {
     this.ensureAnnouncer();
     return start.call(this);
   };
 
-  proto.intercepted = function (matched, event) {
+  proto.intercepted = function(matched, event) {
     const announcer = this.ensureAnnouncer();
     announcer.queued = null;
     // clearing on departure makes back-to-back routes with identical titles announce again on settle
@@ -51,14 +54,15 @@ export default ({
     return intercepted.call(this, matched, event);
   };
 
-  proto.renderView = async function (page, event = null) {
+  proto.renderView = async function(page, event = null) {
     await renderView.call(this, page, event);
     if (!page || page.status === 'loading') {
       return;
     }
     const announcer = this.ensureAnnouncer();
     const { lastPage } = announcer;
-    const moved = !lastPage || lastPage.route !== page.route || !isEqual(lastPage.params, page.params) || event?.navigationType === 'reload';
+    const moved = !lastPage || lastPage.route !== page.route || !isEqual(lastPage.params, page.params)
+      || event?.navigationType === 'reload';
     announcer.lastPage = { route: page.route, params: page.params };
     const text = String(format(page) ?? '');
     if (!lastPage || event?.initial || !text || (!moved && text === announcer.lastText)) {
@@ -72,7 +76,7 @@ export default ({
     }
   };
 
-  proto.settled = function (event) {
+  proto.settled = function(event) {
     const result = settled.call(this, event);
     if (this.announcer?.queued) {
       speak(this.announcer, this.announcer.queued);
@@ -81,14 +85,14 @@ export default ({
     return result;
   };
 
-  proto.failed = function (error, event) {
+  proto.failed = function(error, event) {
     if (this.announcer) {
       this.announcer.queued = null;
     }
     return failed.call(this, error, event);
   };
 
-  proto.stop = function () {
+  proto.stop = function() {
     if (this.announcer) {
       this.announcer.element?.remove();
       this.announcer = null;

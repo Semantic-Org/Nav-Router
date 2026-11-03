@@ -5,10 +5,13 @@ import { IS_NAVIGATOR } from './internal-helpers/identity.js';
 // the platform seam: window.navigation projected as plain fields, the verbs, the filter, and the
 // moments handed to the router by name. nothing here decides a route or holds one
 export class Navigator {
-
   // brand navigator
-  get [IS_NAVIGATOR]() { return true; }
-  static [Symbol.hasInstance](value) { return !!value?.[IS_NAVIGATOR]; }
+  get [IS_NAVIGATOR]() {
+    return true;
+  }
+  static [Symbol.hasInstance](value) {
+    return !!value?.[IS_NAVIGATOR];
+  }
 
   constructor(router) {
     this.router = router;
@@ -123,10 +126,13 @@ export class Navigator {
   navigate(url, { state, info, history = 'auto', resetScroll = true, resetFocus = true } = {}) {
     const nav = globalThis.navigation;
     if (!nav) {
-      return this.documentLoad(() => (history === 'replace' ? globalThis.location.replace(url) : globalThis.location.assign(url)));
+      return this.documentLoad(
+        () => (history === 'replace' ? globalThis.location.replace(url) : globalThis.location.assign(url)),
+      );
     }
     // a replace without state would wipe the entry's memory, and auto becomes a replace on the same url
-    const sameUrl = history === 'auto' && globalThis.location && new URL(url, globalThis.location.href).href === nav.currentEntry?.url;
+    const sameUrl = history === 'auto' && globalThis.location
+      && new URL(url, globalThis.location.href).href === nav.currentEntry?.url;
     const resolvedState = state === undefined && (history === 'replace' || sameUrl)
       ? nav.currentEntry?.getState?.()
       : state;

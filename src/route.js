@@ -1,20 +1,15 @@
-import {
-  each,
-  extend,
-  isBoolean,
-  isDate,
-  isNumber,
-  isPlainObject,
-  isString,
-} from '@semantic-ui/utils';
+import { each, extend, isBoolean, isDate, isNumber, isPlainObject, isString } from '@semantic-ui/utils';
 
 import { IS_ROUTE, IS_ROUTER } from './internal-helpers/identity.js';
 
 export class Route {
-
   // brand route
-  get [IS_ROUTE]() { return true; }
-  static [Symbol.hasInstance](value) { return !!value?.[IS_ROUTE]; }
+  get [IS_ROUTE]() {
+    return true;
+  }
+  static [Symbol.hasInstance](value) {
+    return !!value?.[IS_ROUTE];
+  }
 
   static defaults = {
     params: {},
@@ -153,8 +148,8 @@ export class Route {
   isSectionConfig(config) {
     return Boolean(
       config.index
-      || config.routes
-      || (config.layout && !config.view && !config.redirect),
+        || config.routes
+        || (config.layout && !config.view && !config.redirect),
     );
   }
 

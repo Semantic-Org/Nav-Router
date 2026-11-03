@@ -22,11 +22,21 @@ export const canAccess = (target, args = {}) => {
     return false;
   }
   const { params, query } = instance.splitArgs(route, args);
-  const matched = { route, params: { ...defaultParams(route), ...params }, query, chain: route.ancestors, currentRoutes: route.ancestors };
+  const matched = {
+    route,
+    params: { ...defaultParams(route), ...params },
+    query,
+    chain: route.ancestors,
+    currentRoutes: route.ancestors,
+  };
   const results = [];
   for (const ancestor of route.ancestors) {
     if (ancestor.permission !== undefined) {
-      results.push(isFunction(ancestor.permission) ? ancestor.permission(instance.contextFor(ancestor, matched)) : ancestor.permission);
+      results.push(
+        isFunction(ancestor.permission)
+          ? ancestor.permission(instance.contextFor(ancestor, matched))
+          : ancestor.permission,
+      );
     }
   }
   if (results.some(isPromise)) {

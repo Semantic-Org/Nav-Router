@@ -13,7 +13,6 @@ import { Router } from './router.js';
 // four primitives below; the fifth, the per-key store, is built from signals unless the provider
 // has a native one ($state, a store, reactive())
 export class ReactiveRouter extends Router {
-
   constructor(options) {
     super(options);
     // a tracked page is live; a cached result would not be

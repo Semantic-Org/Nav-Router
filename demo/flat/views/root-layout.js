@@ -31,21 +31,33 @@ export function RootLayout(context) {
             <span class="brand-dot"></span>
             <span class="brand-name">Acme Console</span>
           </a>
-          ${state.titles?.length ? `
+          ${
+    state.titles?.length
+      ? `
             <nav class="breadcrumbs" aria-label="Breadcrumb">
-              ${state.titles.map((title, index) => `
-                <span class="crumb ${index === state.titles.length - 1 ? 'crumb-current' : ''}">${escapeHTML(title)}</span>
-              `).join('<span class="crumb-sep">/</span>')}
+              ${
+        state.titles.map((title, index) => `
+                <span class="crumb ${index === state.titles.length - 1 ? 'crumb-current' : ''}">${
+          escapeHTML(title)
+        }</span>
+              `).join('<span class="crumb-sep">/</span>')
+      }
             </nav>
-          ` : ''}
+          `
+      : ''
+  }
         </div>
 
         <nav class="primary-links" aria-label="Primary Navigation">
           <a href="/" class="nav-link ${isActive('/', true)}">Overview</a>
           <a href="/team/acme" class="nav-link ${isActive('/team/acme')}">Team Acme</a>
           <a href="/team/globex" class="nav-link ${isActive('/team/globex')}">Team Globex</a>
-          <a href="/team/acme/analytics" class="nav-link ${pathname.endsWith('/analytics') ? 'is-active' : ''}">Analytics</a>
-          <a href="/team/acme/settings" class="nav-link ${pathname.endsWith('/settings') ? 'is-active' : ''}">Settings</a>
+          <a href="/team/acme/analytics" class="nav-link ${
+    pathname.endsWith('/analytics') ? 'is-active' : ''
+  }">Analytics</a>
+          <a href="/team/acme/settings" class="nav-link ${
+    pathname.endsWith('/settings') ? 'is-active' : ''
+  }">Settings</a>
           <a href="/old-docs" class="nav-link" title="Redirects to 'home' (/)">/old-docs ↪</a>
           <a href="/sign-in" class="nav-link ${isActive('/sign-in', true)}">Sign In</a>
         </nav>
@@ -53,9 +65,15 @@ export function RootLayout(context) {
         <div class="auth-bar">
           <span class="badge ${userBadgeClass}" id="current-user-badge">${escapeHTML(userLabel)}</span>
           <div class="auth-quick-actions" role="group" aria-label="Quick Auth Role Switcher">
-            <button type="button" class="btn-chip ${!user ? 'is-selected' : ''}" data-set-user="none" title="Set app.user = null">Out</button>
-            <button type="button" class="btn-chip ${user?.role === 'member' ? 'is-selected' : ''}" data-set-user="member" title="Set app.user = { role: 'member' }">Member</button>
-            <button type="button" class="btn-chip ${user?.role === 'admin' ? 'is-selected' : ''}" data-set-user="admin" title="Set app.user = { role: 'admin' }">Admin</button>
+            <button type="button" class="btn-chip ${
+    !user ? 'is-selected' : ''
+  }" data-set-user="none" title="Set app.user = null">Out</button>
+            <button type="button" class="btn-chip ${
+    user?.role === 'member' ? 'is-selected' : ''
+  }" data-set-user="member" title="Set app.user = { role: 'member' }">Member</button>
+            <button type="button" class="btn-chip ${
+    user?.role === 'admin' ? 'is-selected' : ''
+  }" data-set-user="admin" title="Set app.user = { role: 'admin' }">Admin</button>
           </div>
         </div>
       </header>

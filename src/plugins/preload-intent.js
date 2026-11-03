@@ -7,7 +7,7 @@ export default (options, Router, Navigator) => {
   const { attach, detach } = proto;
   const events = ['pointerover', 'focusin', 'touchstart'];
 
-  Router.prototype.preloadViews = function (matched) {
+  Router.prototype.preloadViews = function(matched) {
     const { route, currentRoutes } = matched;
     return Promise.all([
       this.resolveView(route.view),
@@ -17,14 +17,14 @@ export default (options, Router, Navigator) => {
   };
 
   // nothing is returned because nothing was decided
-  Router.prototype.preload = async function (target, args = {}) {
+  Router.prototype.preload = async function(target, args = {}) {
     const matched = this.match(this.href(target, args));
     if (matched) {
       await this.preloadViews(matched);
     }
   };
 
-  proto.onPreloadIntent = function (event) {
+  proto.onPreloadIntent = function(event) {
     const link = event?.target?.closest?.('a[href], area[href]');
     if (!link?.href || link.hasAttribute('download') || (link.target && link.target !== '_self')) {
       return;
@@ -42,7 +42,7 @@ export default (options, Router, Navigator) => {
     }
   };
 
-  proto.attach = function () {
+  proto.attach = function() {
     attach.call(this);
     if ((this.router.preload ?? 'intent') === 'intent' && globalThis.document) {
       this.handlePreload ??= (event) => this.onPreloadIntent(event);
@@ -50,7 +50,7 @@ export default (options, Router, Navigator) => {
     }
   };
 
-  proto.detach = function () {
+  proto.detach = function() {
     if (this.handlePreload && globalThis.document) {
       each(events, (name) => globalThis.document.removeEventListener(name, this.handlePreload));
     }

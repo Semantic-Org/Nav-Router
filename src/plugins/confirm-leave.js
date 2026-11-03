@@ -2,9 +2,13 @@ import { each, inArray, isEqual, isFunction, isPromise, isString } from '@semant
 
 // holds dirty forms and in-flight edits on the page across link clicks, traverses and tab close.
 // sync guards refuse inside navigate before intercept runs, async modals hold precommit or roll back
-export default ({
-  confirm = (message) => (globalThis.confirm ? globalThis.confirm(message) : false),
-} = {}, Router, Navigator) => {
+export default (
+  {
+    confirm = (message) => (globalThis.confirm ? globalThis.confirm(message) : false),
+  } = {},
+  Router,
+  Navigator,
+) => {
   const routerProto = Router.prototype;
   const navProto = Navigator.prototype;
   const { runGuards, beforeCommit, afterCommit, applyCascade, stop } = routerProto;
@@ -35,14 +39,14 @@ export default ({
     return true;
   };
 
-  routerProto.hasLeaveBlockers = function () {
+  routerProto.hasLeaveBlockers = function() {
     return Boolean(
       this.leaveGuards?.size
-      || this.page?.chain?.some((route) => route.canLeave !== undefined),
+        || this.page?.chain?.some((route) => route.canLeave !== undefined),
     );
   };
 
-  routerProto.onBeforeUnload = function (event) {
+  routerProto.onBeforeUnload = function(event) {
     const context = { router: this, from: this.page, destination: null, navigationType: 'unload', event };
     let blocked = false;
     each([...(this.page?.chain ?? [])].reverse(), (route) => {
@@ -64,7 +68,7 @@ export default ({
   };
 
   // attached only while a blocker is live so idle pages stay eligible for bfcache
-  routerProto.syncBeforeUnload = function () {
+  routerProto.syncBeforeUnload = function() {
     if (!globalThis.window) {
       return;
     }
@@ -78,14 +82,14 @@ export default ({
     }
   };
 
-  routerProto.disarmBeforeUnload = function () {
+  routerProto.disarmBeforeUnload = function() {
     if (this.handleBeforeUnload && globalThis.window) {
       globalThis.window.removeEventListener('beforeunload', this.handleBeforeUnload);
       this.handleBeforeUnload = null;
     }
   };
 
-  routerProto.confirmLeave = function (guard, { signal } = {}) {
+  routerProto.confirmLeave = function(guard, { signal } = {}) {
     if (!isFunction(guard)) {
       throw new TypeError('Router.confirmLeave: expected a guard function');
     }
@@ -101,17 +105,23 @@ export default ({
     return dispose;
   };
 
-  navProto.onNavigate = function (event) {
+  navProto.onNavigate = function(event) {
     const router = this.router;
     // a leave the modal already approved comes back as a plain document load of the same url
-    if (event?.info?.[bypassKey] || event?.downloadRequest != null || (router.leaveApproved && router.leaveApproved === event?.destination?.url)) {
+    if (
+      event?.info?.[bypassKey] || event?.downloadRequest != null
+      || (router.leaveApproved && router.leaveApproved === event?.destination?.url)
+    ) {
       router.leaveApproved = null;
       return onNavigate.call(this, event);
     }
 
     const matched = router.match(event.destination?.url);
     const { current } = router;
-    if (event.hashChange && current?.route === matched?.route && isEqual(current?.params, matched?.params) && isEqual(current?.query, matched?.query)) {
+    if (
+      event.hashChange && current?.route === matched?.route && isEqual(current?.params, matched?.params)
+      && isEqual(current?.query, matched?.query)
+    ) {
       return onNavigate.call(this, event);
     }
 
@@ -187,7 +197,7 @@ export default ({
   };
 
   // hold destination guards and data until an open async leave prompt answers
-  routerProto.runGuards = async function (matched, navigation) {
+  routerProto.runGuards = async function(matched, navigation) {
     const pending = this.pendingLeave;
     if (pending && (!navigation?.signal || pending.signal === navigation.signal)) {
       if (!(await pending.decision)) {
@@ -197,7 +207,7 @@ export default ({
     return runGuards.call(this, matched, navigation);
   };
 
-  routerProto.beforeCommit = async function (work, event, controller) {
+  routerProto.beforeCommit = async function(work, event, controller) {
     const pending = this.pendingLeave;
     if (pending && (!event?.signal || pending.signal === event.signal)) {
       this.pendingLeave = null;
@@ -208,7 +218,7 @@ export default ({
     return beforeCommit.call(this, work, event, controller);
   };
 
-  routerProto.afterCommit = async function (work, event, precommitRan) {
+  routerProto.afterCommit = async function(work, event, precommitRan) {
     const pending = !precommitRan ? this.pendingLeave : null;
     if (pending && (!event?.signal || pending.signal === event.signal)) {
       this.pendingLeave = null;
@@ -229,12 +239,12 @@ export default ({
     return afterCommit.call(this, work, event, precommitRan);
   };
 
-  routerProto.applyCascade = async function (matched, resolved, event = null) {
+  routerProto.applyCascade = async function(matched, resolved, event = null) {
     await applyCascade.call(this, matched, resolved, event);
     this.syncBeforeUnload();
   };
 
-  routerProto.stop = function () {
+  routerProto.stop = function() {
     this.disarmBeforeUnload();
     this.leaveGuards?.clear();
     this.leaveGuards = null;

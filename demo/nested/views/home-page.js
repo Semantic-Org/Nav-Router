@@ -65,7 +65,11 @@ export function HomePage(context) {
             <p>
               <code>/team/:org/settings</code> requires <code>user?.role === 'admin'</code>.
               Currently: <strong>${user ? `${escapeHTML(user.name)} (${escapeHTML(user.role)})` : 'Signed Out'}</strong>
-              (${!user ? 'will redirect to /sign-in' : (user.role === 'admin' ? 'will render SettingsPage' : 'will render ForbiddenPage')}).
+              (${
+    !user
+      ? 'will redirect to /sign-in'
+      : (user.role === 'admin' ? 'will render SettingsPage' : 'will render ForbiddenPage')
+  }).
             </p>
             <div class="card-links">
               <a href="/team/acme/settings" class="btn btn-primary">Try /team/acme/settings</a>

@@ -45,19 +45,29 @@ export function TeamLayout(context) {
         </div>
 
         <nav class="team-tabs" aria-label="Team Section Navigation">
-          <a href="/team/${escapeHTML(orgKey)}" class="team-tab ${isOverviewIndex && (!activeTab || activeTab === 'overview') ? 'is-active' : ''}">
+          <a href="/team/${escapeHTML(orgKey)}" class="team-tab ${
+    isOverviewIndex && (!activeTab || activeTab === 'overview') ? 'is-active' : ''
+  }">
             Overview <span class="tab-meta">:tab=overview</span>
           </a>
-          <a href="/team/${escapeHTML(orgKey)}/members" class="team-tab ${isOverviewIndex && activeTab === 'members' ? 'is-active' : ''}">
+          <a href="/team/${escapeHTML(orgKey)}/members" class="team-tab ${
+    isOverviewIndex && activeTab === 'members' ? 'is-active' : ''
+  }">
             Members <span class="tab-meta">:tab=members</span>
           </a>
-          <a href="/team/${escapeHTML(orgKey)}/activity" class="team-tab ${isOverviewIndex && activeTab === 'activity' ? 'is-active' : ''}">
+          <a href="/team/${escapeHTML(orgKey)}/activity" class="team-tab ${
+    isOverviewIndex && activeTab === 'activity' ? 'is-active' : ''
+  }">
             Activity <span class="tab-meta">:tab=activity</span>
           </a>
-          <a href="/team/${escapeHTML(orgKey)}/analytics" class="team-tab ${routeName === 'analytics' || pathname.endsWith('/analytics') ? 'is-active' : ''}">
+          <a href="/team/${escapeHTML(orgKey)}/analytics" class="team-tab ${
+    routeName === 'analytics' || pathname.endsWith('/analytics') ? 'is-active' : ''
+  }">
             Analytics <span class="tab-meta">1500ms async</span>
           </a>
-          <a href="/team/${escapeHTML(orgKey)}/settings" class="team-tab ${routeName === 'settings' || pathname.endsWith('/settings') ? 'is-active' : ''}">
+          <a href="/team/${escapeHTML(orgKey)}/settings" class="team-tab ${
+    routeName === 'settings' || pathname.endsWith('/settings') ? 'is-active' : ''
+  }">
             Settings <span class="tab-meta">admin guard</span>
           </a>
         </nav>

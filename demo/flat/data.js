@@ -8,17 +8,41 @@ export const MEMBERS = {
     team: 'Core Platform',
     location: 'San Francisco · UTC-8',
     status: 'online',
-    bio: 'Leads routing infrastructure, edge runtime resiliency, and zero-downtime deployment pipelines across Acme Console.',
+    bio:
+      'Leads routing infrastructure, edge runtime resiliency, and zero-downtime deployment pipelines across Acme Console.',
     activity: 'Merged precommit redirect controller support in edge-router (#418)',
     commits: [
-      { sha: '9f3c2a1', message: 'feat(router): hold precommit during fast cascade transitions', branch: 'main', time: '14m ago' },
-      { sha: '4d81e0b', message: 'fix(navigator): preserve scroll state on replace navigations', branch: 'main', time: '2h ago' },
-      { sha: '1a77c4e', message: 'refactor(route): unify param and query coercion specs', branch: 'main', time: '1d ago' },
+      {
+        sha: '9f3c2a1',
+        message: 'feat(router): hold precommit during fast cascade transitions',
+        branch: 'main',
+        time: '14m ago',
+      },
+      {
+        sha: '4d81e0b',
+        message: 'fix(navigator): preserve scroll state on replace navigations',
+        branch: 'main',
+        time: '2h ago',
+      },
+      {
+        sha: '1a77c4e',
+        message: 'refactor(route): unify param and query coercion specs',
+        branch: 'main',
+        time: '1d ago',
+      },
     ],
     permissions: [
-      { scope: 'org:settings', level: 'Read / Write', description: 'Configure organization security, SSO, and billing policies' },
+      {
+        scope: 'org:settings',
+        level: 'Read / Write',
+        description: 'Configure organization security, SSO, and billing policies',
+      },
       { scope: 'deploy:production', level: 'Admin', description: 'Approve and promote production edge releases' },
-      { scope: 'members:manage', level: 'Admin', description: 'Invite, suspend, and assign roles to workspace members' },
+      {
+        scope: 'members:manage',
+        level: 'Admin',
+        description: 'Invite, suspend, and assign roles to workspace members',
+      },
     ],
   },
   bob: {
@@ -33,8 +57,18 @@ export const MEMBERS = {
     bio: 'Maintains the Acme UI primitives, focus management utilities, and keyboard navigation ergonomics.',
     activity: 'Shipped manual focusReset handling for live filter inputs (#415)',
     commits: [
-      { sha: '7c2e91f', message: 'feat(ui): keep input focus on query-only route filtering', branch: 'main', time: '42m ago' },
-      { sha: '3b109d4', message: 'fix(sidebar): restore custom container scroll offset on traverse', branch: 'main', time: '5h ago' },
+      {
+        sha: '7c2e91f',
+        message: 'feat(ui): keep input focus on query-only route filtering',
+        branch: 'main',
+        time: '42m ago',
+      },
+      {
+        sha: '3b109d4',
+        message: 'fix(sidebar): restore custom container scroll offset on traverse',
+        branch: 'main',
+        time: '5h ago',
+      },
       { sha: '8e42a11', message: 'chore(tokens): refine dark surface contrast ratios', branch: 'main', time: '2d ago' },
     ],
     permissions: [
@@ -55,14 +89,37 @@ export const MEMBERS = {
     bio: 'Builds real-time latency histograms, distributed trace ingestion, and synthetic navigation probes.',
     activity: 'Calibrated p99 telemetry thresholds for EU-West edge nodes (#412)',
     commits: [
-      { sha: '6a11b08', message: 'perf(analytics): stream latency percentiles in parallel slices', branch: 'main', time: '1h ago' },
-      { sha: '2f95c30', message: 'feat(probes): track AbortSignal cancellation on rapid navs', branch: 'main', time: '1d ago' },
-      { sha: 'c04d882', message: 'fix(metrics): exclude aborted preloads from error budgets', branch: 'main', time: '3d ago' },
+      {
+        sha: '6a11b08',
+        message: 'perf(analytics): stream latency percentiles in parallel slices',
+        branch: 'main',
+        time: '1h ago',
+      },
+      {
+        sha: '2f95c30',
+        message: 'feat(probes): track AbortSignal cancellation on rapid navs',
+        branch: 'main',
+        time: '1d ago',
+      },
+      {
+        sha: 'c04d882',
+        message: 'fix(metrics): exclude aborted preloads from error budgets',
+        branch: 'main',
+        time: '3d ago',
+      },
     ],
     permissions: [
       { scope: 'org:settings', level: 'No Access', description: 'Requires organization admin privileges' },
-      { scope: 'telemetry:read', level: 'Read / Write', description: 'Query production traces, logs, and SLO dashboards' },
-      { scope: 'alerts:configure', level: 'Maintainer', description: 'Edit paging thresholds and incident routing rules' },
+      {
+        scope: 'telemetry:read',
+        level: 'Read / Write',
+        description: 'Query production traces, logs, and SLO dashboards',
+      },
+      {
+        scope: 'alerts:configure',
+        level: 'Maintainer',
+        description: 'Edit paging thresholds and incident routing rules',
+      },
     ],
   },
   diana: {
@@ -77,13 +134,31 @@ export const MEMBERS = {
     bio: 'Oversees route permission boundaries, session token rotation, and audit log integrity.',
     activity: 'Audited route permission cascade for unauthenticated sign-in redirects (#409)',
     commits: [
-      { sha: 'e41a772', message: 'sec(guard): verify permission cascade before view resolution', branch: 'main', time: '3h ago' },
-      { sha: '55d093a', message: 'feat(auth): distinguish unauthenticated redirect from 403 forbidden', branch: 'main', time: '2d ago' },
+      {
+        sha: 'e41a772',
+        message: 'sec(guard): verify permission cascade before view resolution',
+        branch: 'main',
+        time: '3h ago',
+      },
+      {
+        sha: '55d093a',
+        message: 'feat(auth): distinguish unauthenticated redirect from 403 forbidden',
+        branch: 'main',
+        time: '2d ago',
+      },
     ],
     permissions: [
-      { scope: 'org:settings', level: 'Read / Write', description: 'Configure organization security, SSO, and billing policies' },
+      {
+        scope: 'org:settings',
+        level: 'Read / Write',
+        description: 'Configure organization security, SSO, and billing policies',
+      },
       { scope: 'audit:export', level: 'Admin', description: 'Export compliance logs and access trails' },
-      { scope: 'members:manage', level: 'Admin', description: 'Invite, suspend, and assign roles to workspace members' },
+      {
+        scope: 'members:manage',
+        level: 'Admin',
+        description: 'Invite, suspend, and assign roles to workspace members',
+      },
     ],
   },
   evan: {
@@ -98,12 +173,26 @@ export const MEMBERS = {
     bio: 'Focuses on pointerover intent preloading, LRU entry caching, and memory eviction on entry dispose.',
     activity: 'Verified NavigationHistoryEntry dispose listener cache eviction (#406)',
     commits: [
-      { sha: '0d83f19', message: 'perf(preload): warm cascade on pointerover and focusin intent', branch: 'main', time: '6h ago' },
-      { sha: '91ba405', message: 'fix(cache): evict entryCache slot on NavigationHistoryEntry dispose', branch: 'main', time: '4d ago' },
+      {
+        sha: '0d83f19',
+        message: 'perf(preload): warm cascade on pointerover and focusin intent',
+        branch: 'main',
+        time: '6h ago',
+      },
+      {
+        sha: '91ba405',
+        message: 'fix(cache): evict entryCache slot on NavigationHistoryEntry dispose',
+        branch: 'main',
+        time: '4d ago',
+      },
     ],
     permissions: [
       { scope: 'org:settings', level: 'No Access', description: 'Requires organization admin privileges' },
-      { scope: 'benchmarks:run', level: 'Read / Write', description: 'Trigger automated browser navigation benchmarks' },
+      {
+        scope: 'benchmarks:run',
+        level: 'Read / Write',
+        description: 'Trigger automated browser navigation benchmarks',
+      },
     ],
   },
   fiona: {
@@ -118,8 +207,18 @@ export const MEMBERS = {
     bio: 'Designs ergonomic route definition APIs, flat and modular section patterns, and live inspector tooling.',
     activity: 'Added modular nested section example alongside flat router config (#403)',
     commits: [
-      { sha: 'b72c641', message: 'docs(examples): compare flat vs nested section route definitions', branch: 'main', time: '8h ago' },
-      { sha: '39fa12c', message: 'feat(redirect): redirect legacy /old-docs path to home route', branch: 'main', time: '5d ago' },
+      {
+        sha: 'b72c641',
+        message: 'docs(examples): compare flat vs nested section route definitions',
+        branch: 'main',
+        time: '8h ago',
+      },
+      {
+        sha: '39fa12c',
+        message: 'feat(redirect): redirect legacy /old-docs path to home route',
+        branch: 'main',
+        time: '5d ago',
+      },
     ],
     permissions: [
       { scope: 'org:settings', level: 'No Access', description: 'Requires organization admin privileges' },
@@ -153,9 +252,17 @@ export const sidebarShortcuts = [
   { label: 'Live Analytics', sub: 'Async data + LoadingPage', path: (org) => `/team/${org}/analytics` },
   { label: 'Org Settings', sub: 'Admin permission guard', path: (org) => `/team/${org}/settings` },
   { label: 'Alice · Commits', sub: '?section=commits', path: (org) => `/team/${org}/alice?section=commits` },
-  { label: 'Alice · Permissions', sub: '?section=permissions', path: (org) => `/team/${org}/alice?section=permissions` },
+  {
+    label: 'Alice · Permissions',
+    sub: '?section=permissions',
+    path: (org) => `/team/${org}/alice?section=permissions`,
+  },
   { label: 'Bob · Profile', sub: '?section=profile', path: (org) => `/team/${org}/bob?section=profile` },
   { label: 'Charlie · Commits', sub: '?section=commits', path: (org) => `/team/${org}/charlie?section=commits` },
-  { label: 'Diana · Permissions', sub: '?section=permissions', path: (org) => `/team/${org}/diana?section=permissions` },
+  {
+    label: 'Diana · Permissions',
+    sub: '?section=permissions',
+    path: (org) => `/team/${org}/diana?section=permissions`,
+  },
   { label: 'Unknown Member (404)', sub: 'Triggers notFound() swap', path: (org) => `/team/${org}/unknown-user` },
 ];

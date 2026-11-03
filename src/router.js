@@ -3,23 +3,23 @@ import {
   each,
   extend,
   inArray,
-  isFunction,
   isEqual,
+  isFunction,
   isPlainObject,
   isPromise,
   isString,
   noop,
   toBoolean,
   toDate,
-  toNumber,
   toDuration,
+  toNumber,
   toString,
   wait,
 } from '@semantic-ui/utils';
 
-import { IS_ROUTER } from './internal-helpers/identity.js';
 import { isLazy } from './helpers/lazy.js';
 import { setRouter } from './helpers/router.js';
+import { IS_ROUTER } from './internal-helpers/identity.js';
 import { Navigator } from './navigator.js';
 import { Route } from './route.js';
 
@@ -28,10 +28,13 @@ const installed = new WeakSet();
 const NOT_FOUND = Symbol('notFound');
 
 export class Router extends Route {
-
   // brand router
-  get [IS_ROUTER]() { return true; }
-  static [Symbol.hasInstance](value) { return !!value?.[IS_ROUTER]; }
+  get [IS_ROUTER]() {
+    return true;
+  }
+  static [Symbol.hasInstance](value) {
+    return !!value?.[IS_ROUTER];
+  }
 
   // the day.js shape: a plugin is a function of (options, Router, Navigator) that patches a prototype.
   // it wraps a moment and calls through, never replaces one, or adds a method the core would
@@ -112,7 +115,11 @@ export class Router extends Route {
 
     const matched = this.match(initialUrl);
     if (!matched) {
-      const [view, layouts, slots] = await Promise.all([this.resolveView(this.views?.notFound), this.resolveLayouts([this]), this.resolveSlots([this])]);
+      const [view, layouts, slots] = await Promise.all([
+        this.resolveView(this.views?.notFound),
+        this.resolveLayouts([this]),
+        this.resolveSlots([this]),
+      ]);
       this.page = { view, layouts, slots, status: 'notFound', url: initialUrl };
       await this.renderView(this.page);
       this.notify();
@@ -159,7 +166,10 @@ export class Router extends Route {
     each(this.timers, (timer) => clearTimeout(timer));
     this.timers.clear();
 
-    each([...(this.page?.chain ?? [])].reverse(), (route) => this.destroyRoute(route, this.lifecycleContext(route, null)));
+    each(
+      [...(this.page?.chain ?? [])].reverse(),
+      (route) => this.destroyRoute(route, this.lifecycleContext(route, null)),
+    );
     this.page = null;
     this.entryCache?.clear();
   }
@@ -283,12 +293,19 @@ export class Router extends Route {
 
       if (segment !== undefined) {
         const coerced = this.coerceValue(segment, spec);
-        if (coerced === null || (spec?.allowed && !inArray(coerced, spec.allowed)) || (spec?.validator && !spec.validator(coerced))) {
+        if (
+          coerced === null || (spec?.allowed && !inArray(coerced, spec.allowed))
+          || (spec?.validator && !spec.validator(coerced))
+        ) {
           return null;
         }
         params[paramName] = coerced;
         // an allowed set beats a typed or validated param beats a bare one, so siblings on one segment resolve by what they claim
-        scores.push(spec?.allowed ? 4 : (spec?.validator || (spec?.type && spec.type !== String && spec.type !== 'string') ? 3 : 2));
+        scores.push(
+          spec?.allowed
+            ? 4
+            : (spec?.validator || (spec?.type && spec.type !== String && spec.type !== 'string') ? 3 : 2),
+        );
       }
       else if (spec?.default !== undefined) {
         params[paramName] = spec.default;
@@ -343,7 +360,8 @@ export class Router extends Route {
       }
       const isFlag = (spec.type === Boolean || spec.type === 'boolean') && rawValue === '';
       const coerced = isFlag ? true : this.coerceValue(rawValue, spec);
-      query[key] = (coerced === null || (spec.allowed && !inArray(coerced, spec.allowed)) || (spec.validator && !spec.validator(coerced)))
+      query[key] = (coerced === null || (spec.allowed && !inArray(coerced, spec.allowed))
+          || (spec.validator && !spec.validator(coerced)))
         ? spec.default
         : coerced;
     }
@@ -385,7 +403,9 @@ export class Router extends Route {
         return target;
       }
       rawPath = stripped;
-      literal.searchParams.forEach((value, key) => { query[key] ??= value; });
+      literal.searchParams.forEach((value, key) => {
+        query[key] ??= value;
+      });
       hash ??= literal.hash.slice(1) || undefined;
     }
 
@@ -427,7 +447,11 @@ export class Router extends Route {
         return;
       }
       const bare = value === true && (spec?.type === Boolean || spec?.type === 'boolean');
-      pairs.push(bare ? encodeURIComponent(key) : `${encodeURIComponent(key)}=${encodeURIComponent(this.formatParamValue(value))}`);
+      pairs.push(
+        bare
+          ? encodeURIComponent(key)
+          : `${encodeURIComponent(key)}=${encodeURIComponent(this.formatParamValue(value))}`,
+      );
     });
     const search = pairs.join('&');
     const path = this.prependBase(search ? `${pathname}?${search}` : pathname) + (hash ? `#${hash}` : '');
@@ -435,8 +459,12 @@ export class Router extends Route {
   }
 
   // the names people reach for; one implementation
-  urlFor(...args) { return this.href(...args); }
-  url(...args) { return this.href(...args); }
+  urlFor(...args) {
+    return this.href(...args);
+  }
+  url(...args) {
+    return this.href(...args);
+  }
 
   // a name, a Route, or nothing: a literal path has no route and keeps every arg as query
   routeFor(target) {
@@ -502,17 +530,35 @@ export class Router extends Route {
     return this.navigator.canGoForward;
   }
 
-  get entry() { return this.navigator.entry; }
-  get entries() { return this.navigator.entries; }
-  get activation() { return this.navigator.activation; }
-  get transition() { return this.navigator.transition; }
+  get entry() {
+    return this.navigator.entry;
+  }
+  get entries() {
+    return this.navigator.entries;
+  }
+  get activation() {
+    return this.navigator.activation;
+  }
+  get transition() {
+    return this.navigator.transition;
+  }
 
   /*******************************
               Writes
   *******************************/
 
-  navigate(target, args = {}, { history = 'auto', state, info, resetScroll = true, resetFocus = true, hash, keepQuery, absolute } = {}) {
-    return this.navigator.navigate(this.href(target, args, { hash, keepQuery, absolute }), { state, info, history, resetScroll, resetFocus });
+  navigate(
+    target,
+    args = {},
+    { history = 'auto', state, info, resetScroll = true, resetFocus = true, hash, keepQuery, absolute } = {},
+  ) {
+    return this.navigator.navigate(this.href(target, args, { hash, keepQuery, absolute }), {
+      state,
+      info,
+      history,
+      resetScroll,
+      resetFocus,
+    });
   }
 
   reload(options) {
@@ -547,16 +593,18 @@ export class Router extends Route {
 
   // the platform runs one navigation at a time, so pending is one match
   setPending(matched, navigationType) {
-    this.pending = matched ? {
-      route: matched.route,
-      url: matched.url,
-      params: matched.params,
-      query: matched.query,
-      chain: matched.chain,
-      navigationType,
-      loading: false,
-      committed: false,
-    } : null;
+    this.pending = matched
+      ? {
+        route: matched.route,
+        url: matched.url,
+        params: matched.params,
+        query: matched.query,
+        chain: matched.chain,
+        navigationType,
+        loading: false,
+        committed: false,
+      }
+      : null;
   }
 
   entryChanged(entry, event) {
@@ -607,7 +655,14 @@ export class Router extends Route {
         this.logError(error);
       }
       // the routes on screen stay active under the error page, so the chain carries over
-      this.page = { ...(pending ? this.pageFor(pending) : (this.page ?? {})), chain: this.page?.chain ?? [], slices: this.page?.slices ?? [], view, status: 'error', error };
+      this.page = {
+        ...(pending ? this.pageFor(pending) : (this.page ?? {})),
+        chain: this.page?.chain ?? [],
+        slices: this.page?.slices ?? [],
+        view,
+        status: 'error',
+        error,
+      };
       this.renderView(this.page).catch(noop);
     }
     else {
@@ -659,7 +714,13 @@ export class Router extends Route {
     const cached = () => (remembered && !this.dataChanged(remembered.user, this.user) ? remembered.resolved : null);
     // what the cascade knows of the navigation: its signal, whether it is a reload, the page it leaves
     const navigation = { signal: event.signal, reload: event.navigationType === 'reload', previous: this.page };
-    const work = { matched, settled: false, result: null, redirected: null, identity: identity ?? this.resolveIdentity(navigation) };
+    const work = {
+      matched,
+      settled: false,
+      result: null,
+      redirected: null,
+      identity: identity ?? this.resolveIdentity(navigation),
+    };
     work.guards = work.identity.then(() => this.runGuards(matched, navigation));
     work.ready = work.guards.then((guard) => guard ?? cached() ?? this.runData(matched, navigation));
     work.ready.then(
@@ -687,7 +748,9 @@ export class Router extends Route {
         // a traverse or reload cannot be redirected before commit, and a target outside the routes is
         // the browser's: stay put, then go where the guard says
         // a reload or a replace meant to stay, so the redirect replaces. a refused traverse leaves the user where they stood, so it pushes
-        this.navigator.deferNavigate(guard.redirect, { history: event.navigationType === 'reload' || event.navigationType === 'replace' ? 'replace' : 'push' });
+        this.navigator.deferNavigate(guard.redirect, {
+          history: event.navigationType === 'reload' || event.navigationType === 'replace' ? 'replace' : 'push',
+        });
         throw new DOMException('Navigation refused', 'AbortError');
       }
       controller.redirect(guard.redirect);
@@ -788,11 +851,17 @@ export class Router extends Route {
   // one seam per hook, each naming its consequence: a redirect moves the page, a refused
   // permission lands as it would at navigation, data replaces its slice, a title its title
   evaluateRedirect(route, fn, context) {
-    return this.evaluateHook(route, fn, context, { kind: 'guard', changed: (target) => this.redirectChanged(route, target) });
+    return this.evaluateHook(route, fn, context, {
+      kind: 'guard',
+      changed: (target) => this.redirectChanged(route, target),
+    });
   }
 
   evaluatePermission(route, fn, context) {
-    return this.evaluateHook(route, fn, context, { kind: 'guard', changed: (allowed) => this.permissionChanged(route, allowed) });
+    return this.evaluateHook(route, fn, context, {
+      kind: 'guard',
+      changed: (allowed) => this.permissionChanged(route, allowed),
+    });
   }
 
   evaluateData(route, fn, context) {
@@ -824,18 +893,38 @@ export class Router extends Route {
 
     for (const ancestor of currentRoutes) {
       if (ancestor.redirect) {
-        const target = await this.evaluateRedirect(ancestor, ancestor.redirect, this.contextFor(ancestor, matched, { signal }));
-        return { status: 'redirect', redirect: this.href(target, this.paramsFor(target, params)), route, params, query };
+        const target = await this.evaluateRedirect(
+          ancestor,
+          ancestor.redirect,
+          this.contextFor(ancestor, matched, { signal }),
+        );
+        return {
+          status: 'redirect',
+          redirect: this.href(target, this.paramsFor(target, params)),
+          route,
+          params,
+          query,
+        };
       }
     }
 
     for (const ancestor of currentRoutes) {
       if (ancestor.permission !== undefined) {
-        const allowed = await this.evaluatePermission(ancestor, ancestor.permission, this.contextFor(ancestor, matched, { signal }));
+        const allowed = await this.evaluatePermission(
+          ancestor,
+          ancestor.permission,
+          this.contextFor(ancestor, matched, { signal }),
+        );
         if (!allowed) {
           if ((!this.user || !this.views?.forbidden) && this.signInRoute) {
             // the return address rides to the sign-in page, which reads it as query.returnTo
-            return { status: 'redirect', redirect: this.href(this.signInRoute, { returnTo: this.returnAddress(matched) }), route, params, query };
+            return {
+              status: 'redirect',
+              redirect: this.href(this.signInRoute, { returnTo: this.returnAddress(matched) }),
+              route,
+              params,
+              query,
+            };
           }
           const [view, layouts, slots, { title, titles }] = await Promise.all([
             this.resolveView(this.views?.forbidden),
@@ -843,7 +932,16 @@ export class Router extends Route {
             this.resolveSlots(currentRoutes),
             this.evaluateTitles(currentRoutes, matched, { signal }),
           ]);
-          return this.buildCascadeResult(matched, { status: 'forbidden', view, layouts, slots, data: {}, slices: [], title, titles });
+          return this.buildCascadeResult(matched, {
+            status: 'forbidden',
+            view,
+            layouts,
+            slots,
+            data: {},
+            slices: [],
+            title,
+            titles,
+          });
         }
       }
     }
@@ -884,14 +982,26 @@ export class Router extends Route {
 
       let sliceData = {};
       if (ancestor.data !== undefined) {
-        const rawData = await this.evaluateData(ancestor, ancestor.data, { ...this.contextFor(ancestor, matched, { data: { ...data }, slices: [...slices], signal }), notFound });
+        const rawData = await this.evaluateData(ancestor, ancestor.data, {
+          ...this.contextFor(ancestor, matched, { data: { ...data }, slices: [...slices], signal }),
+          notFound,
+        });
         if (flaggedNotFound || rawData === NOT_FOUND) {
           const [[, layouts, slots], notFoundView, { title, titles }] = await Promise.all([
             views,
             this.resolveView(this.views?.notFound),
             this.evaluateTitles(currentRoutes, matched, { data, slices, signal }),
           ]);
-          return this.buildCascadeResult(matched, { status: 'notFound', view: notFoundView, layouts, slots, data, slices, title, titles });
+          return this.buildCascadeResult(matched, {
+            status: 'notFound',
+            view: notFoundView,
+            layouts,
+            slots,
+            data,
+            slices,
+            title,
+            titles,
+          });
         }
         if (isPlainObject(rawData)) {
           sliceData = await this.resolveDataSlice(rawData);
@@ -908,7 +1018,16 @@ export class Router extends Route {
 
     const [view, layouts, slots] = await views;
     const titles = slices.map((slice) => slice.title).filter((title) => title !== null);
-    return this.buildCascadeResult(matched, { status: 'ok', view, layouts, slots, data, slices, title: titles.at(-1) ?? '', titles });
+    return this.buildCascadeResult(matched, {
+      status: 'ok',
+      view,
+      layouts,
+      slots,
+      data,
+      slices,
+      title: titles.at(-1) ?? '',
+      titles,
+    });
   }
 
   // a route's share of the page. the reactive scaffold gives it a signal the routes below read
@@ -923,7 +1042,11 @@ export class Router extends Route {
   }
 
   async titleOf(route, matched, { data = {}, slices = [], signal } = {}) {
-    const value = await this.evaluateTitle(route, route.title, this.contextFor(route, matched, { data, slices, signal }));
+    const value = await this.evaluateTitle(
+      route,
+      route.title,
+      this.contextFor(route, matched, { data, slices, signal }),
+    );
     return this.titleText(value);
   }
 
@@ -999,7 +1122,9 @@ export class Router extends Route {
     const pending = [];
     each(rawData, (value, key) => {
       if (isPromise(value)) {
-        pending.push(value.then((settled) => { resolved[key] = settled; }));
+        pending.push(value.then((settled) => {
+          resolved[key] = settled;
+        }));
       }
       else {
         resolved[key] = value;
@@ -1141,7 +1266,9 @@ export class Router extends Route {
       return;
     }
     if ((!this.user || !this.views?.forbidden) && this.signInRoute) {
-      this.navigator.navigate(this.href(this.signInRoute, { returnTo: this.returnAddress(this.current) }), { history: 'replace' });
+      this.navigator.navigate(this.href(this.signInRoute, { returnTo: this.returnAddress(this.current) }), {
+        history: 'replace',
+      });
       return;
     }
     this.page = { ...this.page, view: await this.resolveView(this.views?.forbidden), status: 'forbidden' };

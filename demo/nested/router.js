@@ -21,4 +21,3 @@ export const router = defineRouter({
   preload: 'intent',
   restoreScroll: '#sidebar-scroll',
 });
-
