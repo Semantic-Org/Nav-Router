@@ -1,8 +1,9 @@
 import { escapeHTML } from '@semantic-ui/utils';
 
 export function SignInPage(context) {
-  const { router } = context ?? {};
+  const { router, query = {} } = context ?? {};
   const user = router?.user ?? null;
+  const after = query.returnTo || '/team/acme/settings';
 
   return `
     <main class="page-container sign-in-page">
@@ -32,7 +33,7 @@ export function SignInPage(context) {
             <p>Passes <code>permission</code> check on <code>/team/:org/settings</code> and renders <code>SettingsPage</code>.</p>
             <div class="card-links">
               <button type="button" class="btn btn-primary" data-set-user="admin">Sign In as Admin</button>
-              <button type="button" class="btn" data-set-user="admin" data-then-nav="/team/acme/settings">Sign In Admin &amp; Go to Settings →</button>
+              <button type="button" class="btn" data-set-user="admin" data-then-nav="${escapeHTML(after)}">Sign In Admin &amp; Return to <code>${escapeHTML(after)}</code> →</button>
             </div>
           </div>
 
@@ -44,7 +45,7 @@ export function SignInPage(context) {
             <p>Authenticated but non-admin. Visiting <code>/team/:org/settings</code> stays at the URL and swaps in <code>ForbiddenPage</code> (<code>status: 'forbidden'</code>).</p>
             <div class="card-links">
               <button type="button" class="btn btn-primary" data-set-user="member">Sign In as Member</button>
-              <button type="button" class="btn" data-set-user="member" data-then-nav="/team/acme/settings">Sign In Member &amp; Try Settings →</button>
+              <button type="button" class="btn" data-set-user="member" data-then-nav="${escapeHTML(after)}">Sign In Member &amp; Return to <code>${escapeHTML(after)}</code> →</button>
             </div>
           </div>
 

@@ -49,6 +49,13 @@ export class Route {
     this.ancestors = parent ? [...parent.ancestors, this] : [this];
     this.segments = this.path === '/' ? [] : this.path.slice(1).split('/');
     this.paramSpecs = this.buildSpecs('params');
+    // every :name in the path is a param, a String unless declared, and the rest segment is one named '*', last only
+    each(this.segments, (segment) => {
+      const name = segment === '*' ? '*' : (segment.startsWith(':') ? segment.slice(1).replace(/\?$/, '') : null);
+      if (name) {
+        this.paramSpecs[name] ??= { type: String, default: undefined, allowed: undefined };
+      }
+    });
     this.querySpecs = this.buildSpecs('query');
 
     if (this.name && this.router && (!this.isIndex || !this.router.routesByName.has(this.name))) {
@@ -126,6 +133,7 @@ export class Route {
         type: spec.type ?? this.inferType(sample),
         default: spec.default,
         allowed: spec.allowed,
+        validator: spec.validator,
       };
     }
     return {

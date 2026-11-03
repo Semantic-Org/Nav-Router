@@ -46,13 +46,15 @@ export class Router extends Route {
     base: '',
     views: {},
     signInRoute: null,
+    // the user the guards read: a value, or a function of the navigation returning one or a promise of one
+    identity: null,
     holdCommit: '300ms',
     loadingDelay: '200ms',
     loadingMin: '500ms',
     restoreScroll: null,
     attachGlobal: 'router',
     // whether data recomputed outside a navigation moved: a deep compare, since a render costs more
-    // than the walk. plain data asks it of the whole slice, the reactive scaffold of each key
+    // than the walk. plain data asks it of the whole slice, and a reactive slice asks its cells instead
     dataChanged: (previous, next) => !isEqual(next, previous),
   };
 
@@ -247,7 +249,7 @@ export class Router extends Route {
 
   matchLeaf(leaf, urlSegments) {
     const patternSegments = leaf.segments;
-    if (urlSegments.length > patternSegments.length) {
+    if (urlSegments.length > patternSegments.length && patternSegments.at(-1) !== '*') {
       return null;
     }
 
@@ -258,6 +260,12 @@ export class Router extends Route {
       const pattern = patternSegments[index];
       const segment = urlSegments[index];
 
+      if (pattern === '*') {
+        // the rest takes the lowest rung, and empty it ranks below a route that ends here
+        params['*'] = urlSegments.slice(index).join('/');
+        scores.push(segment !== undefined ? 1 : -2);
+        break;
+      }
       if (!pattern.startsWith(':')) {
         if (segment !== pattern) {
           return null;
@@ -272,20 +280,20 @@ export class Router extends Route {
 
       if (segment !== undefined) {
         const coerced = this.coerceValue(segment, spec);
-        if (coerced === null || (spec?.allowed && !inArray(coerced, spec.allowed))) {
+        if (coerced === null || (spec?.allowed && !inArray(coerced, spec.allowed)) || (spec?.validator && !spec.validator(coerced))) {
           return null;
         }
         params[paramName] = coerced;
-        // an allowed set beats a typed param beats a bare one, so siblings on one segment resolve by what they claim
-        scores.push(spec?.allowed ? 4 : (spec?.type && spec.type !== String && spec.type !== 'string' ? 3 : 2));
+        // an allowed set beats a typed or validated param beats a bare one, so siblings on one segment resolve by what they claim
+        scores.push(spec?.allowed ? 4 : (spec?.validator || (spec?.type && spec.type !== String && spec.type !== 'string') ? 3 : 2));
       }
       else if (spec?.default !== undefined) {
         params[paramName] = spec.default;
-        scores.push(1);
+        scores.push(-1);
       }
       else if (isOptionalFlag) {
         params[paramName] = undefined;
-        scores.push(1);
+        scores.push(-1);
       }
       else {
         return null;
@@ -321,6 +329,10 @@ export class Router extends Route {
     });
 
     for (const [key, rawValue] of searchParams.entries()) {
+      // the return address is a path on this origin, declared or not
+      if (key === 'returnTo' && !(rawValue.startsWith('/') && this.sameOrigin(rawValue))) {
+        continue;
+      }
       const spec = leaf.querySpecs[key];
       if (!spec) {
         query[key] = toString(rawValue);
@@ -328,12 +340,22 @@ export class Router extends Route {
       }
       const isFlag = (spec.type === Boolean || spec.type === 'boolean') && rawValue === '';
       const coerced = isFlag ? true : this.coerceValue(rawValue, spec);
-      query[key] = (coerced === null || (spec.allowed && !inArray(coerced, spec.allowed)))
+      query[key] = (coerced === null || (spec.allowed && !inArray(coerced, spec.allowed)) || (spec.validator && !spec.validator(coerced)))
         ? spec.default
         : coerced;
     }
 
     return query;
+  }
+
+  sameOrigin(url) {
+    const origin = globalThis.location?.origin ?? 'http://localhost';
+    try {
+      return new URL(url, origin).origin === origin;
+    }
+    catch {
+      return false;
+    }
   }
 
   coerceValue(rawValue, spec) {
@@ -351,14 +373,15 @@ export class Router extends Route {
     const { params, query: own } = this.splitArgs(route, args);
     const query = keepQuery ? { ...this.current?.query, ...own } : own;
     let rawPath = route ? route.path : '/';
-    // a literal is a url: another origin passes through whole, and its own query and fragment ride
+    // a literal is a url: another origin or a path outside base passes through whole, its own query and fragment ride
     if (!route && isString(target) && target) {
       const origin = globalThis.location?.origin ?? 'http://localhost';
-      const literal = new URL(target, origin);
-      if (literal.origin !== origin) {
+      const literal = new URL(target, globalThis.location?.href ?? origin);
+      const stripped = literal.origin === origin ? this.stripBase(literal.pathname) : null;
+      if (stripped === null) {
         return target;
       }
-      rawPath = literal.pathname;
+      rawPath = stripped;
       literal.searchParams.forEach((value, key) => { query[key] ??= value; });
       hash ??= literal.hash.slice(1) || undefined;
     }
@@ -367,6 +390,15 @@ export class Router extends Route {
     const resolvedSegments = [];
     for (let index = 0; index < segments.length; index++) {
       const segment = segments[index];
+      // a literal is literal: nothing in it expands
+      if (!route) {
+        resolvedSegments.push(segment);
+        continue;
+      }
+      if (segment === '*') {
+        resolvedSegments.push(...String(params['*'] ?? '').split('/').filter(Boolean).map(encodeURIComponent));
+        continue;
+      }
       if (!segment.startsWith(':')) {
         resolvedSegments.push(segment);
         continue;
@@ -384,13 +416,17 @@ export class Router extends Route {
     }
 
     const pathname = `/${resolvedSegments.join('/')}`;
-    const searchParams = new URLSearchParams();
+    const pairs = [];
     each(query, (value, key) => {
-      if (value !== undefined && value !== null) {
-        searchParams.set(key, this.formatParamValue(value));
+      const spec = route?.querySpecs[key];
+      // a value equal to its default leaves the url, and a declared boolean's true is the bare key
+      if (value === undefined || value === null || isEqual(value, spec?.default)) {
+        return;
       }
+      const bare = value === true && (spec?.type === Boolean || spec?.type === 'boolean');
+      pairs.push(bare ? encodeURIComponent(key) : `${encodeURIComponent(key)}=${encodeURIComponent(this.formatParamValue(value))}`);
     });
-    const search = searchParams.toString();
+    const search = pairs.join('&');
     const path = this.prependBase(search ? `${pathname}?${search}` : pathname) + (hash ? `#${hash}` : '');
     return absolute && globalThis.location ? new URL(path, globalThis.location.origin).href : path;
   }
@@ -597,16 +633,27 @@ export class Router extends Route {
   *******************************/
 
   // the guard phase answers before the url may move, the data phase may run on after commit
-  begin(matched, event) {
+  // read once per navigation, ahead of the guards and under holdCommit with them. absent, user is whatever the app set
+  async resolveIdentity(navigation) {
+    if (this.identity == null) {
+      return;
+    }
+    const user = (await (isFunction(this.identity) ? this.identity(navigation) : this.identity)) ?? null;
+    if (!navigation.signal?.aborted) {
+      this.user = user;
+    }
+  }
+
+  begin(matched, event, identity = null) {
     const entryKey = event.navigationType === 'traverse' ? event.destination.key : null;
-    // the visit's result rides its entry: a traverse back shows what was seen, reload() refreshes it
+    // the visit's result rides its entry: a traverse back shows what was seen for the same user, reload() refreshes it
     const remembered = entryKey ? this.entryCache?.get(entryKey) : null;
-    const cached = remembered && remembered.user === this.user ? remembered.resolved : null;
+    const cached = () => (remembered && !this.dataChanged(remembered.user, this.user) ? remembered.resolved : null);
     // what the cascade knows of the navigation: its signal, whether it is a reload, the page it leaves
     const navigation = { signal: event.signal, reload: event.navigationType === 'reload', previous: this.page };
-    const work = { matched, settled: false, result: null, redirected: null };
-    work.guards = this.runGuards(matched, navigation);
-    work.ready = work.guards.then((guard) => guard ?? cached ?? this.runData(matched, navigation));
+    const work = { matched, settled: false, result: null, redirected: null, identity: identity ?? this.resolveIdentity(navigation) };
+    work.guards = work.identity.then(() => this.runGuards(matched, navigation));
+    work.ready = work.guards.then((guard) => guard ?? cached() ?? this.runData(matched, navigation));
     work.ready.then(
       (result) => {
         work.settled = true;
@@ -631,13 +678,14 @@ export class Router extends Route {
       if (!isRewrite || !redirectedMatch) {
         // a traverse or reload cannot be redirected before commit, and a target outside the routes is
         // the browser's: stay put, then go where the guard says
-        this.navigator.deferNavigate(guard.redirect, { history: event.navigationType === 'push' ? 'push' : 'replace' });
+        // a reload or a replace meant to stay, so the redirect replaces. a refused traverse leaves the user where they stood, so it pushes
+        this.navigator.deferNavigate(guard.redirect, { history: event.navigationType === 'reload' || event.navigationType === 'replace' ? 'replace' : 'push' });
         throw new DOMException('Navigation refused', 'AbortError');
       }
       controller.redirect(guard.redirect);
       this.setPending(redirectedMatch, event.navigationType);
       this.navigator.transition.url = redirectedMatch.url;
-      active = work.redirected = this.begin(redirectedMatch, event);
+      active = work.redirected = this.begin(redirectedMatch, event, active.identity);
     }
 
     // a fast load settles before the url moves, a slow one commits into its loading state
@@ -771,7 +819,8 @@ export class Router extends Route {
         const allowed = await this.evaluatePermission(ancestor, ancestor.permission, this.contextFor(ancestor, matched, { signal }));
         if (!allowed) {
           if ((!this.user || !this.views?.forbidden) && this.signInRoute) {
-            return { status: 'redirect', redirect: this.href(this.signInRoute), route, params, query };
+            // the return address rides to the sign-in page, which reads it as query.returnTo
+            return { status: 'redirect', redirect: this.href(this.signInRoute, { returnTo: `${matched.pathname}${matched.search}${matched.hash}` }), route, params, query };
           }
           const [view, layouts, slots, { title, titles }] = await Promise.all([
             this.resolveView(this.views?.forbidden),
@@ -793,15 +842,17 @@ export class Router extends Route {
   async runData(matched, { signal, reload = false, previous = null }) {
     const { route, currentRoutes } = matched;
 
-    const [view, layouts, slots] = await Promise.all([
+    // the chunks load while the data runs, and a failed chunk waits to throw where the data's turn comes
+    const views = Promise.all([
       this.resolveView(route.view),
       this.resolveLayouts(currentRoutes),
       this.resolveSlots(currentRoutes),
     ]);
+    views.catch(noop);
 
     const data = {};
     const slices = [];
-    const everyRoute = !previous || reload || previous.user !== this.user;
+    const everyRoute = !previous || reload || this.dataChanged(previous.user, this.user);
     let flaggedNotFound = false;
     const notFoundSymbol = Symbol('notFound');
     const notFound = () => {
@@ -821,7 +872,8 @@ export class Router extends Route {
       if (ancestor.data !== undefined) {
         const rawData = await this.evaluateData(ancestor, ancestor.data, { ...this.contextFor(ancestor, matched, { data: { ...data }, slices: [...slices], signal }), notFound });
         if (flaggedNotFound || rawData === notFoundSymbol) {
-          const [notFoundView, { title, titles }] = await Promise.all([
+          const [[, layouts, slots], notFoundView, { title, titles }] = await Promise.all([
+            views,
             this.resolveView(this.views?.notFound),
             this.evaluateTitles(currentRoutes, matched, { data, slices, signal }),
           ]);
@@ -840,6 +892,7 @@ export class Router extends Route {
       slices.push(slice);
     }
 
+    const [view, layouts, slots] = await views;
     const titles = slices.map((slice) => slice.title).filter((title) => title !== null);
     return this.buildCascadeResult(matched, { status: 'ok', view, layouts, slots, data, slices, title: titles.at(-1) ?? '', titles });
   }
@@ -1074,7 +1127,7 @@ export class Router extends Route {
       return;
     }
     if ((!this.user || !this.views?.forbidden) && this.signInRoute) {
-      this.navigator.navigate(this.href(this.signInRoute), { history: 'replace' });
+      this.navigator.navigate(this.href(this.signInRoute, { returnTo: `${this.current.pathname}${this.current.search}${this.current.hash}` }), { history: 'replace' });
       return;
     }
     this.page = { ...this.page, view: await this.resolveView(this.views?.forbidden), status: 'forbidden' };
@@ -1116,8 +1169,8 @@ export class Router extends Route {
     await this.updatePage();
   }
 
-  // sets the slice and says whether it moved, one dataChanged compare; the reactive scaffold
-  // compares per key and writes only the keys that moved
+  // sets the slice and says whether it moved, one dataChanged compare. the reactive scaffold
+  // writes each key through its cell and lets the cell's equality say
   setSlice(slice, data) {
     if (!this.dataChanged(slice.data, data)) {
       return false;

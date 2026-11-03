@@ -1,4 +1,4 @@
-import { each, inArray, isFunction } from '@semantic-ui/utils';
+import { each, inArray, isFunction, isPromise, noop } from '@semantic-ui/utils';
 
 import { Router } from './router.js';
 
@@ -7,8 +7,8 @@ import { Router } from './router.js';
 // twice. when something it read moves, a later run lands the way that hook lands at navigation:
 // a redirect moves the page, a refused permission redirects or shows forbidden, data updates its
 // slice, and a title updates its title. a slice is a store with a cell per key, and merged data
-// reads each key through its cell, so a key that moved wakes only the functions that read it, and
-// a key a run returned equal is never written. a run born while its navigation is in flight ends
+// reads each key through its cell, so a key that moved wakes only the functions that read it, the
+// cell's own equality deciding what moved. a run born while its navigation is in flight ends
 // with that navigation's signal, and once active it ends with the route's. a provider supplies the
 // four primitives below; the fifth, the per-key store, is built from signals unless the provider
 // has a native one ($state, a store, reactive())
@@ -44,8 +44,8 @@ export class ReactiveRouter extends Router {
     return fn();
   }
 
-  // { get(key), set(key, value), peek(key) }: a cell per key, made on first touch so a reader of a
-  // key that arrives later is woken when it does. a provider with a native per-key object overrides it
+  // { get(key), set(key, value), peek(key) }: a cell per key, made on first touch. a provider with a
+  // native per-key object overrides it
   createStore(initialValue = {}) {
     const cells = new Map();
     const cell = (key) => {
@@ -88,24 +88,21 @@ export class ReactiveRouter extends Router {
     return slice;
   }
 
-  // writes the keys that moved, dataChanged deciding per key, in one batch. the plain mirror is
-  // written first so a synchronous reaction reads the new value through either door
+  // every key is written through its cell, whose own equality is the one compare, and what the cell
+  // holds afterwards says whether it moved. the plain mirror is written first so a synchronous
+  // reaction reads the new value through either door
   setSlice(slice, data) {
     const previous = slice.data;
-    const moved = [];
-    each({ ...previous, ...data }, (_, key) => {
-      if (this.dataChanged(previous[key], data[key])) {
-        moved.push(key);
-      }
-    });
-    if (!moved.length) {
-      return false;
-    }
+    let moved = false;
     slice.data = data;
     this.batch(() => {
-      each(moved, (key) => slice.store.set(key, data[key]));
+      each({ ...previous, ...data }, (_, key) => {
+        const before = slice.store.peek(key);
+        slice.store.set(key, data[key]);
+        moved ||= slice.store.peek(key) !== before;
+      });
     });
-    return true;
+    return moved;
   }
 
   /*******************************
@@ -145,10 +142,14 @@ export class ReactiveRouter extends Router {
         first = fn({ ...context, data });
         return;
       }
-      const value = fn({ ...context, data, signal: route.abortSignal });
-      // a run born for a navigation in flight lands nothing on the standing page, whose route may be
-      // the same one: its latest value waits for adopt
-      if (born && !born.adopted) {
+      const unadopted = born && !born.adopted;
+      // a run born for a navigation in flight runs under that navigation's signal and lands nothing on
+      // the standing page, whose route may be the same one: its latest value waits for adopt
+      const value = fn({ ...context, data, signal: unadopted ? signal : route.abortSignal });
+      if (unadopted) {
+        if (isPromise(value)) {
+          value.catch(noop);
+        }
         born.latest = { value };
         return;
       }
@@ -165,6 +166,8 @@ export class ReactiveRouter extends Router {
       signal?.addEventListener('abort', () => {
         if (!born.adopted) {
           stop();
+          // its navigation is gone, so nothing of it waits for adopt
+          this.born = this.born.filter((other) => other !== born);
         }
       }, { once: true });
       this.born.push(born);

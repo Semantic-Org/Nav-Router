@@ -15,7 +15,6 @@
   "module": "src/index.js",
   "exports": {
     ".": {
-      "types": "./types/index.d.ts",
       "import": "./src/index.js"
     },
     "./plugins/*": "./src/plugins/*.js",
