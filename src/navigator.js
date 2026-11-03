@@ -125,8 +125,9 @@ export class Navigator {
     if (!nav) {
       return this.documentLoad(() => (history === 'replace' ? globalThis.location.replace(url) : globalThis.location.assign(url)));
     }
-    // a replace without state would wipe the entry's memory
-    const resolvedState = state === undefined && history === 'replace'
+    // a replace without state would wipe the entry's memory, and auto becomes a replace on the same url
+    const sameUrl = history === 'auto' && globalThis.location && new URL(url, globalThis.location.href).href === nav.currentEntry?.url;
+    const resolvedState = state === undefined && (history === 'replace' || sameUrl)
       ? nav.currentEntry?.getState?.()
       : state;
 
@@ -341,12 +342,8 @@ export class Navigator {
   }
 
   onSuccess(event) {
-    const { navigationType } = this.transition ?? {};
     this.transition = null;
     this.router.settled(event);
-    if (navigationType === 'traverse') {
-      this.restoreScroll(this.entry);
-    }
   }
 
   onError(event) {

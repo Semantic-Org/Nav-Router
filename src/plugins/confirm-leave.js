@@ -96,11 +96,13 @@ export default ({
   };
 
   navProto.onNavigate = function (event) {
-    if (!event?.cancelable || event.info?.[bypassKey]) {
+    const router = this.router;
+    // a leave the modal already approved comes back as a plain document load of the same url
+    if (event?.info?.[bypassKey] || (router.leaveApproved && router.leaveApproved === event?.destination?.url)) {
+      router.leaveApproved = null;
       return onNavigate.call(this, event);
     }
 
-    const router = this.router;
     const matched = router.match(event.destination?.url);
     const { current } = router;
     if (event.hashChange && current?.route === matched?.route && isEqual(current?.params, matched?.params) && isEqual(current?.query, matched?.query)) {
@@ -138,25 +140,37 @@ export default ({
     const decision = runChecks(checks, context);
 
     if (!isPromise(decision)) {
-      if (!decision) {
+      if (!decision && event.cancelable) {
         event.preventDefault();
         return;
       }
-      return onNavigate.call(this, event);
+      if (decision) {
+        return onNavigate.call(this, event);
+      }
     }
+    // a refusal the event cannot cancel, a traverse after a reload, rolls back after commit instead
+    const answer = isPromise(decision) ? decision : Promise.resolve(false);
 
-    // external or unrouted links never enter intercept, so async confirmation resumes them explicitly
+    // external or unrouted links never enter intercept, so async confirmation resumes them explicitly.
+    // the approved url is let through once, with beforeunload disarmed, so the modal does not reopen
     if (!this.shouldIntercept(event) || !matched) {
-      event.preventDefault();
-      decision.then((allowed) => {
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+      answer.then((allowed) => {
         if (allowed && event.destination?.url && globalThis.location) {
+          router.leaveApproved = event.destination.url;
+          if (router.handleBeforeUnload && globalThis.window) {
+            globalThis.window.removeEventListener('beforeunload', router.handleBeforeUnload);
+            router.handleBeforeUnload = null;
+          }
           globalThis.location.assign(event.destination.url);
         }
       });
       return;
     }
 
-    const pending = { signal: event.signal ?? null, decision, fromKey, fromUrl };
+    const pending = { signal: event.signal ?? null, decision: answer, fromKey, fromUrl };
     router.pendingLeave = pending;
     event.signal?.addEventListener('abort', () => {
       if (router.pendingLeave === pending) {

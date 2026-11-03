@@ -108,7 +108,7 @@ export class Router extends Route {
 
     const matched = this.match(initialUrl);
     if (!matched) {
-      this.page = { view: this.views?.notFound ?? null, status: 'notFound', url: initialUrl };
+      this.page = { view: await this.resolveView(this.views?.notFound), status: 'notFound', url: initialUrl };
       await this.renderView(this.page);
       this.notify();
       return this;
@@ -169,21 +169,24 @@ export class Router extends Route {
     }
     const origin = globalThis.location?.origin ?? 'http://localhost';
     let parsed;
+    let urlSegments;
     try {
       parsed = url instanceof URL ? url : new URL(String(url), origin);
+      // another origin is never ours, and a malformed escape is no path of ours either
+      if (parsed.origin !== origin) {
+        return null;
+      }
+      const pathname = this.stripBase(parsed.pathname);
+      if (pathname === null) {
+        return null;
+      }
+      parsed.strippedPathname = pathname;
+      urlSegments = pathname === '/' ? [] : pathname.slice(1).split('/').map((part) => decodeURIComponent(part));
     }
     catch {
       return null;
     }
-
-    const pathname = this.stripBase(parsed.pathname);
-    if (pathname === null) {
-      return null;
-    }
-
-    const urlSegments = pathname === '/'
-      ? []
-      : pathname.slice(1).split('/').map((part) => decodeURIComponent(part));
+    const pathname = parsed.strippedPathname;
 
     let bestLeaf = null;
     let bestParams = null;
@@ -259,7 +262,7 @@ export class Router extends Route {
         if (segment !== pattern) {
           return null;
         }
-        scores.push(4);
+        scores.push(5);
         continue;
       }
 
@@ -273,7 +276,8 @@ export class Router extends Route {
           return null;
         }
         params[paramName] = coerced;
-        scores.push(spec?.allowed ? 3 : 2);
+        // an allowed set beats a typed param beats a bare one, so siblings on one segment resolve by what they claim
+        scores.push(spec?.allowed ? 4 : (spec?.type && spec.type !== String && spec.type !== 'string' ? 3 : 2));
       }
       else if (spec?.default !== undefined) {
         params[paramName] = spec.default;
@@ -345,10 +349,8 @@ export class Router extends Route {
   href(target, args = {}, { hash, absolute = false, keepQuery = false } = {}) {
     const route = this.routeFor(target);
     const rawPath = route ? route.path : (isString(target) && target ? target : '/');
-    const { params, query } = this.splitArgs(route, args);
-    if (keepQuery) {
-      extend(query, this.current?.query ?? {}, query);
-    }
+    const { params } = this.splitArgs(route, args);
+    const query = keepQuery ? { ...this.current?.query, ...this.splitArgs(route, args).query } : this.splitArgs(route, args).query;
 
     const segments = rawPath === '/' ? [] : rawPath.replace(/^\//, '').split('/');
     const resolvedSegments = [];
@@ -454,8 +456,8 @@ export class Router extends Route {
               Writes
   *******************************/
 
-  navigate(target, args = {}, { history = 'auto', state, info, resetScroll = true, resetFocus = true } = {}) {
-    return this.navigator.navigate(this.href(target, args), { state, info, history, resetScroll, resetFocus });
+  navigate(target, args = {}, { history = 'auto', state, info, resetScroll = true, resetFocus = true, hash, keepQuery, absolute } = {}) {
+    return this.navigator.navigate(this.href(target, args, { hash, keepQuery, absolute }), { state, info, history, resetScroll, resetFocus });
   }
 
   reload(options) {
@@ -498,12 +500,19 @@ export class Router extends Route {
       chain: matched.chain,
       navigationType,
       loading: false,
+      committed: false,
     } : null;
   }
 
   entryChanged(entry, event) {
-    // a state-only change, such as scroll memory, moves no route
-    const matched = event?.navigationType !== null ? this.match(entry?.url) : null;
+    // a state-only change, such as scroll memory, moves no route and says nothing
+    if (event?.navigationType === null) {
+      return;
+    }
+    if (this.pending) {
+      this.pending.committed = true;
+    }
+    const matched = this.match(entry?.url);
     if (matched) {
       this.commitRoute(matched);
     }
@@ -518,7 +527,7 @@ export class Router extends Route {
     this.notify();
   }
 
-  failed(error, event) {
+  async failed(error, event) {
     const pending = this.pending;
     this.pending = null;
     // a superseded, cancelled or refused navigation is not an error to show
@@ -533,12 +542,12 @@ export class Router extends Route {
       url: pending?.url ?? this.navigator.entry?.url ?? null,
     };
     // a failure before commit left the standing page in place; only a committed one is shown as an error
-    const committed = !pending || this.navigator.entry?.url === pending.url;
+    const committed = !pending || pending.committed;
     if (committed && this.errorRoute) {
       this.navigator.deferNavigate(this.href(this.errorRoute), { history: 'replace' });
     }
     else if (committed) {
-      const view = this.views?.error ?? null;
+      const view = await this.resolveView(this.views?.error);
       if (!view) {
         this.logError(error);
       }
@@ -580,7 +589,8 @@ export class Router extends Route {
   begin(matched, event) {
     const entryKey = event.navigationType === 'traverse' ? event.destination.key : null;
     // the visit's result rides its entry: a traverse back shows what was seen, reload() refreshes it
-    const cached = entryKey ? this.entryCache?.get(entryKey) : null;
+    const remembered = entryKey ? this.entryCache?.get(entryKey) : null;
+    const cached = remembered && remembered.user === this.user ? remembered.resolved : null;
     // what the cascade knows of the navigation: its signal, whether it is a reload, the page it leaves
     const navigation = { signal: event.signal, reload: event.navigationType === 'reload', previous: this.page };
     const work = { matched, settled: false, result: null, redirected: null };
@@ -606,16 +616,14 @@ export class Router extends Route {
         break;
       }
       const isRewrite = event.navigationType === 'push' || event.navigationType === 'replace';
-      if (!isRewrite) {
-        // a traverse or reload cannot be redirected before commit: stay put, then go where the guard says
+      const redirectedMatch = this.match(guard.redirect);
+      if (!isRewrite || !redirectedMatch) {
+        // a traverse or reload cannot be redirected before commit, and a target outside the routes is
+        // the browser's: stay put, then go where the guard says
         this.navigator.deferNavigate(guard.redirect);
         throw new DOMException('Navigation refused', 'AbortError');
       }
       controller.redirect(guard.redirect);
-      const redirectedMatch = this.match(guard.redirect);
-      if (!redirectedMatch) {
-        break;
-      }
       this.setPending(redirectedMatch, event.navigationType);
       this.navigator.transition.url = redirectedMatch.url;
       active = work.redirected = this.begin(redirectedMatch, event);
@@ -634,6 +642,10 @@ export class Router extends Route {
   async afterCommit(work, event, precommitRan) {
     const active = work.redirected ?? work;
     const { matched } = active;
+    // the handler runs only once the url has moved, so this is a commit even where the platform's event did not say so
+    if (this.pending) {
+      this.pending.committed = true;
+    }
 
     const delayMs = toDuration(this.loadingDelay) ?? 0;
     const minMs = toDuration(this.loadingMin) ?? 0;
@@ -669,8 +681,9 @@ export class Router extends Route {
 
     if (resolved?.status === 'redirect' && resolved.redirect) {
       if (!precommitRan) {
-        // no precommit on this browser: the refused url has shown, its slot becomes the redirect target
-        this.navigator.navigate(resolved.redirect, { history: 'replace' });
+        // no precommit on this browser: the refused url has shown, its slot becomes the redirect target,
+        // a task later so this handler is not aborted by its own replacement
+        this.navigator.deferNavigate(resolved.redirect, { history: 'replace' });
       }
       return;
     }
@@ -944,7 +957,7 @@ export class Router extends Route {
     this.settleRoutes(previous, this.page);
 
     if (key && resolved.status === 'ok') {
-      this.entryCache?.set(key, resolved);
+      this.entryCache?.set(key, { resolved, user: this.user });
     }
     if (globalThis.document && resolved.title) {
       globalThis.document.title = resolved.title;
@@ -1064,9 +1077,10 @@ export class Router extends Route {
     if (!slice) {
       return;
     }
+    const version = slice.titleVersion = (slice.titleVersion ?? 0) + 1;
     const title = this.titleText(await value);
-    // a navigation settled meanwhile, and this title belongs to the page before it
-    if (this.page?.slices !== slices || title === slice.title) {
+    // a navigation settled meanwhile, a newer run landed first, or nothing moved
+    if (this.page?.slices !== slices || slice.titleVersion !== version || title === slice.title) {
       return;
     }
     slice.title = title;
@@ -1081,18 +1095,24 @@ export class Router extends Route {
     if (!slice) {
       return;
     }
+    const version = slice.version = (slice.version ?? 0) + 1;
     const resolved = await value;
     const data = isPlainObject(resolved) ? await this.resolveDataSlice(resolved) : {};
-    // a navigation settled meanwhile, and this slice belongs to the page before it
-    if (this.page?.slices !== slices || !this.dataChanged(slice.data, data)) {
+    // a navigation settled meanwhile, a newer run landed first, or the slice did not move
+    if (this.page?.slices !== slices || slice.version !== version || !this.setSlice(slice, data)) {
       return;
     }
-    this.setSlice(slice, data);
     await this.updatePage();
   }
 
+  // sets the slice and says whether it moved. plain data asks the dataChanged option, one compare;
+  // the reactive router asks its signal, whose set already compared
   setSlice(slice, data) {
+    if (!this.dataChanged(slice.data, data)) {
+      return false;
+    }
     slice.data = data;
+    return true;
   }
 
   // the page re-read from its slices, which several updates in one tick share, so none of them
@@ -1110,9 +1130,13 @@ export class Router extends Route {
     this.notify();
   }
 
-  // awaited, so the platform's focus reset and scroll find the new dom
+  // awaited, so the platform's focus reset and scroll find the new dom. a traverse puts the named
+  // containers back here, at the swap, which a view transition's update is part of
   async renderView(page, event = null) {
     await this.onRender?.(page, event);
+    if (event?.navigationType === 'traverse' && this.restoreScroll) {
+      this.navigator.restoreScroll(this.navigator.entry);
+    }
   }
 
   subscribe(listener) {
