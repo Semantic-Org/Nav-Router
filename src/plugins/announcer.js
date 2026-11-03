@@ -5,11 +5,11 @@ const STATUS_WORDS = { forbidden: 'Access denied', notFound: 'Not found', error:
 
 // announces each page through a live region, covering webkit's silence on intercepted navigations.
 // a render during a navigation is announced once it settles, a render of the standing page at once:
-// a guard refusing in place or an error page. the initial load, hash jumps and same-title query
-// keystrokes stay quiet
+// a guard refusing in place, an error page, or a title that moved on a data re-run, on purpose. the
+// initial load, hash jumps and same-title query keystrokes stay quiet
 export default ({
   politeness = 'polite',
-  format = (page) => [STATUS_WORDS[page.status], page.title || page.url].filter(Boolean).join(', '),
+  format = (page) => [STATUS_WORDS[page.status], page.title || (page.url ? new URL(page.url, 'http://x').pathname : '')].filter(Boolean).join(', '),
 } = {}, Router) => {
   const proto = Router.prototype;
   const { start, intercepted, renderView, settled, failed, stop } = proto;
