@@ -24,6 +24,8 @@ import { Navigator } from './navigator.js';
 import { Route } from './route.js';
 
 const installed = new WeakSet();
+// what a data() returns through notFound(), at navigation or on the standing page
+const NOT_FOUND = Symbol('notFound');
 
 export class Router extends Route {
 
@@ -860,10 +862,9 @@ export class Router extends Route {
     const slices = [];
     const everyRoute = !previous || reload || this.dataChanged(previous.user, this.user);
     let flaggedNotFound = false;
-    const notFoundSymbol = Symbol('notFound');
     const notFound = () => {
       flaggedNotFound = true;
-      return notFoundSymbol;
+      return NOT_FOUND;
     };
 
     for (const ancestor of currentRoutes) {
@@ -877,7 +878,7 @@ export class Router extends Route {
       let sliceData = {};
       if (ancestor.data !== undefined) {
         const rawData = await this.evaluateData(ancestor, ancestor.data, { ...this.contextFor(ancestor, matched, { data: { ...data }, slices: [...slices], signal }), notFound });
-        if (flaggedNotFound || rawData === notFoundSymbol) {
+        if (flaggedNotFound || rawData === NOT_FOUND) {
           const [[, layouts, slots], notFoundView, { title, titles }] = await Promise.all([
             views,
             this.resolveView(this.views?.notFound),
@@ -1158,21 +1159,41 @@ export class Router extends Route {
   }
 
   // a route's data recomputed outside a navigation: the slice is set, the page re-reads itself and
-  // renders. anything that read the slice follows on its own
+  // renders, and anything that read the slice follows on its own. notFound() lands as it does at
+  // navigation, the not-found view in place, and data arriving on a page standing on not-found
+  // enters the route as a fresh navigation would
   async updateData(route, value) {
     const slices = this.page?.slices;
     const slice = slices?.find((item) => item.route === route);
     if (!slice) {
+      // the route that said not-found at navigation has no slice, so its arrival is the reload
+      if (this.page?.status === 'notFound' && inArray(route, this.page.chain) && (await value) !== NOT_FOUND) {
+        this.navigator.reload();
+      }
       return;
     }
     const version = slice.version = (slice.version ?? 0) + 1;
     const resolved = await value;
-    const data = isPlainObject(resolved) ? await this.resolveDataSlice(resolved) : {};
-    // a navigation settled meanwhile, a newer run landed first, or the slice did not move
-    if (this.page?.slices !== slices || slice.version !== version || !this.setSlice(slice, data)) {
+    // a navigation settled meanwhile, or a newer run landed first
+    if (this.page?.slices !== slices || slice.version !== version) {
       return;
     }
-    await this.updatePage();
+    if (this.page.status === 'notFound') {
+      if (resolved !== NOT_FOUND) {
+        this.navigator.reload();
+      }
+      return;
+    }
+    if (resolved === NOT_FOUND) {
+      this.page = { ...this.page, view: await this.resolveView(this.views?.notFound), status: 'notFound' };
+      await this.renderView(this.page);
+      this.notify();
+      return;
+    }
+    const data = isPlainObject(resolved) ? await this.resolveDataSlice(resolved) : {};
+    if (this.setSlice(slice, data)) {
+      await this.updatePage();
+    }
   }
 
   // sets the slice and says whether it moved, one dataChanged compare. the reactive scaffold
