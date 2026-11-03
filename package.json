@@ -23,7 +23,9 @@
   "scripts": {
     "demo": "node demo/serve.js flat",
     "demo:flat": "node demo/serve.js flat",
-    "demo:nested": "node demo/serve.js nested"
+    "demo:nested": "node demo/serve.js nested",
+    "format": "npx dprint fmt",
+    "setup": "npx simple-git-hooks"
   },
   "dependencies": {
     "@semantic-ui/utils": "file:../next/packages/utils"
@@ -33,5 +35,13 @@
     "dist",
     "README.md",
     "LICENSE"
-  ]
+  ],
+  "devDependencies": {
+    "dprint": "^0.57.1",
+    "simple-git-hooks": "^2.14.0"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "bash tools/hooks/pre-commit",
+    "commit-msg": "bash tools/hooks/commit-msg \"$1\""
+  }
 }

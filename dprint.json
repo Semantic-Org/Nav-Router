@@ -1,0 +1,51 @@
+{
+  "typescript": {
+    "indentWidth": 2, // default setting
+    "lineWidth": 120, // default setting
+    "useTabs": false, // default setting
+    "semiColons": "always", // default setting
+    "quoteStyle": "preferSingle", // default setting
+    "bracePosition": "sameLine", // same line for if{} (default)
+    "useBraces": "always", // dont allow single line if without braces
+    "nextControlFlowPosition": "nextLine", // newline for else
+    "trailingCommas": "onlyMultiLine", // only use trailing commas if content is multiline
+    "operatorPosition": "nextLine", // operator position on next line
+    "preferHanging": false, // dont use indented content when line width exceeded
+    "arrowFunction.useParentheses": "maintain", // self explanatory
+    "module.sortImportDeclarations": "caseInsensitive",
+    "module.sortExportDeclarations": "caseInsensitive",
+    "spaceAround": false, // myFunction(true) vs myFunction( true )
+    "spaceSurroundingProperties": true, // { one: 'two' } vs {one: 'two'}
+    "importDeclaration.spaceSurroundingNamedImports": true,
+    "exportDeclaration.spaceSurroundingNamedExports": true,
+    "importDeclaration.preferSingleLine": true,
+    "exportDeclaration.preferSingleLine": true,
+    "importDeclaration.sortNamedImports": "caseInsensitive",
+    "exportDeclaration.sortNamedExports": "caseInsensitive"
+    /* these were historically preferred but phasing out for "standard js"
+      "quoteProps": "consistent", // if all props dont need quotes okay to omit
+      "forInStatement.spaceAfterForKeyword": false, // for(const prop of props)
+      "ifStatement.spaceAfterIfKeyword": false, // if(foo) vs if (foo)
+      "whileStatement.spaceAfterWhileKeyword": false
+      "trailingCommas": "never", // only use trailing commas if content is multiline
+    */
+  },
+  "json": {},
+  "markdown": {},
+  "toml": {},
+  "excludes": [
+    "dist/",
+    "types/",
+    "**/node_modules",
+    "**/*.html",
+    "**/*.json",
+    "**/*.md",
+    "**/*-lock.json"
+  ],
+  "plugins": [
+    "https://github.com/jlukic/dprint-plugin-typescript/releases/download/0.94.0-tern/dprint_plugin_typescript.wasm",
+    "https://plugins.dprint.dev/json-0.19.1.wasm",
+    "https://plugins.dprint.dev/markdown-0.16.3.wasm",
+    "https://plugins.dprint.dev/toml-0.6.0.wasm"
+  ]
+}
