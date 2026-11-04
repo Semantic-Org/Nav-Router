@@ -37,7 +37,6 @@ export class Route {
       slots: { ...Route.defaults.slots, ...routeOptions.slots },
     });
 
-    this.layout ??= this.views?.layout;
     this.path = this.normalizePath(routeOptions.path, parent);
     this.assertPathPrefix(this.path, parent);
     this.id = this.resolveId(routeOptions, parent);

@@ -8,8 +8,8 @@ import { RootLayout } from './views/root-layout.js';
 export const router = defineRouter({
   name: 'home',
   title: 'Acme Console',
-  views: {
-    layout: RootLayout,
+  layout: RootLayout,
+  statusViews: {
     notFound: NotFoundPage,
     forbidden: ForbiddenPage,
     loading: LoadingPage,

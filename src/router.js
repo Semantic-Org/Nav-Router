@@ -49,7 +49,8 @@ export class Router extends Route {
 
   static defaults = {
     base: '',
-    views: {},
+    // the view for each status a page can stand in: loading, notFound, forbidden, error
+    statusViews: {},
     signInRoute: null,
     // the user the guards read: a value, or a function of the navigation returning one or a promise of one
     identity: null,
@@ -69,8 +70,7 @@ export class Router extends Route {
     // the resolved settings in one place, for the console and for anything that introspects
     this.config = extend({}, new.target.defaults, options);
     this.base = this.normalizeBase(this.base);
-    this.views = { ...new.target.defaults.views, ...options.views };
-    this.layout ??= this.views.layout;
+    this.statusViews = { ...new.target.defaults.statusViews, ...options.statusViews };
 
     this.routesByName ??= new Map();
     this.leaves ??= [];
@@ -116,7 +116,7 @@ export class Router extends Route {
     const matched = this.match(initialUrl);
     if (!matched) {
       const [view, views] = await Promise.all([
-        this.resolveView(this.views?.notFound),
+        this.resolveView(this.statusViews?.notFound),
         this.resolveViews([this]),
       ]);
       this.page = { view, views, status: 'notFound', url: initialUrl };
@@ -649,7 +649,7 @@ export class Router extends Route {
       this.navigator.deferNavigate(this.href(this.errorRoute), { history: 'replace' });
     }
     else if (committed) {
-      const view = await this.resolveView(this.views?.error).catch(() => null);
+      const view = await this.resolveView(this.statusViews?.error).catch(() => null);
       if (!view) {
         this.logError(error);
       }
@@ -795,8 +795,8 @@ export class Router extends Route {
         if (this.pending) {
           this.pending.loading = true;
         }
-        if (this.views?.loading) {
-          const loadingView = await this.resolveView(this.views.loading);
+        if (this.statusViews?.loading) {
+          const loadingView = await this.resolveView(this.statusViews.loading);
           if (!active.settled && !event.signal.aborted) {
             // page stays the settled page: a loading view is rendered over it, pending.loading says so
             await this.renderView({
@@ -933,7 +933,7 @@ export class Router extends Route {
           this.contextFor(ancestor, matched, { signal }),
         );
         if (!allowed) {
-          if ((!this.user || !this.views?.forbidden) && this.signInRoute) {
+          if ((!this.user || !this.statusViews?.forbidden) && this.signInRoute) {
             // the return address rides to the sign-in page, which reads it as query.returnTo
             return {
               status: 'redirect',
@@ -944,7 +944,7 @@ export class Router extends Route {
             };
           }
           const [view, views, { title, titles }] = await Promise.all([
-            this.resolveView(this.views?.forbidden),
+            this.resolveView(this.statusViews?.forbidden),
             this.resolveViews(currentRoutes),
             this.evaluateTitles(currentRoutes, matched, { signal }),
           ]);
@@ -1000,7 +1000,7 @@ export class Router extends Route {
         if (flaggedNotFound || rawData === NOT_FOUND) {
           const [views, notFoundView, { title, titles }] = await Promise.all([
             viewsReady,
-            this.resolveView(this.views?.notFound),
+            this.resolveView(this.statusViews?.notFound),
             this.evaluateTitles(currentRoutes, matched, { data, slices, signal }),
           ]);
           return this.buildCascadeResult(matched, {
@@ -1262,13 +1262,13 @@ export class Router extends Route {
       }
       return;
     }
-    if ((!this.user || !this.views?.forbidden) && this.signInRoute) {
+    if ((!this.user || !this.statusViews?.forbidden) && this.signInRoute) {
       this.navigator.navigate(this.href(this.signInRoute, { returnTo: this.returnAddress(this.current) }), {
         history: 'replace',
       });
       return;
     }
-    this.page = { ...this.page, view: await this.resolveView(this.views?.forbidden), status: 'forbidden' };
+    this.page = { ...this.page, view: await this.resolveView(this.statusViews?.forbidden), status: 'forbidden' };
     await this.renderView(this.page);
     this.notify();
   }
@@ -1315,7 +1315,7 @@ export class Router extends Route {
       return;
     }
     if (resolved === NOT_FOUND) {
-      const view = await this.resolveView(this.views?.notFound);
+      const view = await this.resolveView(this.statusViews?.notFound);
       if (stale()) {
         return;
       }
