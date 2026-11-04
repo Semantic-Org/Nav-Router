@@ -1,7 +1,6 @@
 import { escapeHTML } from '@semantic-ui/utils';
 
-export function SignInPage(context) {
-  const { router, query = {} } = context ?? {};
+export function SignInPage({ router, query = {} } = {}) {
   const user = router?.user ?? null;
   const after = query.returnTo || '/team/acme/settings';
 

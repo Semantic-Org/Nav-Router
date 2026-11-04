@@ -1,7 +1,6 @@
 import { escapeHTML } from '@semantic-ui/utils';
 
-export function LoadingPage(context) {
-  const { page = {}, params = {} } = context ?? {};
+export function LoadingPage({ page = {}, params = {} } = {}) {
   const pathname = page.url ? new URL(page.url).pathname : '/';
 
   return `

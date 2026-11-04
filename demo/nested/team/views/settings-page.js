@@ -1,7 +1,6 @@
 import { escapeHTML } from '@semantic-ui/utils';
 
-export function SettingsPage(context) {
-  const { params = {}, router } = context ?? {};
+export function SettingsPage({ params = {}, router } = {}) {
   const org = params.org || 'acme';
   const user = router?.user ?? null;
 

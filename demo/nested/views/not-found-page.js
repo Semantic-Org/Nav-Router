@@ -1,7 +1,6 @@
 import { escapeHTML } from '@semantic-ui/utils';
 
-export function NotFoundPage(context) {
-  const { page = {}, params = {} } = context ?? {};
+export function NotFoundPage({ page = {}, params = {} } = {}) {
   const pathname = page.url ? new URL(page.url).pathname : '/';
   const org = params.org || 'acme';
 

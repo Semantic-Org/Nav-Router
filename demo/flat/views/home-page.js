@@ -2,8 +2,7 @@ import { escapeHTML } from '@semantic-ui/utils';
 
 import { MEMBERS } from '../data.js';
 
-export function HomePage(context) {
-  const { data = {}, router } = context ?? {};
+export function HomePage({ data = {}, router } = {}) {
   const memberCount = data.memberCount ?? Object.keys(MEMBERS).length;
   const user = router?.user ?? null;
 
