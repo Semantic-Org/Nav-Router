@@ -190,12 +190,12 @@ export class Route {
     const { layout, slots } = page.views?.find((entry) => entry.route === this) ?? {};
     const context = () => this.viewContext(page);
     const layoutBefore = rendered.layout;
-    rendered.layout = this.createOrUpdateView(
-      rendered.layout,
-      layout,
-      { parent: this.parentLayout(), slot: undefined },
+    rendered.layout = this.createOrUpdateView({
+      prior: rendered.layout,
+      view: layout,
+      placement: { parent: this.parentLayout(), slot: undefined },
       context,
-    );
+    });
     if (layoutBefore !== undefined && rendered.layout !== layoutBefore) {
       const chain = page.chain ?? [];
       each([...chain.slice(chain.indexOf(this) + 1)].reverse(), (below) => below.destroyViews());
@@ -204,19 +204,30 @@ export class Route {
     }
     const parent = rendered.layout ?? this.parentLayout();
     each(slots, (view, slot) => {
-      rendered.slots[slot] = this.createOrUpdateView(rendered.slots[slot], view, { parent, slot }, context);
+      rendered.slots[slot] = this.createOrUpdateView({
+        prior: rendered.slots[slot],
+        view,
+        placement: { parent, slot },
+        context,
+      });
     });
     if (page.chain?.at(-1) === this) {
       if (rendered.view && rendered.page?.view !== page.view) {
         this.router.destroyView({ rendered: rendered.view });
         rendered.view = undefined;
       }
-      rendered.view = this.createOrUpdateView(rendered.view, page.view, { parent, slot: undefined }, context);
+      rendered.view = this.createOrUpdateView({
+        prior: rendered.view,
+        view: page.view,
+        placement: { parent, slot: undefined },
+        context,
+      });
     }
     rendered.page = page;
   }
 
-  createOrUpdateView(prior, view, placement, context) {
+  // prior is the rendered view as it stands, context a thunk built only for a view that is created or told
+  createOrUpdateView({ prior, view, placement, context }) {
     if (!view) {
       if (prior) {
         this.router.destroyView({ rendered: prior });
