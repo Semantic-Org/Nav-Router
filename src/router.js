@@ -1315,29 +1315,39 @@ export class Router extends Route {
   // that said not-found never has one. so data arriving for a route without a slice enters it as
   // a fresh navigation would, while an ancestor's data moving on a not-found page only keeps it current
   async updateData(route, value) {
-    const slices = this.page?.slices;
+    const page = this.page;
+    const slices = page?.slices;
     const slice = slices?.find((item) => item.route === route);
     if (!slice) {
-      if (this.page?.status === 'notFound' && inArray(route, this.page.chain) && (await value) !== NOT_FOUND) {
+      // on a not-found page the route that said so is the first without a slice, and its data arriving is the reload
+      const saidNotFound = page?.status === 'notFound'
+        && page.chain?.find((item) => !slices.some((other) => other.route === item)) === route;
+      if (saidNotFound && (await value) !== NOT_FOUND && this.page === page) {
         this.navigator.reload();
       }
       return;
     }
     const version = slice.version = (slice.version ?? 0) + 1;
+    // the slice left the page, a navigation moved it, or a newer run landed first: checked after every await
+    const stale = () => !inArray(slice, this.page?.slices ?? []) || slice.version !== version;
     const resolved = await value;
-    // a navigation settled meanwhile, or a newer run landed first
-    if (this.page?.slices !== slices || slice.version !== version) {
+    if (stale()) {
       return;
     }
     if (resolved === NOT_FOUND) {
-      slices.splice(slices.indexOf(slice), 1);
-      this.page = { ...this.page, view: await this.resolveView(this.views?.notFound), status: 'notFound' };
+      const view = await this.resolveView(this.views?.notFound);
+      if (stale()) {
+        return;
+      }
+      // the route and the routes below it lose their slices, the shape a not-found cascade has
+      slices.splice(slices.indexOf(slice));
+      this.page = { ...this.page, view, status: 'notFound' };
       await this.renderView(this.page);
       this.notify();
       return;
     }
     const data = isPlainObject(resolved) ? await this.resolveDataSlice(resolved) : {};
-    if (this.setSlice(slice, data)) {
+    if (!stale() && this.setSlice(slice, data)) {
       await this.updatePage();
     }
   }
