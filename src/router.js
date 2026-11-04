@@ -749,7 +749,9 @@ export class Router extends Route {
         // the browser's: stay put, then go where the guard says
         // a reload or a replace meant to stay, so the redirect replaces. a refused traverse leaves the user where they stood, so it pushes
         this.navigator.deferNavigate(guard.redirect, {
-          history: event.navigationType === 'reload' || event.navigationType === 'replace' ? 'replace' : 'push',
+          history: event.navigationType === 'reload' || event.navigationType === 'replace'
+            ? 'replace'
+            : 'push',
         });
         throw new DOMException('Navigation refused', 'AbortError');
       }
@@ -797,7 +799,11 @@ export class Router extends Route {
           const loadingView = await this.resolveView(this.views.loading);
           if (!active.settled && !event.signal.aborted) {
             // page stays the settled page: a loading view is rendered over it, pending.loading says so
-            await this.renderView({ ...this.pageFor(matched), view: loadingView, status: 'loading' }, event);
+            await this.renderView({
+              ...this.pageFor(matched),
+              view: loadingView,
+              status: 'loading',
+            }, event);
           }
         }
         this.notify();
@@ -813,7 +819,9 @@ export class Router extends Route {
       if (!precommitRan) {
         // no precommit on this browser: the refused url has shown, its slot becomes the redirect target,
         // a task later so this handler is not aborted by its own replacement
-        this.navigator.deferNavigate(resolved.redirect, { history: 'replace' });
+        this.navigator.deferNavigate(resolved.redirect, {
+          history: 'replace',
+        });
       }
       return;
     }
@@ -821,7 +829,10 @@ export class Router extends Route {
     if (loadingShownAt !== null && minMs > 0) {
       const elapsed = Date.now() - loadingShownAt;
       if (elapsed < minMs) {
-        await wait(minMs - elapsed, { abortController: event.signal, rejectOnAbort: false });
+        await wait(minMs - elapsed, {
+          abortController: event.signal,
+          rejectOnAbort: false,
+        });
       }
       if (event.signal.aborted) {
         return;
@@ -865,11 +876,17 @@ export class Router extends Route {
   }
 
   evaluateData(route, fn, context) {
-    return this.evaluateHook(route, fn, context, { kind: 'slice', changed: (value) => this.updateData(route, value) });
+    return this.evaluateHook(route, fn, context, {
+      kind: 'slice',
+      changed: (value) => this.updateData(route, value),
+    });
   }
 
   evaluateTitle(route, fn, context) {
-    return this.evaluateHook(route, fn, context, { kind: 'slice', changed: (value) => this.updateTitle(route, value) });
+    return this.evaluateHook(route, fn, context, {
+      kind: 'slice',
+      changed: (value) => this.updateTitle(route, value),
+    });
   }
 
   async runCascade(matched, navigation) {
