@@ -3,12 +3,14 @@ import { isObject, isPromise } from '@semantic-ui/utils';
 import { isLazy } from '../helpers/lazy.js';
 
 // recovers once per url when a fresh deploy invalidates an old lazy view chunk.
-// hover preloads swallow rejections, so only an actual failed navigation triggers a document load
-// the reload is the platform's own, a reload event the router declines, since an assign() of the
-// same url is a navigation it would intercept and the chunk would only fail again
+// hover preloads swallow rejections, so only an actual failed navigation triggers a document load.
+// the listener comes down before the load, so nothing of the router's intercepts it: a reload where
+// the url committed, an assign where a precommit failure left the old url standing
 export default ({
   storageKey = 'nav-router:chunk-reload',
-  reload = () => globalThis.location?.reload?.(),
+  reload = (url) => (url && globalThis.location && globalThis.location.href !== url
+    ? globalThis.location.assign(url)
+    : globalThis.location?.reload?.()),
 } = {}, Router) => {
   const proto = Router.prototype;
   const { intercepted, resolveView, settled, failed, stop } = proto;
@@ -49,6 +51,7 @@ export default ({
         if (globalThis.sessionStorage?.getItem(storageKey) !== url) {
           globalThis.sessionStorage?.setItem(storageKey, url);
           this.pending = null;
+          this.navigator.detach();
           reload(url);
           return;
         }
