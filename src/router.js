@@ -121,7 +121,7 @@ export class Router extends Route {
       ]);
       this.page = { view, views, chain: [this], status: 'notFound', url: initialUrl };
       this.settleRoutes(null, this.page);
-      await this.renderView(this.page);
+      await this.renderPage(this.page);
       this.notify();
       return this;
     }
@@ -638,7 +638,7 @@ export class Router extends Route {
       // the loading view it showed leaves, the standing page's own view comes back
       if (pending?.loading && this.page) {
         this.page.chain?.at(-1)?.update(this.page);
-        this.renderView(this.page).catch(noop);
+        this.renderPage(this.page).catch(noop);
       }
       this.notify();
       return;
@@ -669,7 +669,7 @@ export class Router extends Route {
         status: 'error',
         error,
       };
-      this.renderView(this.page).catch(noop);
+      this.renderPage(this.page).catch(noop);
     }
     else {
       this.logError(error);
@@ -813,7 +813,7 @@ export class Router extends Route {
               status: 'loading',
             };
             loading.chain.at(-1)?.update(loading);
-            await this.renderView(loading, event);
+            await this.renderPage(loading, event);
           }
         }
         this.notify();
@@ -1173,7 +1173,7 @@ export class Router extends Route {
       globalThis.document.title = resolved.title;
     }
 
-    await this.renderView(this.page, event);
+    await this.renderPage(this.page, event);
     this.notify();
   }
 
@@ -1281,7 +1281,7 @@ export class Router extends Route {
     }
     this.page = { ...this.page, view: await this.resolveView(this.statusViews?.forbidden), status: 'forbidden' };
     this.page.chain.at(-1)?.update(this.page);
-    await this.renderView(this.page);
+    await this.renderPage(this.page);
     this.notify();
   }
 
@@ -1334,7 +1334,7 @@ export class Router extends Route {
       // the route and the routes below it lose their slices, the shape a not-found cascade has
       slices.splice(slices.indexOf(slice));
       this.page = { ...this.page, view, status: 'notFound' };
-      await this.renderView(this.page);
+      await this.renderPage(this.page);
       this.notify();
       return;
     }
@@ -1367,13 +1367,13 @@ export class Router extends Route {
       globalThis.document.title = this.page.title;
     }
     each(chain.slice(chain.indexOf(route)), (moved) => moved.update(this.page));
-    await this.renderView(this.page);
+    await this.renderPage(this.page);
     this.notify();
   }
 
   // awaited, so the platform's focus reset and scroll find the new dom. a traverse puts the named
   // containers back here, at the swap, which a view transition's update is part of
-  async renderView(page, event = null) {
+  async renderPage(page, event = null) {
     await this.onRender?.(page, event);
     if (event?.navigationType === 'traverse' && this.restoreScroll && page.status !== 'loading') {
       this.navigator.restoreScroll(this.navigator.entry);

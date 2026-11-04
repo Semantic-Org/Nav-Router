@@ -15,7 +15,7 @@ export default ({
       .join(', '),
 } = {}, Router) => {
   const proto = Router.prototype;
-  const { start, intercepted, renderView, settled, failed, stop } = proto;
+  const { start, intercepted, renderPage, settled, failed, stop } = proto;
 
   // mounted empty ahead of time so screen readers register the live region before its text mutates
   proto.ensureAnnouncer = function() {
@@ -54,8 +54,8 @@ export default ({
     return intercepted.call(this, matched, event);
   };
 
-  proto.renderView = async function(page, event = null) {
-    await renderView.call(this, page, event);
+  proto.renderPage = async function(page, event = null) {
+    await renderPage.call(this, page, event);
     if (!page || page.status === 'loading') {
       return;
     }

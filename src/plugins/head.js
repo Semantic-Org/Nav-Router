@@ -12,7 +12,7 @@ export default ({
   formatTitle = null,
 } = {}, Router) => {
   const proto = Router.prototype;
-  const { renderView, onRouteCreated, onRouteUpdated, onRouteDestroyed, stop } = proto;
+  const { renderPage, onRouteCreated, onRouteUpdated, onRouteDestroyed, stop } = proto;
 
   const findExistingTag = (head, key) => {
     if (key === 'canonical') {
@@ -186,9 +186,9 @@ export default ({
     }
   };
 
-  proto.renderView = async function(page, event = null) {
+  proto.renderPage = async function(page, event = null) {
     this.writeHead(page);
-    return renderView.call(this, page, event);
+    return renderPage.call(this, page, event);
   };
 
   proto.stop = function() {
