@@ -306,7 +306,7 @@ code {
   background: var(--surface);
   color: var(--text);
 }
-.nav-link.is-active {
+.nav-link[aria-current] {
   background: var(--surface-elevated);
   color: var(--accent);
 }
@@ -387,7 +387,8 @@ code {
   color: var(--text);
   border-color: var(--accent);
 }
-.btn-chip.is-selected {
+.btn-chip.is-selected,
+.btn-chip[aria-current] {
   background: var(--accent-soft);
   border-color: var(--accent);
   color: var(--accent);
@@ -629,7 +630,7 @@ code {
 .team-tab:hover {
   color: var(--text);
 }
-.team-tab.is-active {
+.team-tab[aria-current="page"] {
   color: var(--accent);
   border-bottom-color: var(--accent);
 }
@@ -726,7 +727,7 @@ code {
 .sidebar-item:hover {
   background: var(--surface-hover);
 }
-.sidebar-item.is-active {
+.sidebar-item[aria-current="page"] {
   background: var(--accent-soft);
   color: var(--accent);
 }
