@@ -8,17 +8,18 @@ import { Router } from './router.js';
 // a redirect moves the page, a refused permission redirects or shows forbidden, data updates its
 // slice, and a title updates its title. a slice is a store with a cell per key, and merged data
 // reads each key through its cell, so a key that moved wakes only the functions that read it, the
-// cell's own equality deciding what moved. a run born while its navigation is in flight ends
-// with that navigation's signal, and once active it ends with the route's. a provider supplies the
-// four primitives below; the fifth, the per-key store, is built from signals unless the provider
-// has a native one ($state, a store, reactive())
+// cell's own equality deciding what moved. a route holds its runs, and a run born while its
+// navigation is in flight belongs to that navigation until the route adopts it at settle: it ends
+// with the navigation's signal before, and with the route's after. a provider supplies the four
+// primitives below; the fifth, the per-key store, is built from signals unless the provider has a
+// native one ($state, a store, reactive())
 export class ReactiveRouter extends Router {
   constructor(options) {
     super(options);
     // a tracked page is live; a cached result would not be
     this.entryCache = null;
+    // the runs the navigation in flight has born and no route has adopted yet
     this.born = [];
-    this.runs = new Map();
   }
 
   /*******************************
@@ -142,7 +143,7 @@ export class ReactiveRouter extends Router {
     });
     const run = { stop, kind };
     if (signal === route.abortSignal) {
-      this.runsOf(route).add(run);
+      (route.runs ??= new Set()).add(run);
     }
     else {
       born = { route, run, adopted: false, changed, latest: null };
@@ -158,18 +159,11 @@ export class ReactiveRouter extends Router {
     return first;
   }
 
-  runsOf(route) {
-    if (!this.runs.has(route.id)) {
-      this.runs.set(route.id, new Set());
-    }
-    return this.runs.get(route.id);
-  }
-
   stopRuns(route, kind = null) {
-    each([...this.runsOf(route)], (run) => {
+    each([...(route.runs ?? [])], (run) => {
       if (kind === null || run.kind === kind) {
         run.stop();
-        this.runsOf(route).delete(run);
+        route.runs.delete(run);
       }
     });
   }
@@ -182,7 +176,7 @@ export class ReactiveRouter extends Router {
     this.stopRuns(route, kind);
     each(mine, (born) => {
       born.adopted = true;
-      this.runsOf(route).add(born.run);
+      (route.runs ??= new Set()).add(born.run);
       if (born.latest) {
         born.changed(born.latest.value);
       }
