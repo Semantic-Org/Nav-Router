@@ -81,6 +81,12 @@ export class Router extends Route {
     this.error = null;
 
     this.entryCache = createCache({ maxSize: 100 });
+    // what appears, by route: the function each thing was shown from, the handle its seam returned, its placement
+    this.handles = new Map();
+    // the routes settle or a data move named, read once by the render moment that follows. a render
+    // that never came leaves it for the next, which then tells routes that did not move, and update
+    // is idempotent, so that costs a render and nothing else
+    this.updatedRoutes = null;
     this.timers = new Set();
     this.listeners = new Set();
     this.activeAbort = null;
@@ -169,6 +175,7 @@ export class Router extends Route {
       [...(this.page?.chain ?? [])].reverse(),
       (route) => this.destroyRoute(route, this.lifecycleContext(route, null)),
     );
+    this.renderViews({});
     this.page = null;
     this.entryCache?.clear();
   }
@@ -634,6 +641,10 @@ export class Router extends Route {
     this.pending = null;
     // a superseded, cancelled or refused navigation is not an error to show
     if (error?.name === 'AbortError') {
+      // the loading view it showed leaves, the standing page's own view comes back
+      if (pending?.loading && this.page) {
+        this.renderView(this.page).catch(noop);
+      }
       this.notify();
       return;
     }
@@ -801,6 +812,7 @@ export class Router extends Route {
             // page stays the settled page: a loading view is rendered over it, pending.loading says so
             await this.renderView({
               ...this.pageFor(matched),
+              views: this.page?.views ?? [],
               view: loadingView,
               status: 'loading',
             }, event);
@@ -1198,15 +1210,19 @@ export class Router extends Route {
         this.destroyRoute(route, this.lifecycleContext(route, page, previous));
       }
     });
+    const updated = [];
     each(after, (route) => {
       if (!inArray(route, before)) {
         route.activate();
         this.onRouteCreated(route, this.lifecycleContext(route, page, previous));
       }
       else if (sliceOf(page, route) !== sliceOf(previous, route)) {
+        updated.push(route);
         this.onRouteUpdated(route, this.lifecycleContext(route, page, previous));
       }
     });
+    // the render moment tells these routes' views; what is new or gone it sees for itself
+    this.updatedRoutes = updated;
   }
 
   destroyRoute(route, context) {
@@ -1286,7 +1302,7 @@ export class Router extends Route {
       return;
     }
     slice.title = title;
-    await this.updatePage();
+    await this.updatePage(route);
   }
 
   // a route's data recomputed outside a navigation: the slice is set, the page re-reads itself and
@@ -1328,7 +1344,7 @@ export class Router extends Route {
     }
     const data = isPlainObject(resolved) ? await this.resolveDataSlice(resolved) : {};
     if (!stale() && this.setSlice(slice, data)) {
-      await this.updatePage();
+      await this.updatePage(route);
     }
   }
 
@@ -1343,9 +1359,10 @@ export class Router extends Route {
   }
 
   // the page re-read from its slices, which several updates in one tick share, so none of them
-  // writes over another's
-  async updatePage() {
-    const { slices } = this.page;
+  // writes over another's. the moved route and the routes below it are told at the render moment,
+  // since data flows down
+  async updatePage(route) {
+    const { slices, chain = [] } = this.page;
     const data = {};
     each(slices, (slice) => extend(data, slice.data));
     const titles = slices.map((slice) => slice.title).filter((title) => title !== null);
@@ -1353,6 +1370,7 @@ export class Router extends Route {
     if (globalThis.document && this.page.title) {
       globalThis.document.title = this.page.title;
     }
+    this.updatedRoutes = chain.slice(chain.indexOf(route));
     await this.renderView(this.page);
     this.notify();
   }
@@ -1360,10 +1378,111 @@ export class Router extends Route {
   // awaited, so the platform's focus reset and scroll find the new dom. a traverse puts the named
   // containers back here, at the swap, which a view transition's update is part of
   async renderView(page, event = null) {
+    this.renderViews(page);
     await this.onRender?.(page, event);
     if (event?.navigationType === 'traverse' && this.restoreScroll && page.status !== 'loading') {
       this.navigator.restoreScroll(this.navigator.entry);
     }
+  }
+
+  /*******************************
+                Views
+  *******************************/
+
+  // the three seams of anything that appears, no-ops here: native shows nothing on its own. the dom
+  // plugin makes them the native how and an integration wraps them for its components. each takes
+  // one bag: the thing, where it attaches as placement { parent, slot }, the parent layout's handle
+  // and a slot name, absent for the default slot, the handle createView returned for it, and the
+  // context the thing is shown with. a view's life ends at destroyView, never at its route's signal
+  createView({ view, placement, context }) {}
+
+  updateView({ handle, view, placement, context }) {
+    return handle;
+  }
+
+  destroyView({ handle, placement }) {}
+
+  // the render moment for what appears: routes the page no longer shows lose their views leaf to
+  // root, then root to leaf each route's layout, its named slot content and, at the leaf, the page's
+  // view go through their seams. a layout that came back from its update as a new handle has what
+  // hung inside it leave and come back
+  renderViews(page) {
+    const entries = page.views ?? [];
+    const updated = this.updatedRoutes ?? [];
+    this.updatedRoutes = null;
+    each([...this.handles.keys()].reverse(), (route) => {
+      if (!entries.some((entry) => entry.route === route)) {
+        this.destroyRouteViews(route);
+      }
+    });
+    let parent = null;
+    each(entries, ({ route, layout, slots }, index) => {
+      const shown = this.handles.get(route) ?? { slots: {} };
+      this.handles.set(route, shown);
+      // built only for a thing that is created or told, not for every standing one on every render
+      const context = () => this.viewContext(route, page);
+      const moved = inArray(route, updated);
+      if (layout) {
+        const before = shown.layout?.handle;
+        shown.layout = this.createOrUpdateView(shown.layout, layout, { parent, slot: undefined }, context, moved);
+        if (before !== undefined && shown.layout.handle !== before) {
+          each([...entries].slice(index + 1).reverse(), (below) => this.destroyRouteViews(below.route));
+          this.destroyRouteViews(route, { layout: false });
+        }
+        parent = shown.layout.handle;
+      }
+      each(slots, (view, slot) => {
+        shown.slots[slot] = this.createOrUpdateView(shown.slots[slot], view, { parent, slot }, context, moved);
+      });
+      if (index === entries.length - 1) {
+        shown.view = this.createOrUpdateView(shown.view, page.view, { parent, slot: undefined }, context, moved);
+      }
+    });
+  }
+
+  // one thing through its seam: new, it is created; its function changed in place, a page going
+  // not-found, it leaves and comes back; its route moved, it is told
+  createOrUpdateView(shown, view, placement, context, moved) {
+    if (shown && (!view || shown.view !== view)) {
+      this.destroyView(shown);
+      shown = null;
+    }
+    if (!view || (shown && !moved)) {
+      return shown ?? undefined;
+    }
+    const handle = shown
+      ? this.updateView({ ...shown, view, placement, context: context() })
+      : this.createView({ view, placement, context: context() });
+    return { view, handle, placement };
+  }
+
+  // a route's views leave, its page view first and its layout last, or all but the layout when the
+  // layout stays and what hung inside it is to come back
+  destroyRouteViews(route, { layout = true } = {}) {
+    const shown = this.handles.get(route);
+    if (!shown) {
+      return;
+    }
+    each([shown.view, ...Object.values(shown.slots), layout ? shown.layout : null], (thing) => {
+      if (thing) {
+        this.destroyView(thing);
+      }
+    });
+    if (layout) {
+      this.handles.delete(route);
+    }
+    else {
+      shown.view = undefined;
+      shown.slots = {};
+    }
+  }
+
+  // what a view sees: the page's params and query, the data of its route and the routes above it
+  viewContext(route, page) {
+    const slices = (page.slices ?? []).filter((slice) => inArray(slice.route, route.ancestors));
+    const data = {};
+    each(slices, (slice) => extend(data, slice.data));
+    return { ...this.contextFor(route, page, { data, slices }), page };
   }
 
   subscribe(listener) {
