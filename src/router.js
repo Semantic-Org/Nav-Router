@@ -23,7 +23,6 @@ import { IS_ROUTER } from './internal-helpers/identity.js';
 import { Navigator } from './navigator.js';
 import { Route } from './route.js';
 
-const installed = new WeakSet();
 // what a data() returns through notFound(), at navigation or on the standing page
 const NOT_FOUND = Symbol('notFound');
 
@@ -40,8 +39,9 @@ export class Router extends Route {
   // it wraps a moment and calls through, never replaces one, or adds a method the core would
   // otherwise make every page carry. installed between navigations it takes effect on the next
   static extend(plugin, options) {
-    if (!installed.has(plugin)) {
-      installed.add(plugin);
+    // the plugin carries its own mark, as day.js marks one
+    if (!plugin.installed) {
+      plugin.installed = true;
       plugin(options, Router, Navigator);
     }
     return Router;

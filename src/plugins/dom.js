@@ -10,7 +10,6 @@ import { isArray, isFunction, isString } from '@semantic-ui/utils';
 // element that has an update() of its own. the root's parent is the mount
 export default ({ mount = 'body' } = {}, Router) => {
   const proto = Router.prototype;
-  const fallbacks = new WeakMap();
 
   const mountElement = () => (isString(mount) ? document.querySelector(mount) : mount);
 
@@ -63,8 +62,9 @@ export default ({ mount = 'body' } = {}, Router) => {
         element.removeAttribute('slot');
       }
     }
-    if (target.tagName === 'SLOT' && !fallbacks.has(target)) {
-      fallbacks.set(target, [...target.childNodes]);
+    // a light-dom slot keeps its own fallback children aside while something fills it
+    if (target.tagName === 'SLOT' && !target.fallback) {
+      target.fallback = [...target.childNodes];
       target.replaceChildren();
     }
     target.appendChild(element);
@@ -73,9 +73,9 @@ export default ({ mount = 'body' } = {}, Router) => {
   const remove = (element) => {
     const target = element.parentNode;
     element.remove();
-    if (target && fallbacks.has(target) && !target.childElementCount) {
-      target.append(...fallbacks.get(target));
-      fallbacks.delete(target);
+    if (target?.fallback && !target.childElementCount) {
+      target.append(...target.fallback);
+      delete target.fallback;
     }
   };
 

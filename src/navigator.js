@@ -18,7 +18,6 @@ export class Navigator {
     // per instance, so two routers on one page never claim each other's navigations
     this.infoKey = Symbol('nav-router/info');
     this.attached = false;
-    this.boundEntries = new WeakSet();
 
     this.entry = null;
     this.entries = [];
@@ -89,9 +88,9 @@ export class Navigator {
     this.entries = nav?.entries?.() ?? [];
     this.activation = nav?.activation ?? null;
     each(this.entries, (entry) => {
-      if (entry && !this.boundEntries.has(entry)) {
-        this.boundEntries.add(entry);
-        entry.addEventListener?.('dispose', () => this.onDispose(entry), { once: true });
+      // the entry's own handler slot, so binding again binds once
+      if (entry) {
+        entry.ondispose = () => this.onDispose(entry);
       }
     });
   }
