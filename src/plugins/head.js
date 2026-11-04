@@ -96,7 +96,8 @@ export default ({
     const record = this.metaRecord(route);
     const version = record.version = (record.version ?? 0) + 1;
     const resolved = await value;
-    if (record.version !== version) {
+    // a newer answer landed first, or the route left and came back with a record of its own
+    if (record.version !== version || this.headMeta?.get(route) !== record) {
       return;
     }
     record.value = isPlainObject(resolved) ? resolved : {};
