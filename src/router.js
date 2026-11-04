@@ -637,7 +637,6 @@ export class Router extends Route {
     if (error?.name === 'AbortError') {
       // the loading view it showed leaves, the standing page's own view comes back
       if (pending?.loading && this.page) {
-        this.page.chain?.at(-1)?.update(this.page);
         this.renderPage(this.page).catch(noop);
       }
       this.notify();
@@ -662,13 +661,15 @@ export class Router extends Route {
       // the routes on screen stay active under the error page, so the chain carries over
       this.page = {
         ...(pending ? this.pageFor(pending) : (this.page ?? {})),
-        chain: this.page?.chain ?? [],
+        chain: this.page?.chain ?? [this],
         slices: this.page?.slices ?? [],
         views: this.page?.views ?? [],
         view,
         status: 'error',
         error,
       };
+      // a cold error, nothing yet shown, is the root's to show
+      this.settleRoutes(pending ? this.page : null, this.page);
       this.renderPage(this.page).catch(noop);
     }
     else {
@@ -812,7 +813,6 @@ export class Router extends Route {
               view: loadingView,
               status: 'loading',
             };
-            loading.chain.at(-1)?.update(loading);
             await this.renderPage(loading, event);
           }
         }
@@ -911,10 +911,11 @@ export class Router extends Route {
   }
 
   // null when the route may be entered, otherwise the redirect or forbidden result
-  async runGuards(matched, { signal }) {
+  async runGuards(matched, navigation) {
     if (!matched) {
       return null;
     }
+    const { signal } = navigation;
 
     const { route, params, query, currentRoutes } = matched;
 
@@ -953,17 +954,21 @@ export class Router extends Route {
               query,
             };
           }
+          // the routes the page keeps keep their slices, so their layouts stand under the forbidden view
+          const slices = currentRoutes.map((ancestor) => this.keptSlice(ancestor, matched, navigation)).filter(Boolean);
+          const data = {};
+          each(slices, (slice) => extend(data, slice.data));
           const [view, views, { title, titles }] = await Promise.all([
             this.resolveView(this.statusViews?.forbidden),
             this.resolveRouteViews(currentRoutes),
-            this.evaluateTitles(currentRoutes, matched, { signal }),
+            this.evaluateTitles(currentRoutes, matched, { data, slices, signal }),
           ]);
           return this.buildCascadeResult(matched, {
             status: 'forbidden',
             view,
             views,
-            data: {},
-            slices: [],
+            data,
+            slices,
             title,
             titles,
           });
@@ -977,7 +982,19 @@ export class Router extends Route {
   // one slice per route in chain order. a route runs when the url as it sees it moved, the params
   // and query keys it can see with its ancestors' included, on a reload, or for another user;
   // otherwise it keeps its slice and never runs
-  async runData(matched, { signal, reload = false, previous = null }) {
+  // the slice a route keeps across a navigation: the one it had on the page the navigation leaves,
+  // when the url as the route sees it did not move, unless every route runs again, on a reload or
+  // for another user
+  keptSlice(route, matched, { reload = false, previous = null }) {
+    if (!previous || reload || this.dataChanged(previous.user, this.user)) {
+      return null;
+    }
+    const slice = previous.slices?.find((item) => item.route === route);
+    return slice && !this.keysMoved(route, previous, matched) ? slice : null;
+  }
+
+  async runData(matched, navigation) {
+    const { signal } = navigation;
     const { route, currentRoutes } = matched;
 
     // the chunks load while the data runs, and a failed chunk waits to throw where the data's turn comes
@@ -986,7 +1003,6 @@ export class Router extends Route {
 
     const data = {};
     const slices = [];
-    const everyRoute = !previous || reload || this.dataChanged(previous.user, this.user);
     let flaggedNotFound = false;
     const notFound = () => {
       flaggedNotFound = true;
@@ -994,8 +1010,8 @@ export class Router extends Route {
     };
 
     for (const ancestor of currentRoutes) {
-      const kept = !everyRoute && previous.slices?.find((slice) => slice.route === ancestor);
-      if (kept && !this.keysMoved(ancestor, previous, matched)) {
+      const kept = this.keptSlice(ancestor, matched, navigation);
+      if (kept) {
         slices.push(kept);
         extend(data, kept.data);
         continue;
@@ -1280,7 +1296,6 @@ export class Router extends Route {
       return;
     }
     this.page = { ...this.page, view: await this.resolveView(this.statusViews?.forbidden), status: 'forbidden' };
-    this.page.chain.at(-1)?.update(this.page);
     await this.renderPage(this.page);
     this.notify();
   }
@@ -1374,6 +1389,12 @@ export class Router extends Route {
   // awaited, so the platform's focus reset and scroll find the new dom. a traverse puts the named
   // containers back here, at the swap, which a view transition's update is part of
   async renderPage(page, event = null) {
+    // the chain's leaf shows the page's view, so a view swapped in place, a status view or the
+    // loading view, is told here, once, for every path that swaps one
+    const leaf = page.chain?.at(-1);
+    if (leaf?.rendered && leaf.rendered.page !== page) {
+      leaf.update(page);
+    }
     await this.onRender?.(page, event);
     if (event?.navigationType === 'traverse' && this.restoreScroll && page.status !== 'loading') {
       this.navigator.restoreScroll(this.navigator.entry);
