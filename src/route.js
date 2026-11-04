@@ -177,8 +177,14 @@ export class Route {
     this.abortController?.abort('Route destroyed');
   }
 
-  update(page) {
-    this.render(page);
+  // told which slots, only those are rendered again: an override below entered or left
+  update(page, { slots } = {}) {
+    if (slots) {
+      this.renderSlots(page, slots);
+    }
+    else {
+      this.render(page);
+    }
   }
 
   // each of the route's views through its seam: new, it is created, otherwise it is told. the
@@ -203,14 +209,7 @@ export class Route {
       each(chain.slice(chain.indexOf(this) + 1), (below) => below.render(page));
     }
     const parent = rendered.layout ?? this.parentLayout();
-    each(slots, (view, slot) => {
-      rendered.slots[slot] = this.createOrUpdateView({
-        prior: rendered.slots[slot],
-        view,
-        placement: { parent, slot },
-        context,
-      });
-    });
+    this.renderSlots(page, Object.keys(slots ?? {}));
     if (page.chain?.at(-1) === this) {
       if (rendered.view && rendered.page?.view !== page.view) {
         this.router.destroyView({ rendered: rendered.view });
@@ -224,6 +223,29 @@ export class Route {
       });
     }
     rendered.page = page;
+  }
+
+  // the named slots through their seams. a slot a route below declares is the route below's to fill,
+  // nearest to the leaf winning, and an explicit empty, null or false, is a declaration too: the
+  // slot shows its own fallback
+  renderSlots(page, names) {
+    const { slots = {} } = page.views?.find((entry) => entry.route === this) ?? {};
+    const parent = this.rendered.layout ?? this.parentLayout();
+    const context = () => this.viewContext(page);
+    each(names, (slot) => {
+      const view = this.slotDeclaredBelow(page.chain ?? [], slot) ? null : slots[slot];
+      this.rendered.slots[slot] = this.createOrUpdateView({
+        prior: this.rendered.slots[slot],
+        view,
+        placement: { parent, slot },
+        context,
+      });
+    });
+  }
+
+  // whether a route below this one in the chain declares the slot, an explicit empty included
+  slotDeclaredBelow(chain, slot) {
+    return chain.slice(chain.indexOf(this) + 1).some((other) => slot in other.slots);
   }
 
   // prior is the rendered view as it stands, context a thunk built only for a view that is created or told

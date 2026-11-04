@@ -1233,6 +1233,15 @@ export class Router extends Route {
         route.update(page);
         this.onRouteUpdated(route, this.lifecycleContext(route, page, previous));
       }
+      else {
+        // a kept route renders a slot again when a route below it took that slot or gave it back
+        const crossed = Object.keys(route.slots).filter((slot) =>
+          route.slotDeclaredBelow(before, slot) !== route.slotDeclaredBelow(after, slot)
+        );
+        if (crossed.length) {
+          route.update(page, { slots: crossed });
+        }
+      }
     });
   }
 
