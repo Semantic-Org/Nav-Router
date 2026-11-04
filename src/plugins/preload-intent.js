@@ -8,12 +8,7 @@ export default (options, Router, Navigator) => {
   const events = ['pointerover', 'focusin', 'touchstart'];
 
   Router.prototype.preloadViews = function(matched) {
-    const { route, currentRoutes } = matched;
-    return Promise.all([
-      this.resolveView(route.view),
-      this.resolveLayouts(currentRoutes),
-      this.resolveSlots(currentRoutes),
-    ]);
+    return this.resolveViews(matched.currentRoutes);
   };
 
   // nothing is returned because nothing was decided
