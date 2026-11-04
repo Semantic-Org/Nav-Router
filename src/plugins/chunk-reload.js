@@ -5,7 +5,8 @@ import { isLazy } from '../helpers/lazy.js';
 // recovers once per url when a fresh deploy invalidates an old lazy view chunk.
 // hover preloads swallow rejections, so only an actual failed navigation triggers a document load.
 // the listener comes down before the load, so nothing of the router's intercepts it: a reload where
-// the url committed, an assign where a precommit failure left the old url standing
+// the url committed, an assign where a precommit failure left the old url standing. a reload an app
+// supplies in its place must leave the document too, or the router is down on a page that stays
 export default ({
   storageKey = 'nav-router:chunk-reload',
   reload = (url) => (url && globalThis.location && globalThis.location.href !== url
