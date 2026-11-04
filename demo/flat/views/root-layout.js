@@ -17,7 +17,7 @@ export function RootLayout({ router }) {
             <span class="brand-dot"></span>
             <span class="brand-name">Acme Console</span>
           </a>
-          <slot name="breadcrumbs"></slot>
+          <span id="breadcrumbs"></span>
         </div>
 
         <nav class="primary-links" aria-label="Primary Navigation">

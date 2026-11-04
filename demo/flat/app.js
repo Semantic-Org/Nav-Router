@@ -2,10 +2,13 @@ import { escapeHTML } from '@semantic-ui/utils';
 import { Router, update } from 'nav-router';
 import preloadIntent from 'nav-router/plugins/preload-intent';
 
-import { createRenderer } from './render.js';
+import dom from 'nav-router/plugins/dom';
+
 import { app } from './routes.js';
+import { Breadcrumbs } from './views/breadcrumbs.js';
 
 Router.extend(preloadIntent);
+Router.extend(dom, { mount: '#app-mount' });
 
 const demoUsers = {
   none: null,
@@ -14,7 +17,29 @@ const demoUsers = {
 };
 
 let lastRenderedState = null;
-const render = createRenderer({ mount: document.querySelector('#app-mount'), router: app });
+
+// the header's chrome depends on the page as a whole, so the app renders it: the breadcrumb trail
+// from the page's titles, and aria-current on the link to this page and on a link to a section it
+// sits under, which keeps a layout's navigation right without rendering the layout again
+function renderChrome(page) {
+  const crumbs = document.querySelector('#breadcrumbs');
+  if (crumbs) {
+    crumbs.innerHTML = Breadcrumbs({ page });
+  }
+  const here = new URL(location.href);
+  document.querySelectorAll('#app-mount a[href]').forEach((link) => {
+    const target = new URL(link.getAttribute('href'), location.origin);
+    const samePath = target.pathname === here.pathname && (!target.search || target.search === here.search);
+    const under = target.pathname !== '/' && here.pathname.startsWith(`${target.pathname}/`);
+    const current = target.origin !== here.origin ? null : (samePath ? 'page' : (under ? 'true' : null));
+    if (current) {
+      link.setAttribute('aria-current', current);
+    }
+    else {
+      link.removeAttribute('aria-current');
+    }
+  });
+}
 
 function syncSidebarScrollReadout() {
   const sidebarEl = document.querySelector('#sidebar-scroll');
@@ -168,7 +193,7 @@ function renderInspector() {
 
 app.onRender = (page) => {
   lastRenderedState = page;
-  render(page);
+  renderChrome(page);
   renderInspector();
   syncSidebarScrollReadout();
 };

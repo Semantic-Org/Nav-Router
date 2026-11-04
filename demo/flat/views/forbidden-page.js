@@ -1,7 +1,8 @@
 import { escapeHTML } from '@semantic-ui/utils';
 
 export function ForbiddenPage(context) {
-  const { page = {}, url, params = {}, router } = context ?? {};
+  const { page = {}, params = {}, router } = context ?? {};
+  const pathname = page.url ? new URL(page.url).pathname : '/';
   const user = router?.user ?? null;
   const org = params.org || 'acme';
 

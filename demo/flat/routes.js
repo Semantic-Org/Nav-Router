@@ -2,7 +2,6 @@ import { wait } from '@semantic-ui/utils';
 import { lazy, router } from 'nav-router';
 
 import { MEMBERS } from './data.js';
-import { Breadcrumbs } from './views/breadcrumbs.js';
 import { ErrorPage } from './views/error-page.js';
 import { ForbiddenPage } from './views/forbidden-page.js';
 import { HomePage } from './views/home-page.js';
@@ -26,7 +25,6 @@ export const app = router({
     loading: LoadingPage,
     error: ErrorPage,
   },
-  slots: { breadcrumbs: Breadcrumbs },
   signInRoute: 'signIn',
   holdCommit: '300ms',
   loadingDelay: '200ms',

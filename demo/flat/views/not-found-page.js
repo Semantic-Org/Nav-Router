@@ -1,7 +1,8 @@
 import { escapeHTML } from '@semantic-ui/utils';
 
 export function NotFoundPage(context) {
-  const { page = {}, url, params = {} } = context ?? {};
+  const { page = {}, params = {} } = context ?? {};
+  const pathname = page.url ? new URL(page.url).pathname : '/';
   const org = params.org || 'acme';
 
   return `
@@ -9,7 +10,7 @@ export function NotFoundPage(context) {
       <div class="status-code-pill status-404">404 · status: 'notFound'</div>
       <h2>Resource Not Found</h2>
       <p>
-        The route matched <code>${escapeHTML(page.route?.path ?? url?.pathname)}</code> with params
+        The route matched <code>${escapeHTML(page.route?.path ?? pathname)}</code> with params
         <code>${escapeHTML(JSON.stringify(params))}</code>, and its <code>data()</code> loader invoked
         <code>notFound()</code>.
       </p>
