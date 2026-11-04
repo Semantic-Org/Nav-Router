@@ -117,7 +117,7 @@ export class Router extends Route {
     if (!matched) {
       const [view, views] = await Promise.all([
         this.resolveView(this.statusViews?.notFound),
-        this.resolveViews([this]),
+        this.resolveRouteViews([this]),
       ]);
       this.page = { view, views, status: 'notFound', url: initialUrl };
       await this.renderView(this.page);
@@ -945,7 +945,7 @@ export class Router extends Route {
           }
           const [view, views, { title, titles }] = await Promise.all([
             this.resolveView(this.statusViews?.forbidden),
-            this.resolveViews(currentRoutes),
+            this.resolveRouteViews(currentRoutes),
             this.evaluateTitles(currentRoutes, matched, { signal }),
           ]);
           return this.buildCascadeResult(matched, {
@@ -971,7 +971,7 @@ export class Router extends Route {
     const { route, currentRoutes } = matched;
 
     // the chunks load while the data runs, and a failed chunk waits to throw where the data's turn comes
-    const viewsReady = this.resolveViews(currentRoutes);
+    const viewsReady = this.resolveRouteViews(currentRoutes);
     viewsReady.catch(noop);
 
     const data = {};
@@ -1103,7 +1103,7 @@ export class Router extends Route {
 
   // what each route shows, in chain order: its layout, its view, and the slots it declares by name.
   // whoever renders places them, a route's content filling the nearest slot above it
-  async resolveViews(routes) {
+  async resolveRouteViews(routes) {
     return Promise.all(routes.map(async (route) => {
       const [layout, view] = await Promise.all([this.resolveView(route.layout), this.resolveView(route.view)]);
       const slots = {};
