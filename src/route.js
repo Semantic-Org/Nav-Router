@@ -159,13 +159,15 @@ export class Route {
   // a route's active life is its signal: whatever it stores while active hangs on it, and
   // onDestroyed is where that is released. what it shows lives with it too: its layout, its named
   // slot content and, as the chain's leaf, the page's view go through the router's seams when it
-  // activates, are told when it or the data above it moves, and are destroyed when it deactivates
+  // activates, are told when it or the data above it moves, and are destroyed when it deactivates.
+  // rendered mirrors those three declarations with what the seams returned, a rendered element or
+  // component, and the page they were rendered for
 
   activate(page) {
     this.abortController = new AbortController();
     this.abortSignal = this.abortController.signal;
     this.active = true;
-    this.rendered = { slots: {} };
+    this.rendered = { page: null, slots: {} };
     this.render(page);
   }
 
@@ -179,46 +181,51 @@ export class Route {
     this.render(page);
   }
 
-  // each of the route's views through its seam: new, it is created; its function changed in place,
-  // a page going not-found, it leaves and comes back; otherwise it is told. a layout that came back
-  // from its update as a new handle has what hung inside it, this route's own content and every
-  // route below, leave and come back
+  // each of the route's views through its seam: new, it is created, otherwise it is told. the
+  // page's view swaps in place, a page going not-found, so one rendered for another page leaves
+  // first. a layout that came back from its update as a new one has what hung inside it, this
+  // route's own content and every route below, leave and come back
   render(page) {
+    const { rendered } = this;
     const { layout, slots } = page.views?.find((entry) => entry.route === this) ?? {};
     const context = () => this.viewContext(page);
-    const layoutBefore = this.rendered.layout?.handle;
-    this.rendered.layout = this.createOrUpdateView(this.rendered.layout, layout, {
-      parent: this.parentHandle(),
-      slot: undefined,
-    }, context);
-    if (layoutBefore !== undefined && this.rendered.layout?.handle !== layoutBefore) {
+    const layoutBefore = rendered.layout;
+    rendered.layout = this.createOrUpdateView(
+      rendered.layout,
+      layout,
+      { parent: this.parentLayout(), slot: undefined },
+      context,
+    );
+    if (layoutBefore !== undefined && rendered.layout !== layoutBefore) {
       const chain = page.chain ?? [];
       each([...chain.slice(chain.indexOf(this) + 1)].reverse(), (below) => below.destroyViews());
       this.destroyViews({ keepLayout: true });
       each(chain.slice(chain.indexOf(this) + 1), (below) => below.render(page));
     }
-    const parent = this.rendered.layout?.handle ?? this.parentHandle();
+    const parent = rendered.layout ?? this.parentLayout();
     each(slots, (view, slot) => {
-      this.rendered.slots[slot] = this.createOrUpdateView(this.rendered.slots[slot], view, { parent, slot }, context);
+      rendered.slots[slot] = this.createOrUpdateView(rendered.slots[slot], view, { parent, slot }, context);
     });
     if (page.chain?.at(-1) === this) {
-      this.rendered.view = this.createOrUpdateView(this.rendered.view, page.view, { parent, slot: undefined }, context);
+      if (rendered.view && rendered.page?.view !== page.view) {
+        this.router.destroyView({ rendered: rendered.view });
+        rendered.view = undefined;
+      }
+      rendered.view = this.createOrUpdateView(rendered.view, page.view, { parent, slot: undefined }, context);
     }
+    rendered.page = page;
   }
 
   createOrUpdateView(prior, view, placement, context) {
-    const { router } = this;
-    if (prior && (!view || prior.view !== view)) {
-      router.destroyView(prior);
-      prior = null;
-    }
     if (!view) {
+      if (prior) {
+        this.router.destroyView({ rendered: prior });
+      }
       return undefined;
     }
-    const handle = prior
-      ? router.updateView({ ...prior, view, placement, context: context() })
-      : router.createView({ view, placement, context: context() });
-    return { view, handle };
+    return prior
+      ? this.router.updateView({ rendered: prior, view, placement, context: context() })
+      : this.router.createView({ view, placement, context: context() });
   }
 
   // view first, layout last; the layout stays when what hung inside it is to come back
@@ -226,19 +233,19 @@ export class Route {
     const { layout, slots, view } = this.rendered ?? {};
     each([view, ...Object.values(slots ?? {}), keepLayout ? null : layout], (rendered) => {
       if (rendered) {
-        this.router.destroyView(rendered);
+        this.router.destroyView({ rendered });
       }
     });
-    this.rendered = { slots: {}, layout: keepLayout ? layout : undefined };
+    this.rendered = { ...this.rendered, slots: {}, view: undefined, layout: keepLayout ? layout : undefined };
   }
 
   // the nearest rendered layout above this route, or null for the mount
-  parentHandle() {
+  parentLayout() {
     let route = this.parent;
     while (route && !route.rendered?.layout) {
       route = route.parent;
     }
-    return route?.rendered.layout.handle ?? null;
+    return route?.rendered.layout ?? null;
   }
 
   // what a view sees: the page's params and query, and the data of this route and the routes above it

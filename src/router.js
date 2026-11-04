@@ -1387,17 +1387,17 @@ export class Router extends Route {
   // the three seams of anything that appears, no-ops here: native shows nothing on its own. the dom
   // plugin makes them the native how and an integration wraps them for its components. a route runs
   // its own views through them as it activates, is told and deactivates. each takes one bag: the
-  // view, where it attaches as placement { parent, slot }, the parent layout's handle and a slot
-  // name, absent for the default slot, the handle createView returned for it, and the context the
-  // view is rendered with; destroy takes the handle alone, which knows where it sits. a view's life
-  // ends at destroyView, never at its route's signal
+  // view, where it attaches as placement { parent, slot }, the parent's rendered layout and a slot
+  // name, absent for the default slot, the context the view is rendered with, and the rendered
+  // view createView returned, an element or a component, which update hands back or replaces and
+  // destroy ends. a view's life ends at destroyView, never at its route's signal
   createView({ view, placement, context }) {}
 
-  updateView({ handle, view, placement, context }) {
-    return handle;
+  updateView({ rendered, view, placement, context }) {
+    return rendered;
   }
 
-  destroyView({ handle }) {}
+  destroyView({ rendered }) {}
 
   subscribe(listener) {
     if (isFunction(listener)) {
