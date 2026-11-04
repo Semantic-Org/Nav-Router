@@ -1,4 +1,4 @@
-import { each, extend, isBoolean, isDate, isNumber, isPlainObject, isString } from '@semantic-ui/utils';
+import { each, extend, inArray, isBoolean, isDate, isNumber, isPlainObject, isString } from '@semantic-ui/utils';
 
 import { IS_ROUTE, IS_ROUTER } from './internal-helpers/identity.js';
 
@@ -157,17 +157,96 @@ export class Route {
   *******************************/
 
   // a route's active life is its signal: whatever it stores while active hangs on it, and
-  // onDestroyed is where that is released
+  // onDestroyed is where that is released. what it shows lives with it too: its layout, its named
+  // slot content and, as the chain's leaf, the page's view go through the router's seams when it
+  // activates, are told when it or the data above it moves, and are destroyed when it deactivates
 
-  activate() {
+  activate(page) {
     this.abortController = new AbortController();
     this.abortSignal = this.abortController.signal;
     this.active = true;
+    this.rendered = { slots: {} };
+    this.render(page);
   }
 
   deactivate() {
     this.active = false;
+    this.destroyViews();
     this.abortController?.abort('Route destroyed');
+  }
+
+  update(page) {
+    this.render(page);
+  }
+
+  // each of the route's views through its seam: new, it is created; its function changed in place,
+  // a page going not-found, it leaves and comes back; otherwise it is told. a layout that came back
+  // from its update as a new handle has what hung inside it, this route's own content and every
+  // route below, leave and come back
+  render(page) {
+    const { layout, slots } = page.views?.find((entry) => entry.route === this) ?? {};
+    const context = () => this.viewContext(page);
+    const layoutBefore = this.rendered.layout?.handle;
+    this.rendered.layout = this.createOrUpdateView(this.rendered.layout, layout, {
+      parent: this.parentHandle(),
+      slot: undefined,
+    }, context);
+    if (layoutBefore !== undefined && this.rendered.layout?.handle !== layoutBefore) {
+      const chain = page.chain ?? [];
+      each([...chain.slice(chain.indexOf(this) + 1)].reverse(), (below) => below.destroyViews());
+      this.destroyViews({ keepLayout: true });
+      each(chain.slice(chain.indexOf(this) + 1), (below) => below.render(page));
+    }
+    const parent = this.rendered.layout?.handle ?? this.parentHandle();
+    each(slots, (view, slot) => {
+      this.rendered.slots[slot] = this.createOrUpdateView(this.rendered.slots[slot], view, { parent, slot }, context);
+    });
+    if (page.chain?.at(-1) === this) {
+      this.rendered.view = this.createOrUpdateView(this.rendered.view, page.view, { parent, slot: undefined }, context);
+    }
+  }
+
+  createOrUpdateView(prior, view, placement, context) {
+    const { router } = this;
+    if (prior && (!view || prior.view !== view)) {
+      router.destroyView(prior);
+      prior = null;
+    }
+    if (!view) {
+      return undefined;
+    }
+    const handle = prior
+      ? router.updateView({ ...prior, view, placement, context: context() })
+      : router.createView({ view, placement, context: context() });
+    return { view, handle };
+  }
+
+  // view first, layout last; the layout stays when what hung inside it is to come back
+  destroyViews({ keepLayout = false } = {}) {
+    const { layout, slots, view } = this.rendered ?? {};
+    each([view, ...Object.values(slots ?? {}), keepLayout ? null : layout], (rendered) => {
+      if (rendered) {
+        this.router.destroyView(rendered);
+      }
+    });
+    this.rendered = { slots: {}, layout: keepLayout ? layout : undefined };
+  }
+
+  // the nearest rendered layout above this route, or null for the mount
+  parentHandle() {
+    let route = this.parent;
+    while (route && !route.rendered?.layout) {
+      route = route.parent;
+    }
+    return route?.rendered.layout.handle ?? null;
+  }
+
+  // what a view sees: the page's params and query, and the data of this route and the routes above it
+  viewContext(page) {
+    const slices = (page.slices ?? []).filter((slice) => inArray(slice.route, this.ancestors));
+    const data = {};
+    each(slices, (slice) => extend(data, slice.data));
+    return { ...this.router.contextFor(this, page, { data, slices }), page };
   }
 
   timeout(fn, ms) {
