@@ -2,14 +2,7 @@ import { escapeHTML } from '@semantic-ui/utils';
 
 import { orgs } from '../data.js';
 
-export function TeamLayout(context) {
-  const {
-    outlet = '',
-    slots = {},
-    state = {},
-    params = {},
-  } = context ?? {};
-
+export function TeamLayout({ params = {} }) {
   const orgKey = params.org || 'acme';
   const orgInfo = orgs[orgKey] ?? {
     id: orgKey,
@@ -18,11 +11,6 @@ export function TeamLayout(context) {
     region: 'global-edge',
     cluster: `${orgKey}-cluster-01`,
   };
-
-  const pathname = state.pathname ?? '';
-  const activeTab = params.tab;
-  const routeName = state.route?.name;
-  const isOverviewIndex = state.route?.id === 'team:index';
 
   return `
     <div class="team-shell" data-team-org="${escapeHTML(orgKey)}">
@@ -39,46 +27,36 @@ export function TeamLayout(context) {
 
           <div class="org-switcher" role="group" aria-label="Switch Organization Parameter">
             <span class="switcher-label"><code>:org</code> param:</span>
-            <a href="/team/acme" class="btn-chip ${orgKey === 'acme' ? 'is-selected' : ''}">acme</a>
-            <a href="/team/globex" class="btn-chip ${orgKey === 'globex' ? 'is-selected' : ''}">globex</a>
+            <a href="/team/acme" class="btn-chip">acme</a>
+            <a href="/team/globex" class="btn-chip">globex</a>
           </div>
         </div>
 
         <nav class="team-tabs" aria-label="Team Section Navigation">
-          <a href="/team/${escapeHTML(orgKey)}" class="team-tab ${
-    isOverviewIndex && (!activeTab || activeTab === 'overview') ? 'is-active' : ''
-  }">
+          <a href="/team/${escapeHTML(orgKey)}" class="team-tab">
             Overview <span class="tab-meta">:tab=overview</span>
           </a>
-          <a href="/team/${escapeHTML(orgKey)}/members" class="team-tab ${
-    isOverviewIndex && activeTab === 'members' ? 'is-active' : ''
-  }">
+          <a href="/team/${escapeHTML(orgKey)}/members" class="team-tab">
             Members <span class="tab-meta">:tab=members</span>
           </a>
-          <a href="/team/${escapeHTML(orgKey)}/activity" class="team-tab ${
-    isOverviewIndex && activeTab === 'activity' ? 'is-active' : ''
-  }">
+          <a href="/team/${escapeHTML(orgKey)}/activity" class="team-tab">
             Activity <span class="tab-meta">:tab=activity</span>
           </a>
-          <a href="/team/${escapeHTML(orgKey)}/analytics" class="team-tab ${
-    routeName === 'analytics' || pathname.endsWith('/analytics') ? 'is-active' : ''
-  }">
+          <a href="/team/${escapeHTML(orgKey)}/analytics" class="team-tab">
             Analytics <span class="tab-meta">1500ms async</span>
           </a>
-          <a href="/team/${escapeHTML(orgKey)}/settings" class="team-tab ${
-    routeName === 'settings' || pathname.endsWith('/settings') ? 'is-active' : ''
-  }">
+          <a href="/team/${escapeHTML(orgKey)}/settings" class="team-tab">
             Settings <span class="tab-meta">admin guard</span>
           </a>
         </nav>
       </div>
 
       <div class="team-body">
-        <aside class="team-sidebar-container" aria-label="Team Sidebar Slot">
-          ${slots.sidebar ?? ''}
+        <aside id="sidebar-scroll" class="team-sidebar-container sidebar-scroll-area" tabindex="0" aria-label="Team Sidebar">
+          <slot name="sidebar"></slot>
         </aside>
-        <section class="team-content-outlet" id="team-outlet">
-          ${outlet}
+        <section class="team-content" id="team-content">
+          <slot></slot>
         </section>
       </div>
     </div>
