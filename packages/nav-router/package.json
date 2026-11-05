@@ -21,7 +21,7 @@
     "./reactive": "./src/reactive-router.js"
   },
   "dependencies": {
-    "@semantic-ui/utils": "file:../../../next/packages/utils"
+    "@semantic-ui/utils": "^0.18.0"
   },
   "files": [
     "src",
