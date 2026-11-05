@@ -107,10 +107,10 @@ export class ReactiveRouter extends Router {
   // reading nothing reactive, a cookie or a fetch, still moves with the page
   async start() {
     if (isFunction(this.identity)) {
-      this.lifetime = new AbortController();
+      this.abortController = new AbortController();
       this.stopIdentity = this.createReaction(() => {
         this.identityFresh = true;
-        this.askIdentity({ signal: this.lifetime.signal, reload: false, previous: null });
+        this.askIdentity({ signal: this.abortController.signal, reload: false, previous: null });
       });
     }
     return super.start();
@@ -120,7 +120,7 @@ export class ReactiveRouter extends Router {
     this.stopIdentity?.();
     this.stopIdentity = null;
     this.identityAnswer = null;
-    this.lifetime?.abort();
+    this.abortController?.abort();
     return super.stop();
   }
 
