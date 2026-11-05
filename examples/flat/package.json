@@ -6,7 +6,7 @@
     "dev": "vite"
   },
   "dependencies": {
-    "nav-router": "file:../.."
+    "nav-router": "0.1.0"
   },
   "devDependencies": {
     "vite": "^6"

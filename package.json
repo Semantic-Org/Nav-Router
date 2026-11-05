@@ -1,45 +1,21 @@
 {
-  "name": "nav-router",
-  "version": "0.1.0",
-  "title": "Nav Router",
-  "description": "A thin Navigation API router built on web standards",
-  "author": "Jack Lukic",
-  "homepage": "https://navrouter.dev",
-  "license": "ISC",
+  "name": "nav-router-monorepo",
+  "private": true,
   "type": "module",
-  "sideEffects": false,
-  "engines": {
-    "node": ">=24"
-  },
-  "main": "src/index.js",
-  "module": "src/index.js",
-  "exports": {
-    ".": {
-      "import": "./src/index.js"
-    },
-    "./plugins/*": "./src/plugins/*.js",
-    "./reactive": "./src/reactive-router.js"
-  },
+  "workspaces": [
+    "packages/*",
+    "examples/*"
+  ],
   "scripts": {
-    "flat": "npm --prefix examples/flat run dev",
-    "nested": "npm --prefix examples/nested run dev",
-    "solid": "npm --prefix examples/solid run dev",
+    "flat": "npm -w examples/flat run dev",
+    "nested": "npm -w examples/nested run dev",
+    "solid": "npm -w examples/solid run dev",
     "format": "npx dprint fmt",
     "setup": "npx simple-git-hooks"
   },
-  "dependencies": {
-    "@semantic-ui/utils": "file:../next/packages/utils"
-  },
-  "files": [
-    "src",
-    "dist",
-    "README.md",
-    "LICENSE"
-  ],
   "devDependencies": {
     "dprint": "^0.57.1",
-    "simple-git-hooks": "^2.14.0",
-    "solid-js": "^1.9.17"
+    "simple-git-hooks": "^2.14.0"
   },
   "simple-git-hooks": {
     "pre-commit": "bash tools/hooks/pre-commit",

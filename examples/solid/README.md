@@ -11,9 +11,9 @@ reactive seams.
 
 then open http://localhost:5173
 
-(inside this repo `nav-router` and `@nav-router/solid` resolve to the repo itself through the
-`file:` dependencies; vite is the example's own dev dependency, so `npm install` here is still
-what brings it)
+(inside this repo `nav-router` and `@nav-router/solid` are workspace packages, so `npm install` at
+the root links them and brings vite; the versions here are what a clone of this example alone
+installs from npm)
 
 ## the layout
 

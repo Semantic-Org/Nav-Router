@@ -6,8 +6,8 @@
     "dev": "vite"
   },
   "dependencies": {
-    "@nav-router/solid": "file:../../integrations/solid",
-    "nav-router": "file:../..",
+    "@nav-router/solid": "0.1.0",
+    "nav-router": "0.1.0",
     "solid-js": "^1.9.17"
   },
   "devDependencies": {
