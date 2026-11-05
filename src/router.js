@@ -986,13 +986,18 @@ export class Router {
               query,
             };
           }
-          // the routes the page keeps keep their slices, so their layouts stand under the forbidden view
-          const slices = currentRoutes.map((ancestor) => this.keptSlice(ancestor, matched, navigation)).filter(Boolean);
-          const data = {};
-          each(slices, (slice) => extend(data, slice.data));
+          // the routes above the refusing one run their data as a landing would, so their layouts
+          // stand with what they read; one of them saying not-found wins, as it does on the data path
+          const viewsReady = this.resolveRouteViews(currentRoutes);
+          viewsReady.catch(noop);
+          const above = currentRoutes.slice(0, currentRoutes.indexOf(ancestor));
+          const { data, slices, notFound } = await this.runSlices(above, matched, navigation);
+          if (notFound) {
+            return this.notFoundResult(matched, viewsReady, { data, slices, signal });
+          }
           const [view, views, { title, titles }] = await Promise.all([
             this.resolveView(this.statusViews?.forbidden),
-            this.resolveRouteViews(currentRoutes),
+            viewsReady,
             this.evaluateTitles(currentRoutes, matched, { data, slices, signal }),
           ]);
           return this.buildCascadeResult(matched, {
@@ -1027,63 +1032,16 @@ export class Router {
 
   async runData(matched, navigation) {
     const { signal } = navigation;
-    const { route, currentRoutes } = matched;
+    const { currentRoutes } = matched;
 
     // the chunks load while the data runs, and a failed chunk waits to throw where the data's turn comes
     const viewsReady = this.resolveRouteViews(currentRoutes);
     viewsReady.catch(noop);
 
-    const data = {};
-    const slices = [];
-    let flaggedNotFound = false;
-    const notFound = () => {
-      flaggedNotFound = true;
-      return NOT_FOUND;
-    };
-
-    for (const ancestor of currentRoutes) {
-      const kept = this.keptSlice(ancestor, matched, navigation);
-      if (kept) {
-        slices.push(kept);
-        extend(data, kept.data);
-        continue;
-      }
-
-      let sliceData = {};
-      if (ancestor.data !== undefined) {
-        const rawData = await this.evaluateData(ancestor, ancestor.data, {
-          ...this.contextFor(ancestor, matched, { data: { ...data }, slices: [...slices], signal }),
-          notFound,
-        });
-        if (flaggedNotFound || rawData === NOT_FOUND) {
-          const [views, notFoundView, { title, titles }] = await Promise.all([
-            viewsReady,
-            this.resolveView(this.statusViews?.notFound),
-            this.evaluateTitles(currentRoutes, matched, { data, slices, signal }),
-          ]);
-          return this.buildCascadeResult(matched, {
-            status: 'notFound',
-            view: notFoundView,
-            views,
-            data,
-            slices,
-            title,
-            titles,
-          });
-        }
-        if (isPlainObject(rawData)) {
-          sliceData = await this.resolveDataSlice(rawData);
-        }
-      }
-      // the slice exists before the title and the routes below run, so they can read it
-      const slice = this.sliceOf(ancestor, sliceData);
-      extend(data, slice.data);
-      if (ancestor.title !== undefined) {
-        slice.title = await this.titleOf(ancestor, matched, { data: { ...data }, slices: [...slices, slice], signal });
-      }
-      slices.push(slice);
+    const { data, slices, notFound } = await this.runSlices(currentRoutes, matched, navigation);
+    if (notFound) {
+      return this.notFoundResult(matched, viewsReady, { data, slices, signal });
     }
-
     const views = await viewsReady;
     const titles = slices.map((slice) => slice.title).filter((title) => title !== null);
     return this.buildCascadeResult(matched, {
@@ -1095,6 +1053,62 @@ export class Router {
       title: titles.at(-1) ?? '',
       titles,
     });
+  }
+
+  // the slices of routes in chain order, each seeing the data of the routes above it: a route keeps
+  // the slice it had when the url as it sees it did not move and runs its data otherwise, and one
+  // saying not-found ends the walk. the data path walks the whole chain; a refusal walks the routes
+  // above the refusing one, so their layouts stand with what they read
+  async runSlices(routes, matched, navigation) {
+    const { signal } = navigation;
+    const data = {};
+    const slices = [];
+    let flaggedNotFound = false;
+    const notFound = () => {
+      flaggedNotFound = true;
+      return NOT_FOUND;
+    };
+
+    for (const route of routes) {
+      const kept = this.keptSlice(route, matched, navigation);
+      if (kept) {
+        slices.push(kept);
+        extend(data, kept.data);
+        continue;
+      }
+
+      let sliceData = {};
+      if (route.data !== undefined) {
+        const rawData = await this.evaluateData(route, route.data, {
+          ...this.contextFor(route, matched, { data: { ...data }, slices: [...slices], signal }),
+          notFound,
+        });
+        if (flaggedNotFound || rawData === NOT_FOUND) {
+          return { data, slices, notFound: true };
+        }
+        if (isPlainObject(rawData)) {
+          sliceData = await this.resolveDataSlice(rawData);
+        }
+      }
+      // the slice exists before the title and the routes below run, so they can read it
+      const slice = this.sliceOf(route, sliceData);
+      extend(data, slice.data);
+      if (route.title !== undefined) {
+        slice.title = await this.titleOf(route, matched, { data: { ...data }, slices: [...slices, slice], signal });
+      }
+      slices.push(slice);
+    }
+
+    return { data, slices, notFound: false };
+  }
+
+  async notFoundResult(matched, viewsReady, { data, slices, signal }) {
+    const [views, view, { title, titles }] = await Promise.all([
+      viewsReady,
+      this.resolveView(this.statusViews?.notFound),
+      this.evaluateTitles(matched.currentRoutes, matched, { data, slices, signal }),
+    ]);
+    return this.buildCascadeResult(matched, { status: 'notFound', view, views, data, slices, title, titles });
   }
 
   // a route's share of the page. the reactive scaffold gives it a signal the routes below read
