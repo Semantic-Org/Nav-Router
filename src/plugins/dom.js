@@ -54,26 +54,39 @@ export default ({ mount: defaultMount = 'body' } = {}, Router) => {
 
   const elements = (region) => contents(region).filter((node) => node.nodeType === Node.ELEMENT_NODE);
 
-  // where the placement lands: the mount for the root, otherwise inside the parent's region: the
-  // host when an element of it projects, the slot of that name among its elements or inside one,
-  // its first element when it wrote none
-  const targetOf = ({ parent, slot }, router) => {
-    if (!parent) {
-      return mountElement(router);
-    }
-    const roots = elements(parent);
+  // the slot element a region's layout wrote for the selector: the host when an element of it
+  // projects one, otherwise the match among the layout's own nodes or inside one
+  const slotIn = (region, selector) => {
+    const roots = elements(region);
     const host = roots.find((element) => element.shadowRoot);
     if (host) {
-      return host;
+      return host.shadowRoot.querySelector(selector) ? host : null;
     }
-    const selector = slot ? `slot[name="${slot}"]` : 'slot:not([name])';
     for (const root of roots) {
       const found = root.matches(selector) ? root : root.querySelector(selector);
       if (found) {
         return found;
       }
     }
-    return roots[0] ?? parent.target;
+    return null;
+  };
+
+  // where the placement lands: the mount for the root, otherwise the slot the parent's layout
+  // wrote. a named slot is the nearest layout's above that wrote it, across layouts that did not,
+  // so a leaf's override of a slot the root declares lands in the root's; content for a slot no
+  // layout wrote goes in the parent's first element
+  const targetOf = ({ parent, slot }, router) => {
+    if (!parent) {
+      return mountElement(router);
+    }
+    const selector = slot ? `slot[name="${slot}"]` : 'slot:not([name])';
+    for (let region = parent; region; region = slot ? region.parent : null) {
+      const found = slotIn(region, selector);
+      if (found) {
+        return found;
+      }
+    }
+    return elements(parent)[0] ?? parent.target;
   };
 
   // a region opened at the target the placement names, before the mount's first child for the root,
@@ -89,7 +102,7 @@ export default ({ mount: defaultMount = 'body' } = {}, Router) => {
     const end = document.createTextNode('');
     target.insertBefore(start, placement.parent ? null : target.firstChild);
     start.after(end);
-    return { target, start, end };
+    return { target, start, end, parent: placement.parent };
   };
 
   // the slot's fallback comes back once what filled it has left

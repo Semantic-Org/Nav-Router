@@ -10,6 +10,7 @@ import { HomePage } from './views/home-page.jsx';
 import { LoadingPage } from './views/loading-page.jsx';
 import { MemberPage } from './views/member-page.jsx';
 import { NotFoundPage } from './views/not-found-page.jsx';
+import { PrintCrumbs } from './views/print-crumbs.jsx';
 import { PrintPage } from './views/print-page.jsx';
 import { RootLayout } from './views/root-layout.jsx';
 import { SettingsPage } from './views/settings-page.jsx';
@@ -107,7 +108,8 @@ export const app = solidRouter({
         print: {
           path: '/team/:org/print',
           title: 'Print',
-          slots: { sidebar: null },
+          // no sidebar, and its own trail in the root's breadcrumbs slot, across the team layout
+          slots: { sidebar: null, breadcrumbs: PrintCrumbs },
           view: PrintPage,
         },
       },
