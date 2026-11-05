@@ -90,6 +90,40 @@ export class ReactiveRouter extends Router {
               Moments
   *******************************/
 
+  // identity as a function runs for the router's life, so the user moves on the standing page as it
+  // does at a navigation, and a guard that read it lands where the navigation's own answer would
+  async start() {
+    if (isFunction(this.identity)) {
+      this.lifetime = new AbortController();
+      this.identityRun = this.createReaction(() => {
+        const answer = this.identity({ signal: this.lifetime.signal, reload: false, previous: null });
+        if (isPromise(answer)) {
+          answer.then((user) => {
+            this.user = user ?? null;
+          });
+        }
+        else {
+          this.user = answer ?? null;
+        }
+      });
+    }
+    return super.start();
+  }
+
+  stop() {
+    this.identityRun?.();
+    this.identityRun = null;
+    this.lifetime?.abort();
+    return super.stop();
+  }
+
+  // what a hook sees of the user is live: a guard that read it runs again when the user moves
+  contextFor(route, matched, options) {
+    const context = super.contextFor(route, matched, options);
+    Object.defineProperty(context, 'user', { get: () => this.user, enumerable: true });
+    return context;
+  }
+
   // the page's write, its settle and its render are one moment to a reader: inside a batch a view
   // sees the page and the chain move together, and a leaving view, disposed before the batch flushes,
   // never runs against the next page's keys
