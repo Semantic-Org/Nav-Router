@@ -74,7 +74,8 @@ export class Router {
     const settings = {};
     const routeOptions = {};
     each(options, (value, key) => {
-      (key in new.target.defaults ? settings : routeOptions)[key] = value;
+      const owner = key in new.target.defaults ? settings : routeOptions;
+      owner[key] = value;
     });
     // the resolved settings in one place, for the console and for anything that introspects
     this.config = extend({}, new.target.defaults, settings);
