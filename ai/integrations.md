@@ -66,7 +66,7 @@ When they fire: at settle, for routes entering (`createView` for each declaratio
 - `signal` is the route's abort signal, its active life.
 - `page` is the whole page: `{ route, url, params, query, chain, slices, data, views, view, status, title, titles, key, user, error }`. `page.views` is `[{ route, layout, view, slots }]` in chain order, what each route shows.
 
-Under `ReactiveRouter`, `context.data` is a plain snapshot. `router.liveContext(context)` is the context made live: `params`, `query` and `user` through cells of the store, `data` through `dataFor` over the slices' own cells so one key moving wakes its reader alone, `slices` and `page` as cells of their own, and `update(next)` writing the keys in one batch. An integration renders its view with the live context and hangs `update` where its rendered view is told; what it hands the view, props or anything else, is its own word.
+Under `ReactiveRouter`, `context.data` is a plain snapshot. `router.liveContext(context)` returns `{ context, update }`: the context made live, where `params`, `query`, `user` and `page` are the router's own cells, so a kept layout's reads stay current without the route being told, and `params.org` tracks `org` alone; `data` reads through the slices' own cells so one key moving wakes its reader alone; `slices` is the one cell per view and `update(next)` its write. An integration renders its view with the live context and hangs `update` where its rendered view is told; what it hands the view, props or anything else, is its own word. `router.params` and `router.query` are those same live objects, for anything outside a view that reads them.
 
 ## The Route's Life
 

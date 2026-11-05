@@ -36,6 +36,27 @@ export class ReactiveRouter extends Router {
     const { equality } = this.constructor;
     each(['current', 'page', 'pending', 'error'], (key) => this.cellFor(key, equality.snapshot));
     this.cellFor('user', (before, after) => !this.dataChanged(before, after));
+    // the page's params and query, live by key: params.org tracks org alone. the page's and so the
+    // router's, written once per settle, which is what keeps a kept layout's reads current
+    this.paramCells = this.createStore({});
+    this.queryCells = this.createStore({});
+    this.params = {};
+    this.query = {};
+  }
+
+  // the keys of a page written to their cells, a getter added for a key the router first meets
+  writeLive(live, cells, values) {
+    each(values, (value, key) => {
+      if (!(key in live)) {
+        Object.defineProperty(live, key, { get: () => cells.get(key), enumerable: true });
+      }
+      cells.set(key, value);
+    });
+    each(live, (_, key) => {
+      if (!(key in values)) {
+        cells.set(key, undefined);
+      }
+    });
   }
 
   // a field of the router backed by a cell: the write is the field's, the read tracks it
@@ -127,30 +148,42 @@ export class ReactiveRouter extends Router {
   // merges ancestor slices behind per-key getters, so reading data.team tracks team's cell alone.
   // a getter exists for the keys a slice holds, so a key a run returns only sometimes is read plain
   // on the runs it is absent: a data() returns every key every run, undefined when it has none
-  // the view's context made live, for an integration to render with: params, query and user through
-  // cells of the store, data through dataFor over the slices' own cells so one key moving wakes its
-  // reader alone, the slices and the page as cells of their own, each compared as the equality table
-  // says. update writes the keys in one batch; an integration hangs it where its rendered view is told
+  // the view's context made live, for an integration to render with. params, query, user and page
+  // are the router's own cells, so a kept layout's reads stay current without the route being told;
+  // data reads through the slices' own cells, so one key moving wakes its reader alone; the slices are
+  // the one cell per view, and update is its write, for an integration to hang where its rendered
+  // view is told. what it hands the view, props or anything else, is its own word
   liveContext(context) {
-    const { equality } = this.constructor;
-    const store = this.createStore({ params: context.params, query: context.query, user: context.user });
-    const slices = this.createSignal(context.slices, { equals: equality.slices });
-    const page = this.createSignal(context.page, { equals: equality.snapshot });
-    const live = { route: context.route, router: context.router, signal: context.signal };
-    each(['params', 'query', 'user'], (key) => {
-      Object.defineProperty(live, key, { get: () => store.get(key), enumerable: true });
-    });
-    Object.defineProperty(live, 'data', { get: () => this.dataFor(slices.get()), enumerable: true });
-    Object.defineProperty(live, 'slices', { get: slices.get, enumerable: true });
-    Object.defineProperty(live, 'page', { get: page.get, enumerable: true });
-    live.update = (next) => {
-      this.batch(() => {
-        each(['params', 'query', 'user'], (key) => store.set(key, next[key]));
-        slices.set(next.slices);
-        page.set(next.page);
-      });
+    const router = this;
+    const slices = this.createSignal(context.slices, { equals: this.constructor.equality.slices });
+    // the merged data is built once per slices array, the cells inside it doing the tracking
+    let builtFor = null;
+    let built = null;
+    const live = {
+      route: context.route,
+      router,
+      signal: context.signal,
+      params: this.params,
+      query: this.query,
+      get user() {
+        return router.user;
+      },
+      get page() {
+        return router.page;
+      },
+      get slices() {
+        return slices.get();
+      },
+      get data() {
+        const current = slices.get();
+        if (current !== builtFor) {
+          builtFor = current;
+          built = router.dataFor(current);
+        }
+        return built;
+      },
     };
-    return live;
+    return { context: live, update: (next) => slices.set(next.slices) };
   }
 
   dataFor(slices) {
@@ -276,6 +309,8 @@ export class ReactiveRouter extends Router {
   // after settle nothing is left unborn: what was not adopted belonged to a branch this navigation
   // abandoned, a precommit redirect's first chain among them
   settleRoutes(previous, page) {
+    this.writeLive(this.params, this.paramCells, page.params ?? {});
+    this.writeLive(this.query, this.queryCells, page.query ?? {});
     this.settling = new Set();
     super.settleRoutes(previous, page);
     each(page.chain ?? [], (route) => {

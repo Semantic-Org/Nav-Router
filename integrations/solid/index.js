@@ -44,10 +44,10 @@ export class SolidRouter extends ReactiveRouter {
   // context's update for the plugin to call and the dispose for destroy, and the plugin places it
   // as it places a view it rendered itself
   createView({ view, placement, context }) {
-    const props = this.liveContext(context);
+    const { context: props, update } = this.liveContext(context);
     const element = document.createElement('div');
     element.dispose = render(() => view(props), element);
-    element.update = props.update;
+    element.update = update;
     return super.createView({ view: element, placement, context });
   }
 
