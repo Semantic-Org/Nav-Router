@@ -26,9 +26,10 @@ export class ReactiveRouter extends Router {
             Provider
   *******************************/
 
-  // { get, set, peek }, equal values leaving dependents alone
-  createSignal(initialValue) {
-    throw new Error('ReactiveRouter: a provider supplies createSignal(value)');
+  // { get, set, peek }, equal values leaving dependents alone. equals, when given, is the cell's
+  // equality in place of the provider's own
+  createSignal(initialValue, { equals } = {}) {
+    throw new Error('ReactiveRouter: a provider supplies createSignal(value, { equals })');
   }
 
   // runs fn(isFirst) now and again whenever what it read moves; returns the dispose
@@ -64,6 +65,36 @@ export class ReactiveRouter extends Router {
   // merges ancestor slices behind per-key getters, so reading data.team tracks team's cell alone.
   // a getter exists for the keys a slice holds, so a key a run returns only sometimes is read plain
   // on the runs it is absent: a data() returns every key every run, undefined when it has none
+  // the view's context made live, for an integration to render with: params, query and user through
+  // cells of the store, data through dataFor over the slices' own cells so one key moving wakes its
+  // reader alone, the slices and the page as cells of their own, the slices compared by their members
+  // since the router builds the array fresh at each update and the page by identity since a page is
+  // new each navigation. update writes the keys in one batch; an integration hangs it where its
+  // rendered view is told
+  liveContext(context) {
+    const store = this.createStore({ params: context.params, query: context.query, user: context.user });
+    const slices = this.createSignal(context.slices, {
+      equals: (before, after) =>
+        before.length === after.length && before.every((slice, index) => slice === after[index]),
+    });
+    const page = this.createSignal(context.page, { equals: (before, after) => before === after });
+    const live = { route: context.route, router: context.router, signal: context.signal };
+    each(['params', 'query', 'user'], (key) => {
+      Object.defineProperty(live, key, { get: () => store.get(key), enumerable: true });
+    });
+    Object.defineProperty(live, 'data', { get: () => this.dataFor(slices.get()), enumerable: true });
+    Object.defineProperty(live, 'slices', { get: slices.get, enumerable: true });
+    Object.defineProperty(live, 'page', { get: page.get, enumerable: true });
+    live.update = (next) => {
+      this.batch(() => {
+        each(['params', 'query', 'user'], (key) => store.set(key, next[key]));
+        slices.set(next.slices);
+        page.set(next.page);
+      });
+    };
+    return live;
+  }
+
   dataFor(slices) {
     const data = {};
     each(slices, (slice) => {

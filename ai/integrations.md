@@ -66,7 +66,7 @@ When they fire: at settle, for routes entering (`createView` for each declaratio
 - `signal` is the route's abort signal, its active life.
 - `page` is the whole page: `{ route, url, params, query, chain, slices, data, views, view, status, title, titles, key, user, error }`. `page.views` is `[{ route, layout, view, slots }]` in chain order, what each route shows.
 
-Under `ReactiveRouter`, `context.data` is a plain snapshot. A view that should re-run when one key moves reads through `router.dataFor(context.slices)`, which returns the same keys as per-key getters, each tracking its cell alone. An integration substitutes that for `data` inside its seams.
+Under `ReactiveRouter`, `context.data` is a plain snapshot. `router.liveContext(context)` is the context made live: `params`, `query` and `user` through cells of the store, `data` through `dataFor` over the slices' own cells so one key moving wakes its reader alone, `slices` and `page` as cells of their own, and `update(next)` writing the keys in one batch. An integration renders its view with the live context and hangs `update` where its rendered view is told; what it hands the view, props or anything else, is its own word.
 
 ## The Route's Life
 
@@ -87,7 +87,8 @@ An integration that needs per-route setup overrides `onRouteCreated`, `onRouteUp
 `ReactiveRouter extends Router`. A provider supplies five primitives:
 
 ```js
-createSignal(value)    // { get, set, peek }. set compares with the cell's own equality; an equal value wakes nobody
+createSignal(value, { equals })   // { get, set, peek }. set compares with the cell's own equality, or with equals when
+                                  // given; an equal value wakes nobody
 createReaction(fn)     // runs fn(isFirst) now, and again whenever what it read moves. returns the dispose
 untrack(fn)            // runs fn reading nothing
 batch(fn)              // runs fn with notifications held to the end
