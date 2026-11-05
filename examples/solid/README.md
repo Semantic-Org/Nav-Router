@@ -21,3 +21,9 @@ what brings it)
 - `client/store.js` — the app's state: signals and a store the routes' data() and guards read
 - `client/views/` — a Solid component per layout, page and slot, in jsx
 - `client/app.js` — installs the plugins and mounts
+
+## context
+
+a Solid context provider inside a layout does not reach the pages in its slots: each view is its
+own render root. a provider that must reach every view wraps the app above `solidRouter`, and the
+state the routes and views share is module-scoped signals and stores, as `store.js` does.
