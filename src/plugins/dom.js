@@ -169,7 +169,10 @@ export default ({ mount: defaultMount = 'body' } = {}, Router) => {
     if (nodes.length === 1 && held.length === 1 && nodes[0] === held[0]) {
       return rendered;
     }
-    if (held[0]?.id && nodes.length === 1 && !nodes[0].id) {
+    // one element in for one out keeps its id, so a control the page addresses by id stays addressed
+    if (
+      held.length === 1 && nodes.length === 1 && held[0].id && nodes[0].nodeType === Node.ELEMENT_NODE && !nodes[0].id
+    ) {
       nodes[0].id = held[0].id;
     }
     const focused = held.some((node) => node.contains(document.activeElement)) ? document.activeElement : null;
