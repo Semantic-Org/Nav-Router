@@ -3,20 +3,20 @@ import { wait } from '@semantic-ui/utils';
 import { lazy } from 'nav-router';
 
 import { members, user } from './store.js';
-import { Breadcrumbs } from './views/breadcrumbs.js';
-import { ErrorPage } from './views/error-page.js';
-import { ForbiddenPage } from './views/forbidden-page.js';
-import { HomePage } from './views/home-page.js';
-import { LoadingPage } from './views/loading-page.js';
-import { MemberPage } from './views/member-page.js';
-import { NotFoundPage } from './views/not-found-page.js';
-import { PrintPage } from './views/print-page.js';
-import { RootLayout } from './views/root-layout.js';
-import { SettingsPage } from './views/settings-page.js';
-import { SignInPage } from './views/sign-in-page.js';
-import { TeamLayout } from './views/team-layout.js';
-import { TeamOverviewPage } from './views/team-overview-page.js';
-import { TeamSidebar } from './views/team-sidebar.js';
+import { Breadcrumbs } from './views/breadcrumbs.jsx';
+import { ErrorPage } from './views/error-page.jsx';
+import { ForbiddenPage } from './views/forbidden-page.jsx';
+import { HomePage } from './views/home-page.jsx';
+import { LoadingPage } from './views/loading-page.jsx';
+import { MemberPage } from './views/member-page.jsx';
+import { NotFoundPage } from './views/not-found-page.jsx';
+import { PrintPage } from './views/print-page.jsx';
+import { RootLayout } from './views/root-layout.jsx';
+import { SettingsPage } from './views/settings-page.jsx';
+import { SignInPage } from './views/sign-in-page.jsx';
+import { TeamLayout } from './views/team-layout.jsx';
+import { TeamOverviewPage } from './views/team-overview-page.jsx';
+import { TeamSidebar } from './views/team-sidebar.jsx';
 
 export const app = solidRouter({
   name: 'home',
@@ -92,7 +92,7 @@ export const app = solidRouter({
             latency: wait(1200, { abortController: signal }).then(() => '14ms'),
             uptime: wait(1800, { abortController: signal }).then(() => '99.98%'),
           }),
-          view: lazy(() => import('./views/analytics-page.js')),
+          view: lazy(() => import('./views/analytics-page.jsx')),
         },
 
         settings: {

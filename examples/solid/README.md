@@ -19,5 +19,5 @@ what brings it)
 
 - `client/routes.js` — the router, built by `solidRouter`, and every route
 - `client/store.js` — the app's state: signals and a store the routes' data() and guards read
-- `client/views/` — a Solid component per layout, page and slot
+- `client/views/` — a Solid component per layout, page and slot, in jsx
 - `client/app.js` — installs the plugins and mounts

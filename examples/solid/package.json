@@ -6,11 +6,12 @@
     "dev": "vite"
   },
   "dependencies": {
-    "nav-router": "file:../..",
     "@nav-router/solid": "file:../../integrations/solid",
+    "nav-router": "file:../..",
     "solid-js": "^1.9.17"
   },
   "devDependencies": {
-    "vite": "^6"
+    "vite": "^6",
+    "vite-plugin-solid": "^2.11.15"
   }
 }
