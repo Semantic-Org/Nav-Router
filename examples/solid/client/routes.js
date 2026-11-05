@@ -20,6 +20,7 @@ import { TeamSidebar } from './views/team-sidebar.jsx';
 
 export const app = solidRouter({
   name: 'home',
+  mount: '#app',
   title: 'Acme Console',
   layout: RootLayout,
   slots: { breadcrumbs: Breadcrumbs },

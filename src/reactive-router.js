@@ -324,18 +324,24 @@ export class ReactiveRouter extends Router {
       }
       const unadopted = born && !born.adopted;
       // a run born for a navigation in flight runs under that navigation's signal and lands nothing on
-      // the standing page, whose route may be the same one: its latest value waits for adopt
-      const value = fn(bagFor({ signal: unadopted ? signal : route.abortSignal }));
+      // the standing page, whose route may be the same one: its latest value waits for adopt. a later
+      // run that throws is a rejected answer, landed as one
+      let value;
+      try {
+        value = fn(bagFor({ signal: unadopted ? signal : route.abortSignal }));
+      }
+      catch (error) {
+        value = Promise.reject(error);
+      }
+      if (isPromise(value)) {
+        value.catch(noop);
+      }
       if (unadopted) {
-        if (isPromise(value)) {
-          value.catch(noop);
-        }
         born.latest = { value };
         return;
       }
       if (route.active) {
-        // untracked: a consequence reads the page before its first await, and the page is a cell
-        this.untrack(() => changed(value));
+        this.land(route, changed, value);
       }
     });
     const run = { stop, kind };
@@ -375,9 +381,27 @@ export class ReactiveRouter extends Router {
       born.adopted = true;
       (route.runs ??= new Set()).add(born.run);
       if (born.latest) {
-        this.untrack(() => born.changed(born.latest.value));
+        this.land(route, born.changed, born.latest.value);
       }
     });
+  }
+
+  // a later answer landing on the standing page through its consequence, untracked since a
+  // consequence reads the page before its first await and the page is a cell. a run aborted at its
+  // route's teardown and a route since gone say nothing; a failure is logged with the page kept,
+  // since the slice the route had still stands
+  land(route, changed, value) {
+    const dropped = (error) => {
+      if (error?.name !== 'AbortError' && route.active) {
+        this.logError(error);
+      }
+    };
+    try {
+      Promise.resolve(this.untrack(() => changed(value))).catch(dropped);
+    }
+    catch (error) {
+      dropped(error);
+    }
   }
 
   // after settle nothing is left unborn: what was not adopted belonged to a branch this navigation
