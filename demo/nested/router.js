@@ -20,6 +20,5 @@ export const router = defineRouter({
   holdCommit: '300ms',
   loadingDelay: '200ms',
   loadingMin: '500ms',
-  preload: 'intent',
   restoreScroll: '#sidebar-scroll',
 });

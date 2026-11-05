@@ -29,7 +29,6 @@ export const app = router({
   holdCommit: '300ms',
   loadingDelay: '200ms',
   loadingMin: '500ms',
-  preload: 'intent',
   restoreScroll: '#sidebar-scroll',
 
   index: {
