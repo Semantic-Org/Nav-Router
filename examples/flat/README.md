@@ -9,9 +9,8 @@ the console app with its routes declared in one tree, the plain string views on 
 
 then open http://localhost:5173
 
-(inside this repo `nav-router` resolves to the repo itself through the `file:` dependency, and
-`@semantic-ui/utils` through the root; vite is the example's own dev dependency, so `npm install`
-here is still what brings it)
+(inside this repo `nav-router` is a workspace package, so `npm install` at the root links it and
+brings vite; the version here is what a clone of this example alone installs from npm)
 
 ## the layout
 

@@ -1,0 +1,31 @@
+{
+  "name": "nav-router",
+  "version": "0.1.0",
+  "title": "Nav Router",
+  "description": "A thin Navigation API router built on web standards",
+  "author": "Jack Lukic",
+  "homepage": "https://navrouter.dev",
+  "license": "ISC",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=24"
+  },
+  "main": "src/index.js",
+  "module": "src/index.js",
+  "exports": {
+    ".": {
+      "import": "./src/index.js"
+    },
+    "./plugins/*": "./src/plugins/*.js",
+    "./reactive": "./src/reactive-router.js"
+  },
+  "dependencies": {
+    "@semantic-ui/utils": "file:../../../next/packages/utils"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ]
+}
