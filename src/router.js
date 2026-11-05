@@ -199,7 +199,11 @@ export class Router {
       [...(this.page?.chain ?? [])].reverse(),
       (route) => this.destroyRoute(route, this.lifecycleContext(route, null)),
     );
-    this.page = null;
+    this.page =
+      this.current =
+      this.pending =
+      this.error =
+        null;
     this.entryCache?.clear();
   }
 

@@ -77,11 +77,11 @@ export class ReactiveRouter extends Router {
 
   // the navigator's readouts move when the current entry does, so reading current first makes them live
   get canGoBack() {
-    return this.current && this.navigator.canGoBack;
+    return !!this.current && this.navigator.canGoBack;
   }
 
   get canGoForward() {
-    return this.current && this.navigator.canGoForward;
+    return !!this.current && this.navigator.canGoForward;
   }
 
   get entry() {
