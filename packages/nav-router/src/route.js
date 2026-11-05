@@ -27,10 +27,11 @@ export class Route {
     this.indexRoute = null;
     this.active = false;
 
-    extend(this, Route.defaults, routeOptions, {
-      params: { ...Route.defaults.params, ...routeOptions.params },
-      query: { ...Route.defaults.query, ...routeOptions.query },
-      slots: { ...Route.defaults.slots, ...routeOptions.slots },
+    const defaults = new.target.defaults;
+    extend(this, defaults, routeOptions, {
+      params: { ...defaults.params, ...routeOptions.params },
+      query: { ...defaults.query, ...routeOptions.query },
+      slots: { ...defaults.slots, ...routeOptions.slots },
     });
 
     this.path = this.normalizePath(routeOptions.path, parent);
