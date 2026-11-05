@@ -173,8 +173,12 @@ export class Route {
     this.abortController?.abort('Route destroyed');
   }
 
-  // told which slots, only those are rendered again: an override below entered or left
+  // told which slots, only those are rendered again: an override below entered or left. a route a
+  // layout's cascade above it already rendered for this page is not rendered a second time
   update(page, { slots } = {}) {
+    if (this.rendered.page === page) {
+      return;
+    }
     if (slots) {
       this.renderSlots(page, slots);
     }
@@ -199,10 +203,12 @@ export class Route {
       context,
     });
     if (layoutBefore !== undefined && rendered.layout !== layoutBefore) {
+      // the routes below that stand; one not yet active renders when it activates
       const chain = page.chain ?? [];
-      each([...chain.slice(chain.indexOf(this) + 1)].reverse(), (below) => below.destroyViews());
+      const below = chain.slice(chain.indexOf(this) + 1).filter((route) => route.active);
+      each([...below].reverse(), (route) => route.destroyViews());
       this.destroyViews({ keepLayout: true });
-      each(chain.slice(chain.indexOf(this) + 1), (below) => below.render(page));
+      each(below, (route) => route.render(page));
     }
     const parent = rendered.layout ?? this.parentLayout();
     this.renderSlots(page, Object.keys(slots ?? {}));
@@ -257,15 +263,19 @@ export class Route {
       : this.router.createView({ view, placement, context: context() });
   }
 
-  // view first, layout last; the layout stays when what hung inside it is to come back
+  // view first, layout last; the layout stays when what hung inside it is to come back. the record
+  // is reset in place, since a render in progress holds it
   destroyViews({ keepLayout = false } = {}) {
-    const { layout, slots, view } = this.rendered ?? {};
-    each([view, ...Object.values(slots ?? {}), keepLayout ? null : layout], (rendered) => {
+    if (!this.rendered) {
+      return;
+    }
+    const { layout, slots, view } = this.rendered;
+    each([view, ...Object.values(slots), keepLayout ? null : layout], (rendered) => {
       if (rendered) {
         this.router.destroyView({ rendered });
       }
     });
-    this.rendered = { ...this.rendered, slots: {}, view: undefined, layout: keepLayout ? layout : undefined };
+    Object.assign(this.rendered, { page: null, slots: {}, view: undefined, layout: keepLayout ? layout : undefined });
   }
 
   // the nearest rendered layout above this route, or null for the mount
