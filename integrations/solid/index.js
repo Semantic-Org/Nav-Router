@@ -49,12 +49,14 @@ export class SolidRouter extends ReactiveRouter {
   }
 
   // the rendered view is the element solid renders into, which stays solid's insertion target so
-  // a fragment or a root that changes with a condition keeps landing in it. it carries the live
-  // context's update for the plugin to call and the dispose for destroy, and the plugin places it
-  // as it places a view it rendered itself
+  // a fragment or a root that changes with a condition keeps landing in it, with no box of its own
+  // so a layout's flex or grid reaches the view's root through it. it carries the live context's
+  // update for the plugin to call and the dispose for destroy, and the plugin places it as it
+  // places a view it rendered itself
   createView({ view, placement, context }) {
     const { context: props, update } = this.liveContext(context);
     const element = document.createElement('div');
+    element.style.display = 'contents';
     element.dispose = render(() => view(props), element);
     element.update = update;
     return super.createView({ view: element, placement, context });
