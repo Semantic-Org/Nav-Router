@@ -143,31 +143,6 @@ export class Router {
       ?? (this.base || '/');
 
     const matched = this.match(initialUrl);
-    if (!matched) {
-      // the user is read as a navigation reads it, so the cold not-found page sees who is signed in;
-      // the root frames it with an empty slice, nothing of its own having run
-      const [view, views] = await Promise.all([
-        this.resolveView(this.statusViews?.notFound),
-        this.resolveRouteViews([this.root]),
-        this.resolveIdentity({ reload: false, previous: null }),
-      ]);
-      const page = {
-        view,
-        views,
-        chain: [this.root],
-        slices: [this.sliceOf(this.root, {})],
-        status: 'notFound',
-        url: initialUrl,
-      };
-      await this.batch(() => {
-        this.page = page;
-        this.settleRoutes(null, page);
-        return this.renderPage(page);
-      });
-      this.notify();
-      return this;
-    }
-
     this.commitRoute(matched);
     this.activeAbort?.abort();
     const controller = new AbortController();
@@ -180,9 +155,14 @@ export class Router {
       destination: { key: null },
       signal: controller.signal,
     };
-    this.setPending(matched, event.navigationType);
     try {
-      await this.afterCommit(this.begin(matched, event), event, false);
+      if (matched) {
+        this.setPending(matched, event.navigationType);
+        await this.afterCommit(this.begin(matched, event), event, false);
+      }
+      else {
+        await this.landNotFound(initialUrl, event);
+      }
     }
     catch (error) {
       if (!controller.signal.aborted) {
@@ -194,6 +174,34 @@ export class Router {
       this.notify();
     }
     return this;
+  }
+
+  // no route for the url: the root runs its slice as the routes above a refusal do, the user read
+  // first, so a root with data frames the cold not-found with what it reads
+  async landNotFound(url, event) {
+    const navigation = { signal: event.signal, reload: false, previous: null };
+    await this.resolveIdentity(navigation);
+    const [view, views, { slices }] = await Promise.all([
+      this.resolveView(this.statusViews?.notFound),
+      this.resolveRouteViews([this.root]),
+      this.runSlices([this.root], { params: {}, query: {} }, navigation),
+    ]);
+    const titles = slices.map((slice) => slice.title).filter((title) => title !== null);
+    const page = {
+      view,
+      views,
+      chain: [this.root],
+      slices,
+      status: 'notFound',
+      url,
+      title: titles.at(-1) ?? '',
+      titles,
+    };
+    await this.batch(() => {
+      this.page = page;
+      this.settleRoutes(null, page);
+      return this.renderPage(page);
+    });
   }
 
   stop() {
@@ -708,14 +716,15 @@ export class Router {
         this.logError(error);
       }
       // the routes on screen stay active under the error page, so the chain carries over. a cold
-      // error, nothing yet shown, is the root's to show, framed by its layout with an empty slice
+      // error, nothing yet shown, is the root's to show: framed by its layout when the root has no
+      // data of its own, since the data that failed may be the root's, and bare at the mount otherwise
       const previous = this.page;
-      const views = previous?.views ?? await this.resolveRouteViews([this.root]);
+      const views = previous?.views ?? await this.resolveRouteViews([this.root]).catch(() => []);
       await this.batch(() => {
         this.page = {
           ...(pending ? this.pageFor(pending) : (previous ?? {})),
           chain: previous?.chain ?? [this.root],
-          slices: previous?.slices ?? [this.sliceOf(this.root, {})],
+          slices: previous?.slices ?? (this.root.data === undefined ? [this.sliceOf(this.root, {})] : []),
           views,
           view,
           status: 'error',
