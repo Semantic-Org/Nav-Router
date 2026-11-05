@@ -181,25 +181,33 @@ export class Router {
   async landNotFound(url, event) {
     const navigation = { signal: event.signal, reload: false, previous: null };
     await this.resolveIdentity(navigation);
-    const [view, views, { slices }] = await Promise.all([
+    const [view, views, { data, slices }] = await Promise.all([
       this.resolveView(this.statusViews?.notFound),
       this.resolveRouteViews([this.root]),
       this.runSlices([this.root], { params: {}, query: {} }, navigation),
     ]);
+    if (event.signal.aborted) {
+      return;
+    }
     const titles = slices.map((slice) => slice.title).filter((title) => title !== null);
     const page = {
       view,
       views,
       chain: [this.root],
+      data,
       slices,
       status: 'notFound',
       url,
       title: titles.at(-1) ?? '',
       titles,
+      user: this.user,
     };
     await this.batch(() => {
       this.page = page;
       this.settleRoutes(null, page);
+      if (globalThis.document && page.title) {
+        globalThis.document.title = page.title;
+      }
       return this.renderPage(page);
     });
   }
