@@ -35,7 +35,7 @@ export class ReactiveRouter extends Router {
     // the helpers and an app's chrome among them. core writes the fields as it always has
     const { equality } = this.constructor;
     each(['current', 'page', 'pending', 'error'], (key) => this.cellFor(key, equality.snapshot));
-    this.cellFor('user', (before, after) => !this.dataChanged(before, after));
+    this.cellFor('user', (a, b) => !this.dataChanged(a, b));
     // the page's params and query, live by key: params.org tracks org alone. the page's and so the
     // router's, written once per settle, which is what keeps a kept layout's reads current
     this.paramCells = this.createStore({});
@@ -188,7 +188,7 @@ export class ReactiveRouter extends Router {
         // a data cell compares as the router's dataChanged says, the instance's word on data
         cells.set(
           key,
-          this.createSignal(initialValue[key], { equals: (before, after) => !this.dataChanged(before, after) }),
+          this.createSignal(initialValue[key], { equals: (a, b) => !this.dataChanged(a, b) }),
         );
       }
       return cells.get(key);
