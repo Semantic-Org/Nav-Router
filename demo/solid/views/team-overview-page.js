@@ -3,6 +3,8 @@ import html from 'solid-js/html';
 
 import { renameMember } from '../store.js';
 
+// the members live in a store, so a rename moves one name in place: the row keeps its element,
+// the input keeps its focus, and only the reads of that name are told
 export const TeamOverviewPage = (props) =>
   html`
   <section class="page">
@@ -13,10 +15,10 @@ export const TeamOverviewPage = (props) =>
         <${For} each=${() => props.data.members}>${(member) =>
     html`
           <tr>
-            <td><input value=${member.name} onInput=${(event) =>
+            <td><input value=${() => member.name} onInput=${(event) =>
       renameMember(member.id, event.target.value)} aria-label=${`Name of ${member.id}`} /></td>
-            <td>${member.role}</td>
-            <td>${member.access}</td>
+            <td>${() => member.role}</td>
+            <td>${() => member.access}</td>
           </tr>
         `}<//>
       </tbody>

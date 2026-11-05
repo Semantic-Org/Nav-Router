@@ -10,7 +10,8 @@ export const TeamSidebar = (props) =>
     <ul class="list">
       <${For} each=${() => props.data.members}>${(member) =>
     html`
-        <li><a href=${`/team/${member.org}/m/${member.id}`} class="item"><span class="dot" data-access=${member.access}></span>${member.name}</a></li>
+        <li><a href=${`/team/${member.org}/m/${member.id}`} class="item"><span class="dot" data-access=${member.access}></span>${() =>
+      member.name}</a></li>
       `}<//>
     </ul>
     <div class="side-actions">
