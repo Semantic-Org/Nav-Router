@@ -48,19 +48,11 @@ export default (
 
   routerProto.onBeforeUnload = function(event) {
     const context = { router: this, from: this.page, destination: null, navigationType: 'unload', event };
-    let blocked = false;
-    each([...(this.page?.chain ?? [])].reverse(), (route) => {
-      if (!blocked && route.canLeave !== undefined) {
-        const result = isFunction(route.canLeave) ? route.canLeave({ ...context, route }) : route.canLeave;
-        blocked = result === false || (isString(result) && result.length > 0);
-      }
-    });
-    each(this.leaveGuards ?? [], (guard) => {
-      if (!blocked) {
-        const result = guard(context);
-        blocked = result === false || (isString(result) && result.length > 0);
-      }
-    });
+    const blocks = (result) => result === false || (isString(result) && result.length > 0);
+    const blocked = [...(this.page?.chain ?? [])].reverse().some((route) =>
+      route.canLeave !== undefined
+      && blocks(isFunction(route.canLeave) ? route.canLeave({ ...context, route }) : route.canLeave)
+    ) || [...(this.leaveGuards ?? [])].some((guard) => blocks(guard(context)));
     if (blocked) {
       event.preventDefault();
       event.returnValue = '';
