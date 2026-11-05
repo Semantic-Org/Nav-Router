@@ -24,6 +24,7 @@
     "demo": "node demo/serve.js flat",
     "demo:flat": "node demo/serve.js flat",
     "demo:nested": "node demo/serve.js nested",
+    "demo:solid": "node demo/serve.js solid",
     "format": "npx dprint fmt",
     "setup": "npx simple-git-hooks"
   },
@@ -38,7 +39,8 @@
   ],
   "devDependencies": {
     "dprint": "^0.57.1",
-    "simple-git-hooks": "^2.14.0"
+    "simple-git-hooks": "^2.14.0",
+    "solid-js": "^1.9.17"
   },
   "simple-git-hooks": {
     "pre-commit": "bash tools/hooks/pre-commit",
