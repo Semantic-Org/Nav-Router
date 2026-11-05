@@ -99,7 +99,7 @@ export class Router {
     this.entryCache = createCache({ maxSize: 100 });
     this.timers = new Set();
     this.listeners = new Set();
-    this.activeAbort = null;
+    this.initialAbort = null;
 
     this.navigator = new Navigator(this);
   }
@@ -144,9 +144,9 @@ export class Router {
 
     const matched = this.match(initialUrl);
     this.commitRoute(matched);
-    this.activeAbort?.abort();
+    this.initialAbort?.abort();
     const controller = new AbortController();
-    this.activeAbort = controller;
+    this.initialAbort = controller;
 
     // the one navigation the platform fires no event for: the same entering flow, a stand-in event
     const event = {
@@ -218,8 +218,8 @@ export class Router {
     if (this.attachGlobal && globalThis[this.attachGlobal] === this) {
       delete globalThis[this.attachGlobal];
     }
-    this.activeAbort?.abort();
-    this.activeAbort = null;
+    this.initialAbort?.abort();
+    this.initialAbort = null;
 
     each(this.timers, (timer) => clearTimeout(timer));
     this.timers.clear();
@@ -649,8 +649,8 @@ export class Router {
 
   intercepted(matched, event) {
     // the initial load is the one navigation the platform holds no signal for
-    this.activeAbort?.abort();
-    this.activeAbort = null;
+    this.initialAbort?.abort();
+    this.initialAbort = null;
     this.setPending(matched, event.navigationType);
     this.notify();
   }
