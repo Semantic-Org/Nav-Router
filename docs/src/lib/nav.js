@@ -1,7 +1,51 @@
+import { frameworkOf, FRAMEWORKS } from './frameworks.js';
 import { PLUGINS } from './plugins.js';
 
 // the docs' order. an item points at a page by slug; a slug with no page yet is listed as a stub,
 // so the shape of the docs is visible before every page exists.
+//
+// a group with `framework` is that framework's slot: the sidebar shows it only while the reader has
+// picked that framework. its pages live under the framework's folder (guides/solid/…), so the same
+// page for another framework is found by swapping the folder.
+
+// what changes from one view layer to the next: how views are written and how they read the route.
+// the shape is a sketch until the integrations settle
+const FRAMEWORK_GUIDES = {
+  core: [['Views with the dom plugin', 'dom-views'], ['Web components', 'web-components']],
+  react: [['Quickstart', 'quickstart'], ['Components and hooks', 'components'], [
+    'Suspense and transitions',
+    'suspense',
+  ]],
+  preact: [['Quickstart', 'quickstart'], ['Components and hooks', 'components']],
+  solid: [['Quickstart', 'quickstart'], ['Views and props', 'views'], ['Shared state', 'state']],
+  vue: [['Quickstart', 'quickstart'], ['Components and composables', 'components']],
+  svelte: [['Quickstart', 'quickstart'], ['Components and runes', 'components']],
+  semantic: [['Quickstart', 'quickstart'], ['Templates and signals', 'templates']],
+};
+
+// an integration's own exports, listed only where the package exists
+const FRAMEWORK_API = {
+  solid: [['SolidRouter', 'solid-router', true], ['solidRouter()', 'solid-router-fn', true]],
+};
+
+const frameworkGroups = (section) =>
+  FRAMEWORKS.flatMap((f) => {
+    const items = section === 'guides'
+      ? FRAMEWORK_GUIDES[f.id] ?? []
+      : f.pkg
+      ? [['Overview', ''], ...(FRAMEWORK_API[f.id] ?? [])]
+      : [];
+    if (!items.length) { return []; }
+    return [{
+      label: section === 'api' ? f.pkg : f.label,
+      framework: f.id,
+      items: items.map(([title, page, symbol]) => ({
+        title,
+        slug: [section, f.slug, page].filter(Boolean).join('/'),
+        ...(symbol && { symbol: true }),
+      })),
+    }];
+  });
 
 export const SECTIONS = [
   {
@@ -16,6 +60,7 @@ export const SECTIONS = [
           { title: 'Your first router', slug: 'guides/first-router' },
         ],
       },
+      ...frameworkGroups('guides'),
       {
         label: 'Routing',
         items: [
@@ -40,6 +85,7 @@ export const SECTIONS = [
     key: 'api',
     label: 'API',
     groups: [
+      ...frameworkGroups('api'),
       {
         label: 'Classes',
         items: [
@@ -145,7 +191,11 @@ export function navFor(ids, currentId) {
 export function pagerFor(ids, currentId) {
   const exists = new Set(ids);
   const section = SECTIONS.find((s) => s.key === currentId.split('/')[0]);
-  const pages = section.groups.flatMap((g) => g.items).filter((it) => !it.slug.includes('#') && exists.has(it.slug));
+  // a shared page pages through shared pages; a framework's page through those and its own
+  const fw = frameworkOf(currentId);
+  const pages = section.groups.flatMap((g) => g.items)
+    .filter((it) => !it.slug.includes('#') && exists.has(it.slug))
+    .filter((it) => [null, fw].includes(frameworkOf(it.slug)));
   const i = pages.findIndex((it) => it.slug === currentId);
   return { prev: pages[i - 1] ?? null, next: pages[i + 1] ?? null };
 }

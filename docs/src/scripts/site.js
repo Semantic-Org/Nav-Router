@@ -1,3 +1,4 @@
+import { FALLBACK, FRAMEWORKS, fwById } from '../lib/frameworks.js';
 import { logoFor } from './framework-logos.js';
 import { mountSearch } from './search.js';
 
@@ -403,17 +404,7 @@ export function createDropdown(host, { options, value, label, onChange, size = '
    variant reached through FALLBACK, else its first. its tabs list only its own variants and switch
    that block alone; the picker is the one control that changes the framework everywhere */
 
-export const FRAMEWORKS = [
-  { id: 'core', label: 'Vanilla JS', pkg: null },
-  { id: 'react', label: 'React', pkg: '@nav-router/react' },
-  { id: 'preact', label: 'Preact', pkg: '@nav-router/preact' },
-  { id: 'solid', label: 'Solid', pkg: '@nav-router/solid' },
-  { id: 'vue', label: 'Vue', pkg: '@nav-router/vue' },
-  { id: 'svelte', label: 'Svelte', pkg: '@nav-router/svelte' },
-  { id: 'semantic', label: 'Semantic UI', pkg: '@nav-router/semantic' },
-];
-const FALLBACK = { preact: ['react'] }; // then core, then a block's first variant
-const fwById = (id) => FRAMEWORKS.find((f) => f.id === id) ?? FRAMEWORKS[0];
+export { FRAMEWORKS };
 
 export function getFramework() {
   try {
@@ -428,6 +419,8 @@ export function setFramework(id) {
     localStorage.setItem('nr:framework', id);
   }
   catch {}
+  // the sidebar's framework slots follow this attribute in css
+  document.documentElement.dataset.framework = fwById(id).id;
   document.dispatchEvent(new CustomEvent('nr:framework', { detail: fwById(id).id }));
 }
 
@@ -521,9 +514,31 @@ export function wireFramework(root = document) {
   apply(getFramework());
 }
 
+// on a framework's own page (guides/solid/…), picking another framework goes to that framework's
+// version of the page when one is written, else says so in place, with the way back
+export function wireFrameworkPage(root = document) {
+  const notice = root.querySelector('[data-fw-notice]');
+  if (!notice) { return; }
+  const { pageFramework, pageLabel } = notice.dataset;
+  const equivalents = JSON.parse(notice.querySelector('[data-fw-equivalents]').textContent);
+  const text = notice.querySelector('[data-fw-notice-text]');
+  const back = notice.querySelector('[data-fw-back]');
+  back.textContent = `Back to ${pageLabel}`;
+  back.addEventListener('click', () => setFramework(pageFramework));
+  document.addEventListener('nr:framework', ({ detail: fw }) => {
+    if (fw !== pageFramework && equivalents[fw]) {
+      location.assign(equivalents[fw]);
+      return;
+    }
+    notice.hidden = fw === pageFramework;
+    text.textContent = `This page is for ${pageLabel}. It isn’t written for ${fwById(fw).label} yet.`;
+  });
+}
+
 export function init() {
   mountSearch();
   wireFramework();
+  wireFrameworkPage();
   wireVariants();
   highlightAll();
   highlightInline();

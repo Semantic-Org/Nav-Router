@@ -51,6 +51,20 @@ updated: 2026-11-05
 ---
 ```
 
+### Framework pages
+
+A page under a framework's folder belongs to that framework alone: `guides/solid/quickstart.md`,
+`api/solid.md`. Folders come from `slug` in `src/lib/frameworks.js` (Vanilla JS is `vanilla`).
+
+- **Sidebar:** each framework has its own group in Guides and in API (`FRAMEWORK_GUIDES` and
+  `FRAMEWORK_API` in `src/lib/nav.js`). The sidebar shows only the reader's framework's groups.
+- **Opening one** sets the reader's framework to the page's, as a `?framework=solid` link does.
+- **Switching** the picker on one goes to the same page for the new framework
+  (`guides/solid/quickstart` → `guides/react/quickstart`) when it's written, and otherwise says so
+  on the page.
+- **The pager** on a shared page skips framework pages, and on a framework's page stays with that
+  framework.
+
 ### Conventions
 
 | Write | Get |
