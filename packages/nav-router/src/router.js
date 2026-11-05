@@ -158,7 +158,7 @@ export class Router {
     try {
       if (matched) {
         this.setPending(matched, event.navigationType);
-        await this.afterCommit(this.begin(matched, event), event, false);
+        await this.afterCommit(this.begin(matched, event), event, { precommitRan: false });
       }
       else {
         await this.landNotFound(initialUrl, event);
@@ -852,7 +852,7 @@ export class Router {
     }
   }
 
-  async afterCommit(work, event, precommitRan) {
+  async afterCommit(work, event, { precommitRan = false } = {}) {
     const active = work.redirected ?? work;
     const { matched } = active;
     // the handler runs only once the url has moved, so this is a commit even where the platform's event did not say so

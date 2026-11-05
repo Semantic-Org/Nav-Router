@@ -292,7 +292,7 @@ export class Navigator {
     const interceptOptions = {
       scroll: resetScroll ? 'after-transition' : 'manual',
       focusReset: resetFocus ? 'after-transition' : 'manual',
-      handler: () => this.router.afterCommit(getWork(), event, precommitRan),
+      handler: () => this.router.afterCommit(getWork(), event, { precommitRan }),
     };
 
     if (event.cancelable) {
