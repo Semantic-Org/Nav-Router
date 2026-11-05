@@ -23,7 +23,6 @@ import { IS_ROUTER } from './internal-helpers/identity.js';
 import { Navigator } from './navigator.js';
 import { Route } from './route.js';
 
-const installed = new WeakSet();
 // what a data() returns through notFound(), at navigation or on the standing page
 const NOT_FOUND = Symbol('notFound');
 
@@ -40,8 +39,9 @@ export class Router extends Route {
   // it wraps a moment and calls through, never replaces one, or adds a method the core would
   // otherwise make every page carry. installed between navigations it takes effect on the next
   static extend(plugin, options) {
-    if (!installed.has(plugin)) {
-      installed.add(plugin);
+    // the plugin carries its own mark, as day.js marks one
+    if (!plugin.installed) {
+      plugin.installed = true;
       plugin(options, Router, Navigator);
     }
     return Router;
@@ -49,7 +49,8 @@ export class Router extends Route {
 
   static defaults = {
     base: '',
-    views: {},
+    // the view for each status a page can stand in: loading, notFound, forbidden, error
+    statusViews: {},
     signInRoute: null,
     // the user the guards read: a value, or a function of the navigation returning one or a promise of one
     identity: null,
@@ -69,8 +70,7 @@ export class Router extends Route {
     // the resolved settings in one place, for the console and for anything that introspects
     this.config = extend({}, new.target.defaults, options);
     this.base = this.normalizeBase(this.base);
-    this.views = { ...new.target.defaults.views, ...options.views };
-    this.layout ??= this.views.layout;
+    this.statusViews = { ...new.target.defaults.statusViews, ...options.statusViews };
 
     this.routesByName ??= new Map();
     this.leaves ??= [];
@@ -115,13 +115,13 @@ export class Router extends Route {
 
     const matched = this.match(initialUrl);
     if (!matched) {
-      const [view, layouts, slots] = await Promise.all([
-        this.resolveView(this.views?.notFound),
-        this.resolveLayouts([this]),
-        this.resolveSlots([this]),
+      const [view, views] = await Promise.all([
+        this.resolveView(this.statusViews?.notFound),
+        this.resolveRouteViews([this]),
       ]);
-      this.page = { view, layouts, slots, status: 'notFound', url: initialUrl };
-      await this.renderView(this.page);
+      this.page = { view, views, chain: [this], status: 'notFound', url: initialUrl };
+      this.settleRoutes(null, this.page);
+      await this.renderPage(this.page);
       this.notify();
       return this;
     }
@@ -635,6 +635,10 @@ export class Router extends Route {
     this.pending = null;
     // a superseded, cancelled or refused navigation is not an error to show
     if (error?.name === 'AbortError') {
+      // the loading view it showed leaves, the standing page's own view comes back
+      if (pending?.loading && this.page) {
+        this.renderPage(this.page).catch(noop);
+      }
       this.notify();
       return;
     }
@@ -650,20 +654,23 @@ export class Router extends Route {
       this.navigator.deferNavigate(this.href(this.errorRoute), { history: 'replace' });
     }
     else if (committed) {
-      const view = await this.resolveView(this.views?.error).catch(() => null);
+      const view = await this.resolveView(this.statusViews?.error).catch(() => null);
       if (!view) {
         this.logError(error);
       }
       // the routes on screen stay active under the error page, so the chain carries over
       this.page = {
         ...(pending ? this.pageFor(pending) : (this.page ?? {})),
-        chain: this.page?.chain ?? [],
+        chain: this.page?.chain ?? [this],
         slices: this.page?.slices ?? [],
+        views: this.page?.views ?? [],
         view,
         status: 'error',
         error,
       };
-      this.renderView(this.page).catch(noop);
+      // a cold error, nothing yet shown, is the root's to show
+      this.settleRoutes(pending ? this.page : null, this.page);
+      this.renderPage(this.page).catch(noop);
     }
     else {
       this.logError(error);
@@ -749,7 +756,9 @@ export class Router extends Route {
         // the browser's: stay put, then go where the guard says
         // a reload or a replace meant to stay, so the redirect replaces. a refused traverse leaves the user where they stood, so it pushes
         this.navigator.deferNavigate(guard.redirect, {
-          history: event.navigationType === 'reload' || event.navigationType === 'replace' ? 'replace' : 'push',
+          history: event.navigationType === 'reload' || event.navigationType === 'replace'
+            ? 'replace'
+            : 'push',
         });
         throw new DOMException('Navigation refused', 'AbortError');
       }
@@ -793,11 +802,18 @@ export class Router extends Route {
         if (this.pending) {
           this.pending.loading = true;
         }
-        if (this.views?.loading) {
-          const loadingView = await this.resolveView(this.views.loading);
+        if (this.statusViews?.loading) {
+          const loadingView = await this.resolveView(this.statusViews.loading);
           if (!active.settled && !event.signal.aborted) {
             // page stays the settled page: a loading view is rendered over it, pending.loading says so
-            await this.renderView({ ...this.pageFor(matched), view: loadingView, status: 'loading' }, event);
+            const loading = {
+              ...this.pageFor(matched),
+              views: this.page?.views ?? [],
+              chain: this.page?.chain ?? [],
+              view: loadingView,
+              status: 'loading',
+            };
+            await this.renderPage(loading, event);
           }
         }
         this.notify();
@@ -813,7 +829,9 @@ export class Router extends Route {
       if (!precommitRan) {
         // no precommit on this browser: the refused url has shown, its slot becomes the redirect target,
         // a task later so this handler is not aborted by its own replacement
-        this.navigator.deferNavigate(resolved.redirect, { history: 'replace' });
+        this.navigator.deferNavigate(resolved.redirect, {
+          history: 'replace',
+        });
       }
       return;
     }
@@ -821,7 +839,10 @@ export class Router extends Route {
     if (loadingShownAt !== null && minMs > 0) {
       const elapsed = Date.now() - loadingShownAt;
       if (elapsed < minMs) {
-        await wait(minMs - elapsed, { abortController: event.signal, rejectOnAbort: false });
+        await wait(minMs - elapsed, {
+          abortController: event.signal,
+          rejectOnAbort: false,
+        });
       }
       if (event.signal.aborted) {
         return;
@@ -865,11 +886,17 @@ export class Router extends Route {
   }
 
   evaluateData(route, fn, context) {
-    return this.evaluateHook(route, fn, context, { kind: 'slice', changed: (value) => this.updateData(route, value) });
+    return this.evaluateHook(route, fn, context, {
+      kind: 'slice',
+      changed: (value) => this.updateData(route, value),
+    });
   }
 
   evaluateTitle(route, fn, context) {
-    return this.evaluateHook(route, fn, context, { kind: 'slice', changed: (value) => this.updateTitle(route, value) });
+    return this.evaluateHook(route, fn, context, {
+      kind: 'slice',
+      changed: (value) => this.updateTitle(route, value),
+    });
   }
 
   async runCascade(matched, navigation) {
@@ -884,10 +911,11 @@ export class Router extends Route {
   }
 
   // null when the route may be entered, otherwise the redirect or forbidden result
-  async runGuards(matched, { signal }) {
+  async runGuards(matched, navigation) {
     if (!matched) {
       return null;
     }
+    const { signal } = navigation;
 
     const { route, params, query, currentRoutes } = matched;
 
@@ -916,7 +944,7 @@ export class Router extends Route {
           this.contextFor(ancestor, matched, { signal }),
         );
         if (!allowed) {
-          if ((!this.user || !this.views?.forbidden) && this.signInRoute) {
+          if ((!this.user || !this.statusViews?.forbidden) && this.signInRoute) {
             // the return address rides to the sign-in page, which reads it as query.returnTo
             return {
               status: 'redirect',
@@ -926,19 +954,21 @@ export class Router extends Route {
               query,
             };
           }
-          const [view, layouts, slots, { title, titles }] = await Promise.all([
-            this.resolveView(this.views?.forbidden),
-            this.resolveLayouts(currentRoutes),
-            this.resolveSlots(currentRoutes),
-            this.evaluateTitles(currentRoutes, matched, { signal }),
+          // the routes the page keeps keep their slices, so their layouts stand under the forbidden view
+          const slices = currentRoutes.map((ancestor) => this.keptSlice(ancestor, matched, navigation)).filter(Boolean);
+          const data = {};
+          each(slices, (slice) => extend(data, slice.data));
+          const [view, views, { title, titles }] = await Promise.all([
+            this.resolveView(this.statusViews?.forbidden),
+            this.resolveRouteViews(currentRoutes),
+            this.evaluateTitles(currentRoutes, matched, { data, slices, signal }),
           ]);
           return this.buildCascadeResult(matched, {
             status: 'forbidden',
             view,
-            layouts,
-            slots,
-            data: {},
-            slices: [],
+            views,
+            data,
+            slices,
             title,
             titles,
           });
@@ -952,20 +982,27 @@ export class Router extends Route {
   // one slice per route in chain order. a route runs when the url as it sees it moved, the params
   // and query keys it can see with its ancestors' included, on a reload, or for another user;
   // otherwise it keeps its slice and never runs
-  async runData(matched, { signal, reload = false, previous = null }) {
+  // the slice a route keeps across a navigation: the one it had on the page the navigation leaves,
+  // when the url as the route sees it did not move, unless every route runs again, on a reload or
+  // for another user
+  keptSlice(route, matched, { reload = false, previous = null }) {
+    if (!previous || reload || this.dataChanged(previous.user, this.user)) {
+      return null;
+    }
+    const slice = previous.slices?.find((item) => item.route === route);
+    return slice && !this.keysMoved(route, previous, matched) ? slice : null;
+  }
+
+  async runData(matched, navigation) {
+    const { signal } = navigation;
     const { route, currentRoutes } = matched;
 
     // the chunks load while the data runs, and a failed chunk waits to throw where the data's turn comes
-    const views = Promise.all([
-      this.resolveView(route.view),
-      this.resolveLayouts(currentRoutes),
-      this.resolveSlots(currentRoutes),
-    ]);
-    views.catch(noop);
+    const viewsReady = this.resolveRouteViews(currentRoutes);
+    viewsReady.catch(noop);
 
     const data = {};
     const slices = [];
-    const everyRoute = !previous || reload || this.dataChanged(previous.user, this.user);
     let flaggedNotFound = false;
     const notFound = () => {
       flaggedNotFound = true;
@@ -973,8 +1010,8 @@ export class Router extends Route {
     };
 
     for (const ancestor of currentRoutes) {
-      const kept = !everyRoute && previous.slices?.find((slice) => slice.route === ancestor);
-      if (kept && !this.keysMoved(ancestor, previous, matched)) {
+      const kept = this.keptSlice(ancestor, matched, navigation);
+      if (kept) {
         slices.push(kept);
         extend(data, kept.data);
         continue;
@@ -987,16 +1024,15 @@ export class Router extends Route {
           notFound,
         });
         if (flaggedNotFound || rawData === NOT_FOUND) {
-          const [[, layouts, slots], notFoundView, { title, titles }] = await Promise.all([
-            views,
-            this.resolveView(this.views?.notFound),
+          const [views, notFoundView, { title, titles }] = await Promise.all([
+            viewsReady,
+            this.resolveView(this.statusViews?.notFound),
             this.evaluateTitles(currentRoutes, matched, { data, slices, signal }),
           ]);
           return this.buildCascadeResult(matched, {
             status: 'notFound',
             view: notFoundView,
-            layouts,
-            slots,
+            views,
             data,
             slices,
             title,
@@ -1016,13 +1052,12 @@ export class Router extends Route {
       slices.push(slice);
     }
 
-    const [view, layouts, slots] = await views;
+    const views = await viewsReady;
     const titles = slices.map((slice) => slice.title).filter((title) => title !== null);
     return this.buildCascadeResult(matched, {
       status: 'ok',
-      view,
-      layouts,
-      slots,
+      view: views.at(-1)?.view ?? null,
+      views,
       data,
       slices,
       title: titles.at(-1) ?? '',
@@ -1092,29 +1127,17 @@ export class Router extends Route {
     return target?.default ?? target;
   }
 
-  async resolveLayouts(currentRoutes) {
-    const layouts = [];
-    for (const ancestor of currentRoutes) {
-      if (ancestor.layout) {
-        const resolved = await this.resolveView(ancestor.layout);
-        if (resolved) {
-          layouts.push(resolved);
-        }
+  // what each route shows, in chain order: its layout, its view, and the slots it declares by name.
+  // whoever renders places them, a route's content filling the nearest slot above it
+  async resolveRouteViews(routes) {
+    return Promise.all(routes.map(async (route) => {
+      const [layout, view] = await Promise.all([this.resolveView(route.layout), this.resolveView(route.view)]);
+      const slots = {};
+      for (const name of Object.keys(route.slots ?? {})) {
+        slots[name] = await this.resolveView(route.slots[name]);
       }
-    }
-    return layouts;
-  }
-
-  async resolveSlots(currentRoutes) {
-    const slots = {};
-    for (const ancestor of currentRoutes) {
-      if (ancestor.slots) {
-        for (const key of Object.keys(ancestor.slots)) {
-          slots[key] = await this.resolveView(ancestor.slots[key]);
-        }
-      }
-    }
-    return slots;
+      return { route, layout, view, slots };
+    }));
   }
 
   async resolveDataSlice(rawData) {
@@ -1166,7 +1189,7 @@ export class Router extends Route {
       globalThis.document.title = resolved.title;
     }
 
-    await this.renderView(this.page, event);
+    await this.renderPage(this.page, event);
     this.notify();
   }
 
@@ -1203,11 +1226,21 @@ export class Router extends Route {
     });
     each(after, (route) => {
       if (!inArray(route, before)) {
-        route.activate();
+        route.activate(page);
         this.onRouteCreated(route, this.lifecycleContext(route, page, previous));
       }
       else if (sliceOf(page, route) !== sliceOf(previous, route)) {
+        route.update(page);
         this.onRouteUpdated(route, this.lifecycleContext(route, page, previous));
+      }
+      else {
+        // a kept route renders a slot again when a route below it took that slot or gave it back
+        const crossed = Object.keys(route.slots).filter((slot) =>
+          route.slotDeclaredBelow(before, slot) !== route.slotDeclaredBelow(after, slot)
+        );
+        if (crossed.length) {
+          route.update(page, { slots: crossed });
+        }
       }
     });
   }
@@ -1265,14 +1298,14 @@ export class Router extends Route {
       }
       return;
     }
-    if ((!this.user || !this.views?.forbidden) && this.signInRoute) {
+    if ((!this.user || !this.statusViews?.forbidden) && this.signInRoute) {
       this.navigator.navigate(this.href(this.signInRoute, { returnTo: this.returnAddress(this.current) }), {
         history: 'replace',
       });
       return;
     }
-    this.page = { ...this.page, view: await this.resolveView(this.views?.forbidden), status: 'forbidden' };
-    await this.renderView(this.page);
+    this.page = { ...this.page, view: await this.resolveView(this.statusViews?.forbidden), status: 'forbidden' };
+    await this.renderPage(this.page);
     this.notify();
   }
 
@@ -1289,7 +1322,7 @@ export class Router extends Route {
       return;
     }
     slice.title = title;
-    await this.updatePage();
+    await this.updatePage(route);
   }
 
   // a route's data recomputed outside a navigation: the slice is set, the page re-reads itself and
@@ -1298,30 +1331,40 @@ export class Router extends Route {
   // that said not-found never has one. so data arriving for a route without a slice enters it as
   // a fresh navigation would, while an ancestor's data moving on a not-found page only keeps it current
   async updateData(route, value) {
-    const slices = this.page?.slices;
+    const page = this.page;
+    const slices = page?.slices;
     const slice = slices?.find((item) => item.route === route);
     if (!slice) {
-      if (this.page?.status === 'notFound' && inArray(route, this.page.chain) && (await value) !== NOT_FOUND) {
+      // on a not-found page the route that said so is the first without a slice, and its data arriving is the reload
+      const saidNotFound = page?.status === 'notFound'
+        && page.chain?.find((item) => !slices.some((other) => other.route === item)) === route;
+      if (saidNotFound && (await value) !== NOT_FOUND && this.page === page) {
         this.navigator.reload();
       }
       return;
     }
     const version = slice.version = (slice.version ?? 0) + 1;
+    // the slice left the page, a navigation moved it, or a newer run landed first: checked after every await
+    const stale = () => !inArray(slice, this.page?.slices ?? []) || slice.version !== version;
     const resolved = await value;
-    // a navigation settled meanwhile, or a newer run landed first
-    if (this.page?.slices !== slices || slice.version !== version) {
+    if (stale()) {
       return;
     }
     if (resolved === NOT_FOUND) {
-      slices.splice(slices.indexOf(slice), 1);
-      this.page = { ...this.page, view: await this.resolveView(this.views?.notFound), status: 'notFound' };
-      await this.renderView(this.page);
+      const view = await this.resolveView(this.statusViews?.notFound);
+      if (stale()) {
+        return;
+      }
+      // the route and the routes below it lose their slices, the shape a not-found cascade has
+      slices.splice(slices.indexOf(slice));
+      this.page = { ...this.page, view, status: 'notFound' };
+      await this.renderPage(this.page);
       this.notify();
       return;
     }
     const data = isPlainObject(resolved) ? await this.resolveDataSlice(resolved) : {};
-    if (this.setSlice(slice, data)) {
-      await this.updatePage();
+    if (!stale() && this.setSlice(slice, data)) {
+      await this.updatePage(route);
     }
   }
 
@@ -1336,9 +1379,10 @@ export class Router extends Route {
   }
 
   // the page re-read from its slices, which several updates in one tick share, so none of them
-  // writes over another's
-  async updatePage() {
-    const { slices } = this.page;
+  // writes over another's. the moved route and the routes below it are told at the render moment,
+  // since data flows down
+  async updatePage(route) {
+    const { slices, chain = [] } = this.page;
     const data = {};
     each(slices, (slice) => extend(data, slice.data));
     const titles = slices.map((slice) => slice.title).filter((title) => title !== null);
@@ -1346,18 +1390,44 @@ export class Router extends Route {
     if (globalThis.document && this.page.title) {
       globalThis.document.title = this.page.title;
     }
-    await this.renderView(this.page);
+    each(chain.slice(chain.indexOf(route)), (moved) => moved.update(this.page));
+    await this.renderPage(this.page);
     this.notify();
   }
 
   // awaited, so the platform's focus reset and scroll find the new dom. a traverse puts the named
   // containers back here, at the swap, which a view transition's update is part of
-  async renderView(page, event = null) {
+  async renderPage(page, event = null) {
+    // the chain's leaf shows the page's view, so a view swapped in place, a status view or the
+    // loading view, is told here, once, for every path that swaps one
+    const leaf = page.chain?.at(-1);
+    if (leaf?.rendered && leaf.rendered.page !== page) {
+      leaf.update(page);
+    }
     await this.onRender?.(page, event);
     if (event?.navigationType === 'traverse' && this.restoreScroll && page.status !== 'loading') {
       this.navigator.restoreScroll(this.navigator.entry);
     }
   }
+
+  /*******************************
+                Views
+  *******************************/
+
+  // the three seams of anything that appears, no-ops here: native shows nothing on its own. the dom
+  // plugin makes them the native how and an integration wraps them for its components. a route runs
+  // its own views through them as it activates, is told and deactivates. each takes one bag: the
+  // view, where it attaches as placement { parent, slot }, the parent's rendered layout and a slot
+  // name, absent for the default slot, the context the view is rendered with, and the rendered
+  // view createView returned, an element or a component, which update hands back or replaces and
+  // destroy ends. a view's life ends at destroyView, never at its route's signal
+  createView({ view, placement, context }) {}
+
+  updateView({ rendered, view, placement, context }) {
+    return rendered;
+  }
+
+  destroyView({ rendered }) {}
 
   subscribe(listener) {
     if (isFunction(listener)) {

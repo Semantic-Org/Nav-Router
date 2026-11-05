@@ -1,10 +1,14 @@
-import { each, escapeHTML, isFunction } from '@semantic-ui/utils';
+import { escapeHTML } from '@semantic-ui/utils';
 import { Router, update } from 'nav-router';
 import preloadIntent from 'nav-router/plugins/preload-intent';
 
+import dom from 'nav-router/plugins/dom';
+
 import { app } from './routes.js';
+import { Breadcrumbs } from './views/breadcrumbs.js';
 
 Router.extend(preloadIntent);
+Router.extend(dom, { mount: '#app-mount' });
 
 const demoUsers = {
   none: null,
@@ -14,6 +18,29 @@ const demoUsers = {
 
 let lastRenderedState = null;
 
+// the header's chrome depends on the page as a whole, so the app renders it: the breadcrumb trail
+// from the page's titles, and aria-current on the link to this page and on a link to a section it
+// sits under, which keeps a layout's navigation right without rendering the layout again
+function renderChrome(page) {
+  const crumbs = document.querySelector('#breadcrumbs');
+  if (crumbs) {
+    crumbs.innerHTML = Breadcrumbs({ page });
+  }
+  const here = new URL(location.href);
+  document.querySelectorAll('#app-mount a[href]').forEach((link) => {
+    const target = new URL(link.getAttribute('href'), location.origin);
+    const samePath = target.pathname === here.pathname && (!target.search || target.search === here.search);
+    const under = target.pathname !== '/' && here.pathname.startsWith(`${target.pathname}/`);
+    const current = target.origin !== here.origin ? null : (samePath ? 'page' : (under ? 'true' : null));
+    if (current) {
+      link.setAttribute('aria-current', current);
+    }
+    else {
+      link.removeAttribute('aria-current');
+    }
+  });
+}
+
 function syncSidebarScrollReadout() {
   const sidebarEl = document.querySelector('#sidebar-scroll');
   const readoutEl = document.querySelector('#sidebar-scroll-readout');
@@ -22,118 +49,12 @@ function syncSidebarScrollReadout() {
   }
 }
 
-function renderFallbackError(state) {
-  const message = state.error?.message ?? String(state.error ?? 'Navigation failed');
-  return `
-    <div class="status-page status-error" data-status-view="ErrorFallback">
-      <div class="status-code-pill status-403">status: 'error'</div>
-      <h2>Navigation Error</h2>
-      <p><code>${escapeHTML(message)}</code></p>
-      <div class="card-links">
-        <a href="/" class="btn btn-primary">Return Home</a>
-      </div>
-    </div>
-  `;
-}
-
-function renderApp(state = app.page) {
-  if (!state) {
-    return;
-  }
-  lastRenderedState = state;
-
-  const mountEl = document.querySelector('#app-mount');
-  if (!mountEl) {
-    return;
-  }
-
-  // innerHTML replacement recreates the sidebar and filter input when the section stays mounted
-  const prevSidebar = document.querySelector('#sidebar-scroll');
-  const prevScrollTop = prevSidebar ? prevSidebar.scrollTop : null;
-  const prevScrollLeft = prevSidebar ? prevSidebar.scrollLeft : null;
-
-  const activeEl = document.activeElement;
-  const preservedFocus = activeEl?.dataset?.preserveFocus === 'true' && activeEl.id
-    ? {
-      id: activeEl.id,
-      value: activeEl.value,
-      selectionStart: activeEl.selectionStart,
-      selectionEnd: activeEl.selectionEnd,
-    }
-    : null;
-
-  const currentRoutes = state.chain ?? state.route?.ancestors ?? [];
-  const layouts = state.layouts?.length
-    ? state.layouts
-    : currentRoutes.map((route) => route.layout).filter(Boolean);
-
-  const slots = state.slots && Object.keys(state.slots).length
-    ? state.slots
-    : Object.assign({}, ...currentRoutes.map((route) => route.slots).filter(Boolean));
-
-  // the page carries its url; the views read the parts
-  const url = state.url ? new URL(state.url, window.location.origin) : null;
-  const baseContext = {
-    state: { ...state, pathname: url?.pathname ?? '', search: url?.search ?? '', hash: url?.hash ?? '' },
-    route: state.route,
-    params: state.params ?? {},
-    query: state.query ?? {},
-    data: state.data ?? {},
-    status: state.status ?? 'ok',
-    router: app,
-  };
-
-  const renderedSlots = {};
-  each(slots, (slotView, slotName) => {
-    renderedSlots[slotName] = isFunction(slotView)
-      ? slotView({ ...baseContext, slots: renderedSlots })
-      : String(slotView ?? '');
-  });
-
-  let outlet;
-  if (isFunction(state.view)) {
-    outlet = state.view({ ...baseContext, slots: renderedSlots });
-  }
-  else if (state.status === 'error' && !state.view) {
-    outlet = renderFallbackError(state);
-  }
-  else {
-    outlet = String(state.view ?? '');
-  }
-
-  each([...layouts].reverse(), (layoutFn) => {
-    if (isFunction(layoutFn)) {
-      outlet = layoutFn({
-        ...baseContext,
-        slots: renderedSlots,
-        outlet,
-      });
-    }
-  });
-
-  mountEl.innerHTML = outlet;
-
-  const nextSidebar = document.querySelector('#sidebar-scroll');
-  if (nextSidebar) {
-    if (prevScrollTop !== null) {
-      nextSidebar.scrollTop = prevScrollTop;
-      nextSidebar.scrollLeft = prevScrollLeft ?? 0;
-    }
-    nextSidebar.addEventListener('scroll', syncSidebarScrollReadout, { passive: true });
+// scroll does not bubble, so the readout listens once in the capture phase for the sidebar's own
+document.addEventListener('scroll', (event) => {
+  if (event.target?.id === 'sidebar-scroll') {
     syncSidebarScrollReadout();
   }
-
-  if (preservedFocus) {
-    const nextInput = document.getElementById(preservedFocus.id);
-    if (nextInput) {
-      nextInput.value = preservedFocus.value;
-      nextInput.focus();
-      if (typeof preservedFocus.selectionStart === 'number') {
-        nextInput.setSelectionRange(preservedFocus.selectionStart, preservedFocus.selectionEnd);
-      }
-    }
-  }
-}
+}, true);
 
 function renderInspector() {
   const inspectorEl = document.querySelector('#router-inspector');
@@ -270,8 +191,9 @@ function renderInspector() {
   `;
 }
 
-app.onRender = (state) => {
-  renderApp(state);
+app.onRender = (page) => {
+  lastRenderedState = page;
+  renderChrome(page);
   renderInspector();
   syncSidebarScrollReadout();
 };
@@ -291,15 +213,12 @@ document.addEventListener('click', (event) => {
     const roleKey = button.dataset.setUser;
     app.user = demoUsers[roleKey] ? { ...demoUsers[roleKey] } : null;
 
+    // the user is read by the guards and the data, so a change is a reload of the cascade
     if (button.dataset.thenNav) {
       app.navigate(button.dataset.thenNav);
     }
-    else if (button.dataset.thenReload) {
-      app.reload();
-    }
     else {
-      renderApp(app.page);
-      renderInspector();
+      app.reload();
     }
     return;
   }

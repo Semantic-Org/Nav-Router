@@ -1,7 +1,6 @@
 import { escapeHTML } from '@semantic-ui/utils';
 
-export function AnalyticsPage(context) {
-  const { data = {}, params = {} } = context ?? {};
+export function AnalyticsPage({ data = {}, params = {} } = {}) {
   const org = data.org ?? params.org ?? 'acme';
 
   return `

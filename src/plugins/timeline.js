@@ -4,7 +4,7 @@ import { isDevelopment, markTimeline, measureTimeline } from '@semantic-ui/utils
 // every entry point is throw-safe, and tooltip prose folds at the callsite in production builds
 export default ({ trackGroup = 'router' } = {}, Router) => {
   const proto = Router.prototype;
-  const { start, intercepted, settled, failed, runGuards, runData, renderView, updateData, stop } = proto;
+  const { start, intercepted, settled, failed, runGuards, runData, renderPage, updateData, stop } = proto;
 
   const routeLabel = (target) => target?.route?.name || target?.pathname || target?.url || 'unknown';
 
@@ -143,11 +143,11 @@ export default ({ trackGroup = 'router' } = {}, Router) => {
     }
   };
 
-  proto.renderView = async function(page, event = null) {
+  proto.renderPage = async function(page, event = null) {
     const status = page?.status ?? 'ok';
     const close = measureTimeline('router:render');
     try {
-      return await renderView.call(this, page, event);
+      return await renderPage.call(this, page, event);
     }
     finally {
       close({

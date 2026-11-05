@@ -2,13 +2,8 @@ import { escapeHTML } from '@semantic-ui/utils';
 
 import { MEMBERS, sidebarShortcuts } from '../data.js';
 
-export function TeamSidebar(context) {
-  const { params = {}, state = {} } = context ?? {};
+export function TeamSidebar({ params = {} }) {
   const org = params.org || 'acme';
-  const activeUserId = params.userId;
-  const pathname = state.pathname ?? '';
-  const search = state.search ?? '';
-  const fullPath = `${pathname}${search}`;
   const members = Object.values(MEMBERS);
 
   return `
@@ -26,59 +21,47 @@ export function TeamSidebar(context) {
         </div>
       </div>
 
-      <div id="sidebar-scroll" class="sidebar-scroll-area" tabindex="0" aria-label="Team Members and Shortcuts">
-        <div class="sidebar-group-label">Team Members (<code>/team/:org/:userId</code>)</div>
-        <ul class="sidebar-list">
-          ${
-    members.map((member) => {
-      const href = `/team/${org}/${member.id}`;
-      const isSelected = activeUserId === member.id;
-      return `
-              <li>
-                <a href="${escapeHTML(href)}" class="sidebar-item ${isSelected ? 'is-active' : ''}">
-                  <div class="sidebar-item-main">
-                    <span class="status-dot status-${escapeHTML(member.status)}"></span>
-                    <span class="sidebar-item-name">${escapeHTML(member.name)}</span>
-                  </div>
-                  <span class="sidebar-item-meta">${escapeHTML(member.access)}</span>
-                </a>
-              </li>
-            `;
-    }).join('')
-  }
+      <div class="sidebar-group-label">Team Members (<code>/team/:org/:userId</code>)</div>
+      <ul class="sidebar-list">
+        ${
+    members.map((member) => `
           <li>
-            <a href="/team/${escapeHTML(org)}/unknown-user" class="sidebar-item sidebar-item-danger ${
-    activeUserId === 'unknown-user' ? 'is-active' : ''
-  }">
+            <a href="${escapeHTML(`/team/${org}/${member.id}`)}" class="sidebar-item">
               <div class="sidebar-item-main">
-                <span class="status-dot status-danger"></span>
-                <span class="sidebar-item-name">unknown-user</span>
+                <span class="status-dot status-${escapeHTML(member.status)}"></span>
+                <span class="sidebar-item-name">${escapeHTML(member.name)}</span>
               </div>
-              <span class="sidebar-item-meta">notFound()</span>
+              <span class="sidebar-item-meta">${escapeHTML(member.access)}</span>
             </a>
           </li>
-        </ul>
-
-        <div class="sidebar-group-label">Deep-Link Shortcuts (Scrollable Area)</div>
-        <ul class="sidebar-list">
-          ${
-    sidebarShortcuts.map((item) => {
-      const href = item.path(org);
-      const isSelected = fullPath === href;
-      return `
-              <li>
-                <a href="${escapeHTML(href)}" class="sidebar-item ${isSelected ? 'is-active' : ''}">
-                  <div class="sidebar-item-main">
-                    <span class="sidebar-item-name">${escapeHTML(item.label)}</span>
-                  </div>
-                  <span class="sidebar-item-meta">${escapeHTML(item.sub)}</span>
-                </a>
-              </li>
-            `;
-    }).join('')
+        `).join('')
   }
-        </ul>
-      </div>
+        <li>
+          <a href="/team/${escapeHTML(org)}/unknown-user" class="sidebar-item sidebar-item-danger">
+            <div class="sidebar-item-main">
+              <span class="status-dot status-danger"></span>
+              <span class="sidebar-item-name">unknown-user</span>
+            </div>
+            <span class="sidebar-item-meta">notFound()</span>
+          </a>
+        </li>
+      </ul>
+
+      <div class="sidebar-group-label">Deep-Link Shortcuts (Scrollable Area)</div>
+      <ul class="sidebar-list">
+        ${
+    sidebarShortcuts.map((item) => `
+          <li>
+            <a href="${escapeHTML(item.path(org))}" class="sidebar-item">
+              <div class="sidebar-item-main">
+                <span class="sidebar-item-name">${escapeHTML(item.label)}</span>
+              </div>
+              <span class="sidebar-item-meta">${escapeHTML(item.sub)}</span>
+            </a>
+          </li>
+        `).join('')
+  }
+      </ul>
     </div>
   `;
 }

@@ -2,13 +2,7 @@ import { capitalize, escapeHTML } from '@semantic-ui/utils';
 
 import { MEMBERS } from '../../data.js';
 
-export function TeamOverviewPage(context) {
-  const {
-    data = {},
-    params = {},
-    query = {},
-  } = context ?? {};
-
+export function TeamOverviewPage({ data = {}, params = {}, query = {} } = {}) {
   const org = params.org || 'acme';
   const tab = params.tab || 'overview';
   const compact = Boolean(query.compact);

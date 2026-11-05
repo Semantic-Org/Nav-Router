@@ -2,6 +2,7 @@ import { wait } from '@semantic-ui/utils';
 import { lazy, router } from 'nav-router';
 
 import { MEMBERS } from './data.js';
+import { ErrorPage } from './views/error-page.js';
 import { ForbiddenPage } from './views/forbidden-page.js';
 import { HomePage } from './views/home-page.js';
 import { LoadingPage } from './views/loading-page.js';
@@ -17,11 +18,12 @@ import { TeamSidebar } from './views/team-sidebar.js';
 export const app = router({
   name: 'home',
   title: 'Acme Console',
-  views: {
-    layout: RootLayout,
+  layout: RootLayout,
+  statusViews: {
     notFound: NotFoundPage,
     forbidden: ForbiddenPage,
     loading: LoadingPage,
+    error: ErrorPage,
   },
   signInRoute: 'signIn',
   holdCommit: '300ms',

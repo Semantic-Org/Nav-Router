@@ -1,4 +1,4 @@
-import { each, extend, isArray, isFunction, isPlainObject, isPromise } from '@semantic-ui/utils';
+import { each, extend, inArray, isArray, isFunction, isPlainObject, isPromise } from '@semantic-ui/utils';
 
 const PROPERTY_PREFIX = /^(og|article|profile|book|fb):/;
 
@@ -12,7 +12,7 @@ export default ({
   formatTitle = null,
 } = {}, Router) => {
   const proto = Router.prototype;
-  const { renderView, onRouteCreated, onRouteUpdated, onRouteDestroyed, stop } = proto;
+  const { renderPage, onRouteCreated, onRouteUpdated, onRouteDestroyed, stop } = proto;
 
   const findExistingTag = (head, key) => {
     if (key === 'canonical') {
@@ -59,7 +59,11 @@ export default ({
   // the hook sees what the other hooks see, with the page's data and slices, so a reactive router
   // tracks what it reads. a sync answer waits for the render's write, an async one lands on its own
   proto.evaluateMeta = function(route) {
-    const context = this.contextFor(route, this.page, { data: this.page.data, slices: this.page.slices });
+    // the hook sees what the other hooks see: the slices of the route and the routes above it
+    const slices = (this.page.slices ?? []).filter((slice) => inArray(slice.route, route.ancestors));
+    const data = {};
+    each(slices, (slice) => extend(data, slice.data));
+    const context = this.contextFor(route, this.page, { data, slices });
     const value = this.evaluateHook(route, route.meta, context, {
       kind: 'slice',
       changed: (answer) => this.metaChanged(route, answer),
@@ -72,12 +76,31 @@ export default ({
     }
   };
 
+  // each store is a newer answer than any still in flight, so a slow one that lands later is dropped
   proto.storeMeta = function(route, value) {
-    (this.headMeta ??= new Map()).set(route, isPlainObject(value) ? value : {});
+    const record = this.metaRecord(route);
+    record.version = (record.version ?? 0) + 1;
+    record.value = isPlainObject(value) ? value : {};
+    return record.version;
+  };
+
+  proto.metaRecord = function(route) {
+    const records = (this.headMeta ??= new Map());
+    if (!records.has(route)) {
+      records.set(route, { value: {}, version: 0 });
+    }
+    return records.get(route);
   };
 
   proto.metaChanged = async function(route, value) {
-    this.storeMeta(route, await value);
+    const record = this.metaRecord(route);
+    const version = record.version = (record.version ?? 0) + 1;
+    const resolved = await value;
+    // a newer answer landed first, or the route left and came back with a record of its own
+    if (record.version !== version || this.headMeta?.get(route) !== record) {
+      return;
+    }
+    record.value = isPlainObject(resolved) ? resolved : {};
     if (route.active && this.page) {
       this.writeHead(this.page);
     }
@@ -125,7 +148,7 @@ export default ({
 
     const merged = extend({}, defaults);
     each(page.chain ?? [], (route) => {
-      const meta = this.headMeta?.get(route);
+      const meta = this.headMeta?.get(route)?.value;
       if (meta) {
         extend(merged, meta);
       }
@@ -163,9 +186,9 @@ export default ({
     }
   };
 
-  proto.renderView = async function(page, event = null) {
+  proto.renderPage = async function(page, event = null) {
     this.writeHead(page);
-    return renderView.call(this, page, event);
+    return renderPage.call(this, page, event);
   };
 
   proto.stop = function() {

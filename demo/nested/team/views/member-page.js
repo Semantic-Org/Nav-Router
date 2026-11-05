@@ -2,13 +2,7 @@ import { escapeHTML } from '@semantic-ui/utils';
 
 import { MEMBERS } from '../../data.js';
 
-export function MemberPage(context) {
-  const {
-    data = {},
-    params = {},
-    query = {},
-  } = context ?? {};
-
+export function MemberPage({ data = {}, params = {}, query = {} } = {}) {
   const org = params.org || 'acme';
   const member = data.member ?? MEMBERS[params.userId] ?? {
     id: params.userId,

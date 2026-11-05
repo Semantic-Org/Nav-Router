@@ -1,15 +1,15 @@
 import { escapeHTML } from '@semantic-ui/utils';
 
-export function LoadingPage(context) {
-  const { state = {}, params = {} } = context ?? {};
+export function LoadingPage({ page = {}, params = {} } = {}) {
+  const pathname = page.url ? new URL(page.url).pathname : '/';
 
   return `
     <div class="status-page status-loading" data-status-view="LoadingPage">
       <div class="spinner" aria-hidden="true"></div>
       <div class="status-code-pill status-loading-pill">status: 'loading'</div>
-      <h2>Loading ${escapeHTML(state.route?.name ?? 'Route')} Cascade…</h2>
+      <h2>Loading ${escapeHTML(page.route?.name ?? 'Route')} Cascade…</h2>
       <p>
-        Resolving parallel async data slices for <code>${escapeHTML(state.pathname ?? '')}</code>
+        Resolving parallel async data slices for <code>${escapeHTML(pathname ?? '')}</code>
         (<code>org: ${escapeHTML(params.org ?? 'acme')}</code>).
       </p>
       <div class="timing-pipeline">
