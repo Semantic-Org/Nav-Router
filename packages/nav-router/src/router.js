@@ -161,7 +161,7 @@ export class Router {
         await this.afterCommit(this.begin(matched, event), event, { precommitRan: false });
       }
       else {
-        await this.landNotFound(initialUrl, event);
+        await this.applyNotFound(initialUrl, event);
       }
     }
     catch (error) {
@@ -178,7 +178,7 @@ export class Router {
 
   // no route for the url: the root runs its slice as the routes above a refusal do, the user read
   // first, so a root with data frames the cold not-found with what it reads
-  async landNotFound(url, event) {
+  async applyNotFound(url, event) {
     const navigation = { signal: event.signal, reload: false, previous: null };
     await this.resolveIdentity(navigation);
     const [view, views, { data, slices }] = await Promise.all([
