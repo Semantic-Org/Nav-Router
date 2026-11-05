@@ -10,22 +10,22 @@ export const setRouter = (instance) => {
   current = instance;
 };
 
-export const router = () => current ?? globalThis.router;
+export const getRouter = () => current ?? globalThis.router;
 
 // reads
-export const href = (...args) => router().href(...args);
-export const urlFor = (...args) => router().href(...args);
-export const url = (...args) => router().href(...args);
-export const match = (...args) => router().match(...args);
-export const sitemap = (...args) => router().sitemap(...args);
+export const href = (...args) => getRouter().href(...args);
+export const urlFor = (...args) => getRouter().href(...args);
+export const url = (...args) => getRouter().href(...args);
+export const match = (...args) => getRouter().match(...args);
+export const sitemap = (...args) => getRouter().sitemap(...args);
 
 // verbs
-export const navigate = (...args) => router().navigate(...args);
+export const navigate = (...args) => getRouter().navigate(...args);
 export const replace = (target, args = {}, options = {}) =>
-  router().navigate(target, args, { ...options, history: 'replace' });
-export const reload = (...args) => router().reload(...args);
-export const back = (...args) => router().back(...args);
-export const forward = (...args) => router().forward(...args);
-export const traverseTo = (...args) => router().traverseTo(...args);
-export const preload = (...args) => router().preload(...args);
-export const confirmLeave = (...args) => router().confirmLeave(...args);
+  getRouter().navigate(target, args, { ...options, history: 'replace' });
+export const reload = (...args) => getRouter().reload(...args);
+export const back = (...args) => getRouter().back(...args);
+export const forward = (...args) => getRouter().forward(...args);
+export const traverseTo = (...args) => getRouter().traverseTo(...args);
+export const preload = (...args) => getRouter().preload(...args);
+export const confirmLeave = (...args) => getRouter().confirmLeave(...args);

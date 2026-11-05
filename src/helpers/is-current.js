@@ -1,8 +1,8 @@
-import { router } from './router.js';
+import { getRouter } from './router.js';
 
 // the leaf itself, with these args
 export const isCurrent = (target, args = null) => {
-  const instance = router();
+  const instance = getRouter();
   const route = instance.routeFor(target);
   if (!route || instance.current?.route !== route) {
     return false;

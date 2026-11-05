@@ -1,6 +1,6 @@
 import { each, isFunction, isPromise } from '@semantic-ui/utils';
 
-import { router } from './router.js';
+import { getRouter } from './router.js';
 
 const defaultParams = (route) => {
   const params = {};
@@ -16,7 +16,7 @@ const defaultParams = (route) => {
 // guard answers as a promise, so a menu that must be sync writes sync guards. a plain read, not
 // the cascade: nothing is born here
 export const canAccess = (target, args = {}) => {
-  const instance = router();
+  const instance = getRouter();
   const route = instance.routeFor(target);
   if (!route) {
     return false;

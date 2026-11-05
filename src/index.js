@@ -12,6 +12,7 @@ export {
   back,
   confirmLeave,
   forward,
+  getRouter,
   href,
   match,
   navigate,
