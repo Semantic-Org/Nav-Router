@@ -144,13 +144,26 @@ export class Router {
 
     const matched = this.match(initialUrl);
     if (!matched) {
+      // the user is read as a navigation reads it, so the cold not-found page sees who is signed in;
+      // the root frames it with an empty slice, nothing of its own having run
       const [view, views] = await Promise.all([
         this.resolveView(this.statusViews?.notFound),
         this.resolveRouteViews([this.root]),
+        this.resolveIdentity({ reload: false, previous: null }),
       ]);
-      this.page = { view, views, chain: [this.root], status: 'notFound', url: initialUrl };
-      this.settleRoutes(null, this.page);
-      await this.renderPage(this.page);
+      const page = {
+        view,
+        views,
+        chain: [this.root],
+        slices: [this.sliceOf(this.root, {})],
+        status: 'notFound',
+        url: initialUrl,
+      };
+      await this.batch(() => {
+        this.page = page;
+        this.settleRoutes(null, page);
+        return this.renderPage(page);
+      });
       this.notify();
       return this;
     }
@@ -694,19 +707,23 @@ export class Router {
       if (!view) {
         this.logError(error);
       }
-      // the routes on screen stay active under the error page, so the chain carries over
-      this.page = {
-        ...(pending ? this.pageFor(pending) : (this.page ?? {})),
-        chain: this.page?.chain ?? [this.root],
-        slices: this.page?.slices ?? [],
-        views: this.page?.views ?? [],
-        view,
-        status: 'error',
-        error,
-      };
-      // a cold error, nothing yet shown, is the root's to show
-      this.settleRoutes(pending ? this.page : null, this.page);
-      this.renderPage(this.page).catch(noop);
+      // the routes on screen stay active under the error page, so the chain carries over. a cold
+      // error, nothing yet shown, is the root's to show, framed by its layout with an empty slice
+      const previous = this.page;
+      const views = previous?.views ?? await this.resolveRouteViews([this.root]);
+      await this.batch(() => {
+        this.page = {
+          ...(pending ? this.pageFor(pending) : (previous ?? {})),
+          chain: previous?.chain ?? [this.root],
+          slices: previous?.slices ?? [this.sliceOf(this.root, {})],
+          views,
+          view,
+          status: 'error',
+          error,
+        };
+        this.settleRoutes(previous, this.page);
+        return this.renderPage(this.page);
+      }).catch(noop);
     }
     else {
       this.logError(error);
