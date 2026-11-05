@@ -6,7 +6,9 @@ import { fileURLToPath } from 'node:url';
 const demoDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(demoDir, '..');
 const routerSrcDir = path.join(repoRoot, 'src');
-const utilsPkgDir = path.join(repoRoot, 'node_modules', '@semantic-ui', 'utils');
+const integrationsDir = path.join(repoRoot, 'integrations');
+// the packages a demo may import from node_modules, each served from its own folder
+const mountedPackages = ['@semantic-ui/utils', 'solid-js'];
 
 const mimeTypes = {
   '.html': 'text/html; charset=utf-8',
@@ -38,21 +40,23 @@ function sendFile(res, filePath) {
 }
 
 function resolveMountedPackage(pathname) {
+  const under = (dir, prefix) => {
+    const candidate = path.resolve(dir, `.${pathname.slice(prefix.length)}`);
+    return candidate.startsWith(`${dir}${path.sep}`) ? candidate : null;
+  };
   if (pathname.startsWith('/src/')) {
-    const candidate = path.resolve(routerSrcDir, `.${pathname.slice('/src'.length)}`);
-    return candidate.startsWith(`${routerSrcDir}${path.sep}`) ? candidate : null;
+    return under(routerSrcDir, '/src');
   }
-  if (pathname.startsWith('/node_modules/@semantic-ui/utils/')) {
-    const rel = pathname.slice('/node_modules/@semantic-ui/utils'.length);
-    const candidate = path.resolve(utilsPkgDir, `.${rel}`);
-    return candidate.startsWith(`${utilsPkgDir}${path.sep}`) ? candidate : null;
+  if (pathname.startsWith('/integrations/')) {
+    return under(integrationsDir, '/integrations');
   }
-  return null;
+  const mounted = mountedPackages.find((name) => pathname.startsWith(`/node_modules/${name}/`));
+  return mounted ? under(path.join(repoRoot, 'node_modules', mounted), `/node_modules/${mounted}`) : null;
 }
 
 export function createDemoServer({ pattern = 'flat' } = {}) {
-  if (pattern !== 'flat' && pattern !== 'nested') {
-    throw new Error(`serve: unknown demo "${pattern}". Use "flat" or "nested".`);
+  if (!['flat', 'nested', 'solid'].includes(pattern)) {
+    throw new Error(`serve: unknown demo "${pattern}". Use "flat", "nested" or "solid".`);
   }
 
   const appRoot = path.join(demoDir, pattern);
