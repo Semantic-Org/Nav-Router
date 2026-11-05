@@ -1,0 +1,59 @@
+---
+// a markdown page: its header from frontmatter, its body, its footer and pager, in the docs frame
+import { getCollection } from 'astro:content';
+
+import { inline } from '../lib/markdown/inline.js';
+import { navFor, pagerFor } from '../lib/nav.js';
+import { formatSize, sizeOf } from '../lib/sizes.js';
+import DocsChrome from './DocsChrome.astro';
+
+const { entry, headings } = Astro.props;
+// section landing pages that live outside the collection
+const ids = [...(await getCollection('docs')).map((e) => e.id), 'plugins'];
+const section = navFor(ids, entry.id).find((s) => s.key === entry.id.split('/')[0]);
+const group = section.groups.find((g) => g.items.some((it) => it.slug === entry.id));
+const { prev, next } = pagerFor(ids, entry.id);
+const { title, lede, kind, import: importLine, size, updated } = entry.data;
+const sizeLabel = size ? formatSize(await sizeOf(size)) : null;
+// a heading that is a symbol on its own (navigate()), not prose that mentions one
+const isSymbol = (t) => /^[\w.$-]+\(\)$/.test(t) || (kind === 'plugin' && t === title);
+const toc = headings.filter((h) => h.depth === 2 || h.depth === 3)
+  .map((h) => ({ depth: h.depth, slug: h.slug, text: h.text.trim(), symbol: isSymbol(h.text.trim()) }));
+const minutes = Math.max(1, Math.round(entry.body.split(/\s+/).length / 220));
+const updatedLabel = updated.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+// the markdown source, for copy page; < is escaped so the text can never close its script
+const source = JSON.stringify(entry.body).replace(/</g, '\\u003c');
+---
+<DocsChrome title={`${title} · nav-router`} description={lede} currentId={entry.id} toc={toc} extraIds={['plugins']}>
+  <main class="doc" id="content" data-pagefind-body>
+    <span hidden data-pagefind-meta={`title:${title}`}></span>
+    <span hidden data-pagefind-meta={`section:${section.label}`}></span>
+    <span hidden data-pagefind-meta={`crumb:${group?.label ?? section.label}`}></span>
+    {kind && <span hidden data-pagefind-meta="symbol:true"></span>}
+
+    <p class="doc-crumb" data-pagefind-ignore>
+      <a class="crumb" href={section.href}>{section.label}</a>{group && group.label !== section.label && <> / {group.label}</>}
+    </p>
+    <h1>{kind ? <><code>{title}</code> <span class="kind" data-pagefind-ignore>{kind}</span></> : title}</h1>
+    <p class="doc-lede" set:html={inline(lede)} />
+
+    <div class="doc-meta" data-pagefind-ignore>
+      {importLine && <span class="import-chip"><code id="import-line">{importLine}</code><button class="copy" type="button" data-copy="#import-line" aria-label="Copy import"></button></span>}
+      {sizeLabel && <span class="meta-badge">{size === 'core' && 'core '}<b>{sizeLabel}</b> <abbr title="minified and Brotli compressed">min+br</abbr></span>}
+      {!kind && <span class="meta-badge">{minutes} min read</span>}
+      <button class="btn ghost" type="button" data-copy-page>Copy page</button>
+    </div>
+
+    <slot />
+
+    <div class="doc-foot" data-pagefind-ignore>
+      <a href={`https://github.com/nav-router/nav-router/edit/main/docs/src/content/docs/${entry.id}.md`}>Edit this page</a>
+      <span>Updated {updatedLabel}</span>
+    </div>
+    <nav class="pager" aria-label="Pages" data-pagefind-ignore>
+      {prev ? <a class:list={['pager-link', 'is-prev', { 'is-symbol': prev.symbol }]} href={`/${prev.slug}/`}><span class="pager-dir">Previous</span><span class="pager-title">{prev.title}</span></a> : <span></span>}
+      {next ? <a class:list={['pager-link', 'is-next', { 'is-symbol': next.symbol }]} href={`/${next.slug}/`}><span class="pager-dir">Next</span><span class="pager-title">{next.title}</span></a> : <span></span>}
+    </nav>
+  </main>
+  <script is:inline slot="after" type="application/json" id="page-source" set:html={source}></script>
+</DocsChrome>

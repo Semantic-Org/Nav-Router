@@ -1,0 +1,20 @@
+---
+// the docs topbar: wordmark, sections, search, framework, github, theme
+import { ICON, MARK } from '../lib/icons.js';
+
+const { nav, sectionKey = null, menu = true } = Astro.props;
+---
+<header class="topbar docs-topbar">
+  <div class="docs-topbar-inner">
+    {menu && <button class="icon-btn nav-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="docs-sidebar" set:html={ICON.menu} />}
+    <a class="wordmark" href="/" aria-label="nav-router home"><Fragment set:html={MARK} />nav-router</a>
+    <nav class="section-tabs" aria-label="Sections">
+      {nav.map((s) => <a href={s.href} aria-current={s.key === sectionKey ? 'page' : undefined}>{s.label}</a>)}
+    </nav>
+    <div class="topbar-tools">
+      <button class="search-trigger" type="button" aria-keyshortcuts="Meta+K Control+K"><Fragment set:html={ICON.search} /><span class="label">Search docs</span><span class="keys" aria-hidden="true"><kbd>⌘</kbd><kbd>K</kbd></span></button>
+        <a class="icon-btn" href="https://github.com/" aria-label="GitHub" set:html={ICON.github} />
+      <button class="icon-btn" type="button" data-theme-toggle aria-label="Toggle color theme" set:html={ICON.theme} />
+    </div>
+  </div>
+</header>

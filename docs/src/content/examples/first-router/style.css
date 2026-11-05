@@ -1,0 +1,11 @@
+body { margin: 0; padding: 20px 24px; font: 15px/1.55 system-ui, sans-serif; background: #0a0d14; color: #e8e8ea; }
+header { display: flex; flex-wrap: wrap; gap: 14px; align-items: baseline; margin-bottom: 18px; }
+a { color: #79c0ff; }
+a[aria-current] { color: #e8e8ea; text-decoration: none; }
+h1 { margin: 0 0 6px; font-size: 22px; }
+p { margin: 0 0 10px; color: #b4b4ba; }
+code { font: 13px ui-monospace, monospace; color: #e8e8ea; }
+button { font: inherit; padding: 4px 10px; border-radius: 6px; border: 1px solid #2a2f3a; background: #141823; color: #e8e8ea; cursor: pointer; }
+.loading { color: #e3b36b; }
+.muted { color: #7c7c84; font-size: 13px; }
+ul { padding-left: 18px; }
