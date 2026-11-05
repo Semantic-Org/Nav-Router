@@ -71,17 +71,18 @@ export class Router {
   // one bag: the keys the defaults declare are the router's settings, every other key is the root
   // route's, so the router holds nothing of a route's and the root nothing of the router's
   constructor(options = {}) {
+    const defaults = new.target.defaults; // new.target so a subclass can declare its own defaults
     const settings = {};
     const routeOptions = {};
     each(options, (value, key) => {
-      const owner = key in new.target.defaults ? settings : routeOptions;
+      const owner = key in defaults ? settings : routeOptions;
       owner[key] = value;
     });
     // the resolved settings in one place, for the console and for anything that introspects
-    this.config = extend({}, new.target.defaults, settings);
+    this.config = extend({}, defaults, settings);
     extend(this, this.config);
     this.base = this.normalizeBase(this.base);
-    this.statusViews = { ...new.target.defaults.statusViews, ...settings.statusViews };
+    this.statusViews = { ...defaults.statusViews, ...settings.statusViews };
 
     this.routesByName = new Map();
     this.leaves = [];
