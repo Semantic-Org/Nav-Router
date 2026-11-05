@@ -1,4 +1,4 @@
-import { each, inArray, isFunction, isPromise, noop } from '@semantic-ui/utils';
+import { each, inArray, isEqual, isFunction, isPromise, noop } from '@semantic-ui/utils';
 
 import { Router } from './router.js';
 
@@ -14,6 +14,16 @@ import { Router } from './router.js';
 // primitives below; the fifth, the per-key store, is built from signals unless the provider has a
 // native one ($state, a store, reactive())
 export class ReactiveRouter extends Router {
+  // the comparator for each kind of cell the scaffold makes, on the class as Signal.equality is so
+  // a provider or an app overrides it once: a data key, a param, a query key or the user compares
+  // deep, the slices by their members since the router builds that array fresh at every update,
+  // and the page by identity since it carries the route and the router, which a walk would enter
+  static equality = {
+    cell: isEqual,
+    slices: (a, b) => a.length === b.length && a.every((slice, index) => slice === b[index]),
+    page: Object.is,
+  };
+
   constructor(options) {
     super(options);
     // a tracked page is live; a cached result would not be
@@ -26,8 +36,8 @@ export class ReactiveRouter extends Router {
             Provider
   *******************************/
 
-  // { get, set, peek }, equal values leaving dependents alone. equals, when given, is the cell's
-  // equality in place of the provider's own
+  // { get, set, peek }, equal values leaving dependents alone. equals is the cell's comparator, handed
+  // by the scaffold from its equality table, so a provider's own default never decides
   createSignal(initialValue, { equals } = {}) {
     throw new Error('ReactiveRouter: a provider supplies createSignal(value, { equals })');
   }
@@ -51,7 +61,7 @@ export class ReactiveRouter extends Router {
     const cells = new Map();
     const cell = (key) => {
       if (!cells.has(key)) {
-        cells.set(key, this.createSignal(initialValue[key]));
+        cells.set(key, this.createSignal(initialValue[key], { equals: this.constructor.equality.cell }));
       }
       return cells.get(key);
     };
@@ -67,17 +77,13 @@ export class ReactiveRouter extends Router {
   // on the runs it is absent: a data() returns every key every run, undefined when it has none
   // the view's context made live, for an integration to render with: params, query and user through
   // cells of the store, data through dataFor over the slices' own cells so one key moving wakes its
-  // reader alone, the slices and the page as cells of their own, the slices compared by their members
-  // since the router builds the array fresh at each update and the page by identity since a page is
-  // new each navigation. update writes the keys in one batch; an integration hangs it where its
-  // rendered view is told
+  // reader alone, the slices and the page as cells of their own, each compared as the equality table
+  // says. update writes the keys in one batch; an integration hangs it where its rendered view is told
   liveContext(context) {
+    const { equality } = this.constructor;
     const store = this.createStore({ params: context.params, query: context.query, user: context.user });
-    const slices = this.createSignal(context.slices, {
-      equals: (before, after) =>
-        before.length === after.length && before.every((slice, index) => slice === after[index]),
-    });
-    const page = this.createSignal(context.page, { equals: (before, after) => before === after });
+    const slices = this.createSignal(context.slices, { equals: equality.slices });
+    const page = this.createSignal(context.page, { equals: equality.page });
     const live = { route: context.route, router: context.router, signal: context.signal };
     each(['params', 'query', 'user'], (key) => {
       Object.defineProperty(live, key, { get: () => store.get(key), enumerable: true });

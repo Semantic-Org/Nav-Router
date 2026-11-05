@@ -1,4 +1,3 @@
-import { isEqual } from '@semantic-ui/utils';
 import { ReactiveRouter } from 'nav-router/reactive';
 import { batch, createComputed, createRoot, createSignal, untrack } from 'solid-js';
 import { render } from 'solid-js/web';
@@ -8,8 +7,9 @@ import { render } from 'solid-js/web';
 // props.params.id or props.data.v and is woken by the key it read and by no other. the scaffold
 // runs on solid's signals and computeds
 export class SolidRouter extends ReactiveRouter {
-  // a thunk to the setter, so a function value is stored and not called
-  createSignal(initialValue, { equals = isEqual } = {}) {
+  // a thunk to the setter, so a function value is stored and not called; the comparator is the
+  // scaffold's, from its equality table
+  createSignal(initialValue, { equals }) {
     const [get, set] = createSignal(initialValue, { equals });
     return { get, set: (value) => set(() => value), peek: () => untrack(get) };
   }

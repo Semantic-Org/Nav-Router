@@ -87,14 +87,16 @@ An integration that needs per-route setup overrides `onRouteCreated`, `onRouteUp
 `ReactiveRouter extends Router`. A provider supplies five primitives:
 
 ```js
-createSignal(value, { equals })   // { get, set, peek }. set compares with the cell's own equality, or with equals when
-                                  // given; an equal value wakes nobody
+createSignal(value, { equals })   // { get, set, peek }. set compares with equals, the comparator the scaffold hands it
+                                  // from its equality table; an equal value wakes nobody
 createReaction(fn)     // runs fn(isFirst) now, and again whenever what it read moves. returns the dispose
 untrack(fn)            // runs fn reading nothing
 batch(fn)              // runs fn with notifications held to the end
 createStore(initial)   // { get(key), set(key, value), peek(key) }, a cell per key. built from createSignal by
                        // default; a provider with a native per-key store overrides it
 ```
+
+Equality is the scaffold's, not the provider's. `ReactiveRouter.equality` is a static table with one comparator per kind of cell the scaffold makes, `cell` for a data key, a param, a query key or the user (deep by default), `slices` by their members, `page` by identity, and every cell is created with its kind's comparator. A provider's `createSignal` compares with what it is handed and never decides. An integration or an app that wants identity for its data cells overrides the one static on its subclass.
 
 How the scaffold spends them. Every hook, `redirect`, `permission`, `data` and `title`, runs inside a reaction. The first run is the cascade's own pass, so nothing computes twice. A later run lands the way that hook lands at navigation: a redirect moves the page, a refused permission redirects or shows forbidden, data writes its slice key by key through the store, a title updates its title. A slice is a store, and merged data reads each key through its cell, so a key that moved wakes only the functions that read it. There is no deep compare anywhere: the cell's equality is the one compare, and the cell is read back to learn whether it moved.
 
@@ -117,7 +119,7 @@ A reactive integration whose views render themselves from signals, so update is 
 import { ReactiveRouter } from 'nav-router/reactive';
 
 export class MyRouter extends ReactiveRouter {
-  createSignal(value) { /* the framework's */ }
+  createSignal(value, { equals }) { /* the framework's, comparing with equals */ }
   createReaction(fn) { /* the framework's; return the dispose */ }
   untrack(fn) { /* the framework's */ }
   batch(fn) { /* the framework's */ }
