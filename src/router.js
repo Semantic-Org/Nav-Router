@@ -711,6 +711,7 @@ export class Router {
       this.navigator.deferNavigate(this.href(this.errorRoute), { history: 'replace' });
     }
     else if (committed) {
+      const previous = this.page;
       const view = await this.resolveView(this.statusViews?.error).catch(() => null);
       if (!view) {
         this.logError(error);
@@ -718,8 +719,12 @@ export class Router {
       // the routes on screen stay active under the error page, so the chain carries over. a cold
       // error, nothing yet shown, is the root's to show: framed by its layout when the root has no
       // data of its own, since the data that failed may be the root's, and bare at the mount otherwise
-      const previous = this.page;
       const views = previous?.views ?? await this.resolveRouteViews([this.root]).catch(() => []);
+      // a newer navigation began or landed while the views loaded: the error page is not this one's
+      // to write. a navigation that failed is finished, so its signal says nothing of what came after
+      if (this.pending || this.page !== previous) {
+        return;
+      }
       await this.batch(() => {
         this.page = {
           ...(pending ? this.pageFor(pending) : (previous ?? {})),
@@ -1400,10 +1405,17 @@ export class Router {
   }
 
   async permissionChanged(route, allowed) {
-    if (!inArray(route, this.page?.chain ?? [])) {
+    const chain = this.page?.chain ?? [];
+    // a navigation meanwhile brings its own chain, and the page it left is not this answer's to change
+    const stale = () => this.page?.chain !== chain;
+    if (!inArray(route, chain)) {
       return;
     }
-    if (await allowed) {
+    const result = await allowed;
+    if (stale()) {
+      return;
+    }
+    if (result) {
       // a forbidden page whose guard now allows enters the route, as a fresh navigation would
       if (this.page.status === 'forbidden') {
         this.navigator.reload();
@@ -1417,6 +1429,9 @@ export class Router {
       return;
     }
     const view = await this.resolveView(this.statusViews?.forbidden);
+    if (stale()) {
+      return;
+    }
     this.dropSlices(route);
     await this.updatePage(route, { view, status: 'forbidden', titles: this.page.titles });
   }
