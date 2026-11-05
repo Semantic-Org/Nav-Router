@@ -2,7 +2,7 @@ import { Router } from 'nav-router';
 import dom from 'nav-router/plugins/dom';
 import { ReactiveRouter } from 'nav-router/reactive';
 import { batch, createComputed, createRoot, createSignal, untrack } from 'solid-js';
-import { render } from 'solid-js/web';
+import { insert } from 'solid-js/web';
 
 // the second example of the door, on the dom plugin's seams: the plugin places, this renders. a
 // view is a solid component whose props are the scaffold's live context, so a component reads
@@ -55,23 +55,20 @@ export class SolidRouter extends ReactiveRouter {
     return batch(fn);
   }
 
-  // the rendered view is the element solid renders into, which stays solid's insertion target so
-  // a fragment or a root that changes with a condition keeps landing in it, with no box of its own
-  // so a layout's flex or grid reaches the view's root through it. it carries the live context's
-  // update for the plugin to call and the dispose for destroy, and the plugin places it as it
-  // places a view it rendered itself
+  // the view is mounted where the plugin reads its place, under a root of its own and with nothing
+  // of the integration's around it, so a layout's flex or grid reaches the view's root; placement,
+  // removal and the slot's fallback are the plugin's. the component is called once under the root
+  // and what it returns is inserted, so a root that changes with a condition is solid's to swap
   createView({ view, placement, context }) {
     const { context: props, update } = this.liveContext(context);
-    const element = document.createElement('div');
-    element.style.display = 'contents';
-    element.dispose = render(() => view(props), element);
-    element.update = update;
-    return super.createView({ view: element, placement, context });
-  }
-
-  destroyView({ rendered }) {
-    rendered.dispose();
-    super.destroyView({ rendered });
+    const mount = (target, anchor) => ({
+      update,
+      dispose: createRoot((end) => {
+        insert(target, view(props), anchor);
+        return end;
+      }),
+    });
+    return super.createView({ view, placement, context, mount });
   }
 }
 
