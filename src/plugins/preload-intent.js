@@ -37,9 +37,10 @@ export default (options, Router, Navigator) => {
     }
   };
 
+  // installed is on: the plugin is named for the intent it listens for
   proto.attach = function() {
     attach.call(this);
-    if ((this.router.preload ?? 'intent') === 'intent' && globalThis.document) {
+    if (globalThis.document) {
       this.handlePreload ??= (event) => this.onPreloadIntent(event);
       each(events, (name) => globalThis.document.addEventListener(name, this.handlePreload, { passive: true }));
     }
