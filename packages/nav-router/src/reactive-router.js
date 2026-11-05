@@ -108,7 +108,7 @@ export class ReactiveRouter extends Router {
   async start() {
     if (isFunction(this.identity)) {
       this.lifetime = new AbortController();
-      this.identityRun = this.createReaction(() => {
+      this.stopIdentity = this.createReaction(() => {
         this.identityFresh = true;
         this.askIdentity({ signal: this.lifetime.signal, reload: false, previous: null });
       });
@@ -117,15 +117,15 @@ export class ReactiveRouter extends Router {
   }
 
   stop() {
-    this.identityRun?.();
-    this.identityRun = null;
+    this.stopIdentity?.();
+    this.stopIdentity = null;
     this.identityAnswer = null;
     this.lifetime?.abort();
     return super.stop();
   }
 
   resolveIdentity(navigation) {
-    if (!this.identityRun) {
+    if (!this.stopIdentity) {
       return super.resolveIdentity(navigation);
     }
     const fresh = !navigation.reload && this.identityFresh && this.identityAnswer;
