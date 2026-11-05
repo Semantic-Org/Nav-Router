@@ -1,5 +1,6 @@
 ---
 // every page: the document, the fonts and tokens, and the theme set before first paint
+import { FRAMEWORKS } from '../lib/frameworks.js';
 import '@fontsource-variable/schibsted-grotesk/wght.css';
 import '@fontsource/fragment-mono/400.css';
 import '@fontsource/fragment-mono/400-italic.css';
@@ -8,7 +9,8 @@ import '../styles/tokens.css';
 import sansLatin from '@fontsource-variable/schibsted-grotesk/files/schibsted-grotesk-latin-wght-normal.woff2?url';
 import monoLatin from '@fontsource/fragment-mono/files/fragment-mono-latin-400-normal.woff2?url';
 
-const { title, description = 'A thin router on the browser’s Navigation API.', share = true } = Astro.props;
+const { title, description = 'A thin router on the browser’s Navigation API.', share = true, pageFramework = null } = Astro.props;
+const frameworkIds = FRAMEWORKS.map((f) => f.id);
 // the page's share card, rendered at build by pages/og/[...slug].png.js
 const path = Astro.url.pathname.replace(/^\/|\/$/g, '');
 const image = new URL(`/og/${path || 'index'}.png`, Astro.site);
@@ -46,6 +48,18 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
       try { t = localStorage.getItem('nr:theme'); } catch {}
       document.documentElement.dataset.theme = t || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
     })();
+  </script>
+  <script is:inline define:vars={{ frameworkIds, pageFramework }}>
+    // the reader's framework, set before first paint so the sidebar shows the right slots: a
+    // ?framework= in the link, else the page's own (a Solid page is read as Solid), else the
+    // reader's last pick. the first two are remembered as the new pick
+    let fw = new URLSearchParams(location.search).get('framework');
+    if (!frameworkIds.includes(fw)) { fw = pageFramework; }
+    try {
+      if (fw) { localStorage.setItem('nr:framework', fw); }
+      else { fw = localStorage.getItem('nr:framework'); }
+    } catch {}
+    document.documentElement.dataset.framework = frameworkIds.includes(fw) ? fw : frameworkIds[0];
   </script>
   <slot name="head" />
 </head>
