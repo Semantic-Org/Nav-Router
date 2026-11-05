@@ -1370,7 +1370,12 @@ export class Router {
       // on a not-found page the route that said so is the first without a slice, and its data arriving is the reload
       const saidNotFound = page?.status === 'notFound'
         && page.chain?.find((item) => !slices.some((other) => other.route === item)) === route;
-      if (saidNotFound && (await value) !== NOT_FOUND && this.page === page) {
+      // the standing page is known by its chain: a parent's data moving in the same tick re-reads the
+      // page from its slices, which keeps the chain, while a navigation brings a new one
+      if (
+        saidNotFound && (await value) !== NOT_FOUND && this.page?.chain === page.chain
+        && this.page.status === 'notFound'
+      ) {
         this.navigator.reload();
       }
       return;
