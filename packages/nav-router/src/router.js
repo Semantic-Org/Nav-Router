@@ -283,7 +283,7 @@ export class Router {
     }
 
     const query = this.coerceQuery(bestLeaf, parsed.searchParams);
-    const currentRoutes = [...bestLeaf.ancestors];
+    const chain = [...bestLeaf.ancestors];
 
     return {
       route: bestLeaf,
@@ -293,8 +293,7 @@ export class Router {
       hash: parsed.hash,
       params: bestParams,
       query,
-      chain: currentRoutes,
-      currentRoutes,
+      chain,
       redirect: bestLeaf.redirect ?? null,
     };
   }
@@ -1016,9 +1015,9 @@ export class Router {
     }
     const { signal } = navigation;
 
-    const { route, params, query, currentRoutes } = matched;
+    const { route, params, query, chain } = matched;
 
-    for (const ancestor of currentRoutes) {
+    for (const ancestor of chain) {
       if (ancestor.redirect) {
         const target = await this.evaluateRedirect(
           ancestor,
@@ -1035,7 +1034,7 @@ export class Router {
       }
     }
 
-    for (const ancestor of currentRoutes) {
+    for (const ancestor of chain) {
       if (ancestor.permission !== undefined) {
         const allowed = await this.evaluatePermission(
           ancestor,
@@ -1055,9 +1054,9 @@ export class Router {
           }
           // the routes above the refusing one run their data as a landing would, so their layouts
           // stand with what they read; one of them saying not-found wins, as it does on the data path
-          const viewsReady = this.resolveRouteViews(currentRoutes);
+          const viewsReady = this.resolveRouteViews(chain);
           viewsReady.catch(noop);
-          const above = currentRoutes.slice(0, currentRoutes.indexOf(ancestor));
+          const above = chain.slice(0, chain.indexOf(ancestor));
           const { data, slices, notFound } = await this.runSlices(above, matched, navigation);
           if (notFound) {
             return this.notFoundResult(matched, viewsReady, { data, slices, signal });
@@ -1065,7 +1064,7 @@ export class Router {
           const [view, views, { title, titles }] = await Promise.all([
             this.resolveView(this.statusViews?.forbidden),
             viewsReady,
-            this.evaluateTitles(currentRoutes, matched, { data, slices, signal }),
+            this.evaluateTitles(chain, matched, { data, slices, signal }),
           ]);
           return this.buildCascadeResult(matched, {
             status: 'forbidden',
@@ -1099,13 +1098,13 @@ export class Router {
 
   async runData(matched, navigation) {
     const { signal } = navigation;
-    const { currentRoutes } = matched;
+    const { chain } = matched;
 
     // the chunks load while the data runs, and a failed chunk waits to throw where the data's turn comes
-    const viewsReady = this.resolveRouteViews(currentRoutes);
+    const viewsReady = this.resolveRouteViews(chain);
     viewsReady.catch(noop);
 
-    const { data, slices, notFound } = await this.runSlices(currentRoutes, matched, navigation);
+    const { data, slices, notFound } = await this.runSlices(chain, matched, navigation);
     if (notFound) {
       return this.notFoundResult(matched, viewsReady, { data, slices, signal });
     }
@@ -1173,7 +1172,7 @@ export class Router {
     const [views, view, { title, titles }] = await Promise.all([
       viewsReady,
       this.resolveView(this.statusViews?.notFound),
-      this.evaluateTitles(matched.currentRoutes, matched, { data, slices, signal }),
+      this.evaluateTitles(matched.chain, matched, { data, slices, signal }),
     ]);
     return this.buildCascadeResult(matched, { status: 'notFound', view, views, data, slices, title, titles });
   }
@@ -1202,9 +1201,9 @@ export class Router {
     return value === undefined || value === null || value === '' ? null : String(value);
   }
 
-  async evaluateTitles(currentRoutes, matched, { data = {}, slices = [], signal } = {}) {
+  async evaluateTitles(chain, matched, { data = {}, slices = [], signal } = {}) {
     const titles = [];
-    for (const ancestor of currentRoutes) {
+    for (const ancestor of chain) {
       if (ancestor.title !== undefined) {
         const title = await this.titleOf(ancestor, matched, { data, slices, signal });
         if (title !== null) {

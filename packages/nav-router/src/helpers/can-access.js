@@ -27,7 +27,6 @@ export const canAccess = (target, args = {}) => {
     params: { ...defaultParams(route), ...params },
     query,
     chain: route.ancestors,
-    currentRoutes: route.ancestors,
   };
   const results = [];
   for (const ancestor of route.ancestors) {
