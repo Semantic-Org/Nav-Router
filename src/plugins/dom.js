@@ -7,11 +7,16 @@ import { isArray, isFunction, isString } from '@semantic-ui/utils';
 // the slot's own fallback children wait aside until it empties; under a shadow host the element is
 // a light child carrying the slot attribute and the host projects it. an update renders the view
 // again and swaps the element where it stood, keeping its id and the focus inside it, or tells an
-// element that has an update() of its own. the root's parent is the mount
+// element that has an update() of its own. the root's parent is the mount, the router's own setting
+// with the install's as its default, so two routers on a page take two containers
 export default ({ mount = 'body' } = {}, Router) => {
   const proto = Router.prototype;
+  Router.defaults.mount ??= mount;
 
-  const mountElement = () => (isString(mount) ? document.querySelector(mount) : mount);
+  const mountElement = (router) => {
+    const target = router.mount ?? mount;
+    return isString(target) ? document.querySelector(target) : target;
+  };
 
   const renderOf = (view, context) => toElement(isFunction(view) ? view(context) : view);
 
@@ -42,9 +47,9 @@ export default ({ mount = 'body' } = {}, Router) => {
 
   // where the placement lands: the mount for the root, the host itself when it projects, otherwise
   // the slot of that name inside the parent's rendered layout, the layout itself when it wrote none
-  const targetOf = ({ parent, slot }) => {
+  const targetOf = ({ parent, slot }, router) => {
     if (!parent) {
-      return mountElement();
+      return mountElement(router);
     }
     if (parent.shadowRoot) {
       return parent;
@@ -52,8 +57,8 @@ export default ({ mount = 'body' } = {}, Router) => {
     return parent.querySelector(slot ? `slot[name="${slot}"]` : 'slot:not([name])') ?? parent;
   };
 
-  const place = (element, placement) => {
-    const target = targetOf(placement);
+  const place = (element, placement, router) => {
+    const target = targetOf(placement, router);
     if (placement.parent?.shadowRoot) {
       if (placement.slot) {
         element.setAttribute('slot', placement.slot);
@@ -81,7 +86,7 @@ export default ({ mount = 'body' } = {}, Router) => {
 
   proto.createView = function({ view, placement, context }) {
     const element = renderOf(view, context);
-    place(element, placement);
+    place(element, placement, this);
     return element;
   };
 
@@ -105,7 +110,7 @@ export default ({ mount = 'body' } = {}, Router) => {
       rendered.replaceWith(next);
     }
     else {
-      place(next, placement);
+      place(next, placement, this);
     }
     // the same control by id takes the focus back, with its selection where it was
     const again = focused?.id && next.querySelector(`#${CSS.escape(focused.id)}`);
