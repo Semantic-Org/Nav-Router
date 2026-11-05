@@ -1,4 +1,4 @@
-import { each, inArray, isFunction, isPromise, noop } from '@semantic-ui/utils';
+import { each, inArray, isFunction, isPromise, isString, noop } from '@semantic-ui/utils';
 
 import { Router } from './router.js';
 
@@ -40,22 +40,32 @@ export class ReactiveRouter extends Router {
     // router's, written once per settle, which is what keeps a kept layout's reads current
     this.paramCells = this.createStore({});
     this.queryCells = this.createStore({});
-    this.params = {};
-    this.query = {};
+    this.params = this.liveObject(this.paramCells);
+    this.query = this.liveObject(this.queryCells);
   }
 
-  // the keys of a page written to their cells, a getter added for a key the router first meets
+  // the keys of a page written to their cells, and the plain object under the live one kept to
+  // the page's keys, so what it enumerates is exact
   writeLive(live, cells, values) {
-    each(values, (value, key) => {
-      if (!(key in live)) {
-        Object.defineProperty(live, key, { get: () => cells.get(key), enumerable: true });
-      }
-      cells.set(key, value);
-    });
-    each(live, (_, key) => {
+    each(Object.keys(live), (key) => {
       if (!(key in values)) {
+        delete live[key];
         cells.set(key, undefined);
       }
+    });
+    each(values, (value, key) => {
+      live[key] = value;
+      cells.set(key, value);
+    });
+  }
+
+  // an object read live by key, every string key through its cell: a key the page does not hold
+  // yet tracks too, so a layout on / that reads params.org wakes when /team/acme lands. the one
+  // proxy in the scaffold, for what a view would otherwise reach through a get(key); a provider
+  // with a native per-key object overrides it with writeLive
+  liveObject(cells) {
+    return new Proxy({}, {
+      get: (target, key) => (isString(key) && !(key in Object.prototype) ? cells.get(key) : target[key]),
     });
   }
 
