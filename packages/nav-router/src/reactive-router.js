@@ -200,9 +200,6 @@ export class ReactiveRouter extends Router {
     };
   }
 
-  // merges ancestor slices behind per-key getters, so reading data.team tracks team's cell alone.
-  // a getter exists for the keys a slice holds, so a key a run returns only sometimes is read plain
-  // on the runs it is absent: a data() returns every key every run, undefined when it has none
   // the view's context made live, for an integration to render with. params, query, user and page
   // are the router's own cells, so a kept layout's reads stay current without the route being told;
   // data reads through the slices' own cells, so one key moving wakes its reader alone; the slices are
@@ -254,6 +251,9 @@ export class ReactiveRouter extends Router {
     return { context: live, update: (next) => slices.set(next.slices) };
   }
 
+  // merges ancestor slices behind per-key getters, so reading data.team tracks team's cell alone.
+  // a getter exists for the keys a slice holds, so a key a run returns only sometimes is read plain
+  // on the runs it is absent: a data() returns every key every run, undefined when it has none
   dataFor(slices) {
     const data = {};
     each(slices, (slice) => {
