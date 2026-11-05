@@ -4,15 +4,14 @@ import { signIn, user } from '../store.js';
 
 // a link by route name: href builds it, and isActive or isCurrent reads the router's current page,
 // a cell under the scaffold, so aria-current follows every navigation with nothing wired
-const Link = (props) => (
-  <a
-    href={href(props.route, props.args)}
-    class='nav-link'
-    aria-current={(props.under ? isActive : isCurrent)(props.route, props.args) ? 'page' : undefined}
-  >
-    {props.children}
-  </a>
-);
+const Link = (props) => {
+  const current = () => (props.under ? isActive(props.route, props.args) : isCurrent(props.route, props.args));
+  return (
+    <a href={href(props.route, props.args)} class='nav-link' aria-current={current() ? 'page' : undefined}>
+      {props.children}
+    </a>
+  );
+};
 
 export const RootLayout = () => (
   <div class='shell'>
