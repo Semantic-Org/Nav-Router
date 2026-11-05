@@ -181,6 +181,19 @@ export class ReactiveRouter extends Router {
   // view is told. what it hands the view, props or anything else, is its own word
   liveContext(context) {
     const router = this;
+    // a loading view is rendered over the standing page, which the router's cells still hold, so
+    // it reads its own page as a snapshot, the user live
+    if (context.page !== this.page) {
+      return {
+        context: {
+          ...context,
+          get user() {
+            return router.user;
+          },
+        },
+        update: noop,
+      };
+    }
     const slices = this.createSignal(context.slices, { equals: this.constructor.equality.slices });
     // the merged data is built once per slices array, the cells inside it doing the tracking
     let builtFor = null;
