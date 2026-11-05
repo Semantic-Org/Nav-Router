@@ -1339,7 +1339,7 @@ export class Router {
       else {
         // a kept route renders a slot again when a route below it took that slot or gave it back
         const crossed = Object.keys(route.slots).filter((slot) =>
-          route.slotDeclaredBelow(before, slot) !== route.slotDeclaredBelow(after, slot)
+          route.slotDeclaredBelow(previous, slot) !== route.slotDeclaredBelow(page, slot)
         );
         if (crossed.length) {
           route.update(page, { slots: crossed });
@@ -1407,9 +1407,9 @@ export class Router {
       });
       return;
     }
-    this.page = { ...this.page, view: await this.resolveView(this.statusViews?.forbidden), status: 'forbidden' };
-    await this.renderPage(this.page);
-    this.notify();
+    const view = await this.resolveView(this.statusViews?.forbidden);
+    this.dropSlices(route);
+    await this.updatePage(route, { view, status: 'forbidden', titles: this.page.titles });
   }
 
   async updateTitle(route, value) {
@@ -1463,11 +1463,8 @@ export class Router {
       if (stale()) {
         return;
       }
-      // the route and the routes below it lose their slices, the shape a not-found cascade has
-      slices.splice(slices.indexOf(slice));
-      this.page = { ...this.page, view, status: 'notFound' };
-      await this.renderPage(this.page);
-      this.notify();
+      this.dropSlices(route);
+      await this.updatePage(route, { view, status: 'notFound', titles: this.page.titles });
       return;
     }
     const data = isPlainObject(resolved) ? await this.resolveDataSlice(resolved) : {};
@@ -1486,16 +1483,27 @@ export class Router {
     return true;
   }
 
+  // the route's slice and those below it leave the page, the shape a page refused or not found at
+  // the route has, and their layouts and slots leave with them when the page is re-read
+  dropSlices(route) {
+    const { slices } = this.page;
+    const index = slices.findIndex((slice) => slice.route === route);
+    if (index >= 0) {
+      slices.splice(index);
+    }
+  }
+
   // the page re-read from its slices, which several updates in one tick share, so none of them
-  // writes over another's. the moved route and the routes below it are told at the render moment,
-  // since data flows down
-  async updatePage(route) {
+  // writes over another's, with whatever else moved: a status swap brings its view and keeps the
+  // titles, which name the page refused or not found as they do at navigation. the moved route and
+  // the routes below it are told at the render moment, since data flows down
+  async updatePage(route, changes = {}) {
     const { slices, chain = [] } = this.page;
     const data = {};
     each(slices, (slice) => extend(data, slice.data));
-    const titles = slices.map((slice) => slice.title).filter((title) => title !== null);
+    const titles = changes.titles ?? slices.map((slice) => slice.title).filter((title) => title !== null);
     const rendering = this.batch(() => {
-      this.page = { ...this.page, data, title: titles.at(-1) ?? '', titles };
+      this.page = { ...this.page, ...changes, data, title: titles.at(-1) ?? '', titles };
       if (globalThis.document && this.page.title) {
         globalThis.document.title = this.page.title;
       }

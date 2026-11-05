@@ -195,10 +195,11 @@ export class Route {
     const { rendered } = this;
     const { layout, slots } = page.views?.find((entry) => entry.route === this) ?? {};
     const context = () => this.viewContext(page);
+    const framed = this.hasSlice(page);
     const layoutBefore = rendered.layout;
     rendered.layout = this.createOrUpdateView({
       prior: rendered.layout,
-      view: layout,
+      view: framed ? layout : null,
       placement: { parent: this.parentLayout(), slot: undefined },
       context,
     });
@@ -239,8 +240,9 @@ export class Route {
     const { slots = {} } = page.views?.find((entry) => entry.route === this) ?? {};
     const parent = this.rendered.layout ?? this.parentLayout();
     const context = () => this.viewContext(page);
+    const framed = this.hasSlice(page);
     each(names, (slot) => {
-      const view = this.slotDeclaredBelow(page.chain ?? [], slot) ? null : slots[slot];
+      const view = framed && !this.slotDeclaredBelow(page, slot) ? slots[slot] : null;
       this.rendered.slots[slot] = this.createOrUpdateView({
         prior: this.rendered.slots[slot],
         view,
@@ -250,9 +252,18 @@ export class Route {
     });
   }
 
-  // whether a route below this one in the chain declares the slot, an explicit empty included
-  slotDeclaredBelow(chain, slot) {
-    return chain.slice(chain.indexOf(this) + 1).some((other) => slot in other.slots);
+  // whether a route below this one on the page declares the slot, an explicit empty included; a
+  // route that frames nothing on the page declares nothing
+  slotDeclaredBelow(page, slot) {
+    const chain = page?.chain ?? [];
+    return chain.slice(chain.indexOf(this) + 1).some((other) => other.hasSlice(page) && slot in other.slots);
+  }
+
+  // a route frames the page, its layout and its slots, while it holds a slice on it: on a page
+  // refused or not found at a route, that route and the routes below it hold none, so the status
+  // view stands in the nearest layout above that has what it read
+  hasSlice(page) {
+    return (page?.slices ?? []).some((slice) => slice.route === this);
   }
 
   // prior is the rendered view as it stands, context a thunk built only for a view that is created or told
