@@ -173,8 +173,12 @@ export class Route {
     this.abortController?.abort('Route destroyed');
   }
 
-  // told which slots, only those are rendered again: an override below entered or left
+  // told which slots, only those are rendered again: an override below entered or left. a route a
+  // layout's cascade above it already rendered for this page is not rendered a second time
   update(page, { slots } = {}) {
+    if (this.rendered.page === page) {
+      return;
+    }
     if (slots) {
       this.renderSlots(page, slots);
     }
@@ -191,18 +195,21 @@ export class Route {
     const { rendered } = this;
     const { layout, slots } = page.views?.find((entry) => entry.route === this) ?? {};
     const context = () => this.viewContext(page);
+    const framed = this.hasSlice(page);
     const layoutBefore = rendered.layout;
     rendered.layout = this.createOrUpdateView({
       prior: rendered.layout,
-      view: layout,
+      view: framed ? layout : null,
       placement: { parent: this.parentLayout(), slot: undefined },
       context,
     });
     if (layoutBefore !== undefined && rendered.layout !== layoutBefore) {
+      // the routes below that stand; one not yet active renders when it activates
       const chain = page.chain ?? [];
-      each([...chain.slice(chain.indexOf(this) + 1)].reverse(), (below) => below.destroyViews());
+      const below = chain.slice(chain.indexOf(this) + 1).filter((route) => route.active);
+      each([...below].reverse(), (route) => route.destroyViews());
       this.destroyViews({ keepLayout: true });
-      each(chain.slice(chain.indexOf(this) + 1), (below) => below.render(page));
+      each(below, (route) => route.render(page));
     }
     const parent = rendered.layout ?? this.parentLayout();
     this.renderSlots(page, Object.keys(slots ?? {}));
@@ -218,6 +225,11 @@ export class Route {
         context,
       });
     }
+    else if (rendered.view) {
+      // the chain grew below: no longer the leaf, the route's view leaves
+      this.router.destroyView({ rendered: rendered.view });
+      rendered.view = undefined;
+    }
     rendered.page = page;
   }
 
@@ -228,8 +240,9 @@ export class Route {
     const { slots = {} } = page.views?.find((entry) => entry.route === this) ?? {};
     const parent = this.rendered.layout ?? this.parentLayout();
     const context = () => this.viewContext(page);
+    const framed = this.hasSlice(page);
     each(names, (slot) => {
-      const view = this.slotDeclaredBelow(page.chain ?? [], slot) ? null : slots[slot];
+      const view = framed && !this.slotDeclaredBelow(page, slot) ? slots[slot] : null;
       this.rendered.slots[slot] = this.createOrUpdateView({
         prior: this.rendered.slots[slot],
         view,
@@ -239,9 +252,18 @@ export class Route {
     });
   }
 
-  // whether a route below this one in the chain declares the slot, an explicit empty included
-  slotDeclaredBelow(chain, slot) {
-    return chain.slice(chain.indexOf(this) + 1).some((other) => slot in other.slots);
+  // whether a route below this one on the page declares the slot, an explicit empty included; a
+  // route that frames nothing on the page declares nothing
+  slotDeclaredBelow(page, slot) {
+    const chain = page?.chain ?? [];
+    return chain.slice(chain.indexOf(this) + 1).some((other) => other.hasSlice(page) && slot in other.slots);
+  }
+
+  // a route frames the page, its layout and its slots, while it holds a slice on it: on a page
+  // refused or not found at a route, that route and the routes below it hold none, so the status
+  // view stands in the nearest layout above that has what it read
+  hasSlice(page) {
+    return (page?.slices ?? []).some((slice) => slice.route === this);
   }
 
   // prior is the rendered view as it stands, context a thunk built only for a view that is created or told
@@ -257,15 +279,19 @@ export class Route {
       : this.router.createView({ view, placement, context: context() });
   }
 
-  // view first, layout last; the layout stays when what hung inside it is to come back
+  // view first, layout last; the layout stays when what hung inside it is to come back. the record
+  // is reset in place, since a render in progress holds it
   destroyViews({ keepLayout = false } = {}) {
-    const { layout, slots, view } = this.rendered ?? {};
-    each([view, ...Object.values(slots ?? {}), keepLayout ? null : layout], (rendered) => {
+    if (!this.rendered) {
+      return;
+    }
+    const { layout, slots, view } = this.rendered;
+    each([view, ...Object.values(slots), keepLayout ? null : layout], (rendered) => {
       if (rendered) {
         this.router.destroyView({ rendered });
       }
     });
-    this.rendered = { ...this.rendered, slots: {}, view: undefined, layout: keepLayout ? layout : undefined };
+    Object.assign(this.rendered, { page: null, slots: {}, view: undefined, layout: keepLayout ? layout : undefined });
   }
 
   // the nearest rendered layout above this route, or null for the mount

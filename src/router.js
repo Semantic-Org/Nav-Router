@@ -143,18 +143,6 @@ export class Router {
       ?? (this.base || '/');
 
     const matched = this.match(initialUrl);
-    if (!matched) {
-      const [view, views] = await Promise.all([
-        this.resolveView(this.statusViews?.notFound),
-        this.resolveRouteViews([this.root]),
-      ]);
-      this.page = { view, views, chain: [this.root], status: 'notFound', url: initialUrl };
-      this.settleRoutes(null, this.page);
-      await this.renderPage(this.page);
-      this.notify();
-      return this;
-    }
-
     this.commitRoute(matched);
     this.activeAbort?.abort();
     const controller = new AbortController();
@@ -167,9 +155,14 @@ export class Router {
       destination: { key: null },
       signal: controller.signal,
     };
-    this.setPending(matched, event.navigationType);
     try {
-      await this.afterCommit(this.begin(matched, event), event, false);
+      if (matched) {
+        this.setPending(matched, event.navigationType);
+        await this.afterCommit(this.begin(matched, event), event, false);
+      }
+      else {
+        await this.landNotFound(initialUrl, event);
+      }
     }
     catch (error) {
       if (!controller.signal.aborted) {
@@ -181,6 +174,34 @@ export class Router {
       this.notify();
     }
     return this;
+  }
+
+  // no route for the url: the root runs its slice as the routes above a refusal do, the user read
+  // first, so a root with data frames the cold not-found with what it reads
+  async landNotFound(url, event) {
+    const navigation = { signal: event.signal, reload: false, previous: null };
+    await this.resolveIdentity(navigation);
+    const [view, views, { slices }] = await Promise.all([
+      this.resolveView(this.statusViews?.notFound),
+      this.resolveRouteViews([this.root]),
+      this.runSlices([this.root], { params: {}, query: {} }, navigation),
+    ]);
+    const titles = slices.map((slice) => slice.title).filter((title) => title !== null);
+    const page = {
+      view,
+      views,
+      chain: [this.root],
+      slices,
+      status: 'notFound',
+      url,
+      title: titles.at(-1) ?? '',
+      titles,
+    };
+    await this.batch(() => {
+      this.page = page;
+      this.settleRoutes(null, page);
+      return this.renderPage(page);
+    });
   }
 
   stop() {
@@ -690,23 +711,33 @@ export class Router {
       this.navigator.deferNavigate(this.href(this.errorRoute), { history: 'replace' });
     }
     else if (committed) {
+      const previous = this.page;
       const view = await this.resolveView(this.statusViews?.error).catch(() => null);
       if (!view) {
         this.logError(error);
       }
-      // the routes on screen stay active under the error page, so the chain carries over
-      this.page = {
-        ...(pending ? this.pageFor(pending) : (this.page ?? {})),
-        chain: this.page?.chain ?? [this.root],
-        slices: this.page?.slices ?? [],
-        views: this.page?.views ?? [],
-        view,
-        status: 'error',
-        error,
-      };
-      // a cold error, nothing yet shown, is the root's to show
-      this.settleRoutes(pending ? this.page : null, this.page);
-      this.renderPage(this.page).catch(noop);
+      // the routes on screen stay active under the error page, so the chain carries over. a cold
+      // error, nothing yet shown, is the root's to show: framed by its layout when the root has no
+      // data of its own, since the data that failed may be the root's, and bare at the mount otherwise
+      const views = previous?.views ?? await this.resolveRouteViews([this.root]).catch(() => []);
+      // a newer navigation began or landed while the views loaded: the error page is not this one's
+      // to write. a navigation that failed is finished, so its signal says nothing of what came after
+      if (this.pending || this.page !== previous) {
+        return;
+      }
+      await this.batch(() => {
+        this.page = {
+          ...(pending ? this.pageFor(pending) : (previous ?? {})),
+          chain: previous?.chain ?? [this.root],
+          slices: previous?.slices ?? (this.root.data === undefined ? [this.sliceOf(this.root, {})] : []),
+          views,
+          view,
+          status: 'error',
+          error,
+        };
+        this.settleRoutes(previous, this.page);
+        return this.renderPage(this.page);
+      }).catch(noop);
     }
     else {
       this.logError(error);
@@ -825,6 +856,7 @@ export class Router {
     const delayMs = toDuration(this.loadingDelay) ?? 0;
     const minMs = toDuration(this.loadingMin) ?? 0;
     let loadingShownAt = null;
+    let coldLoading = null;
 
     if (!active.settled) {
       if (delayMs > 0) {
@@ -841,14 +873,26 @@ export class Router {
         if (this.statusViews?.loading) {
           const loadingView = await this.resolveView(this.statusViews.loading);
           if (!active.settled && !event.signal.aborted) {
-            // page stays the settled page: a loading view is rendered over it, pending.loading says so
+            // page stays the settled page: a loading view is rendered over it with its slices, so a
+            // leaf's own slots re-render against what stands, and pending.loading says so. on a cold
+            // boot nothing stands to render it inside, so it is made at the mount and leaves before
+            // the page lands, or with the navigation
             const loading = {
               ...this.pageFor(matched),
               views: this.page?.views ?? [],
               chain: this.page?.chain ?? [],
+              slices: this.page?.slices ?? [],
+              data: this.page?.data ?? {},
               view: loadingView,
               status: 'loading',
             };
+            if (!this.page) {
+              coldLoading = this.createView({
+                view: loadingView,
+                placement: { parent: null, slot: undefined },
+                context: this.root.viewContext(loading),
+              });
+            }
             await this.renderPage(loading, event);
           }
         }
@@ -856,36 +900,47 @@ export class Router {
       }
     }
 
-    const resolved = await active.ready;
-    if (event.signal.aborted) {
-      return;
-    }
-
-    if (resolved?.status === 'redirect' && resolved.redirect) {
-      if (!precommitRan) {
-        // no precommit on this browser: the refused url has shown, its slot becomes the redirect target,
-        // a task later so this handler is not aborted by its own replacement
-        this.navigator.deferNavigate(resolved.redirect, {
-          history: 'replace',
-        });
-      }
-      return;
-    }
-
-    if (loadingShownAt !== null && minMs > 0) {
-      const elapsed = Date.now() - loadingShownAt;
-      if (elapsed < minMs) {
-        await wait(minMs - elapsed, {
-          abortController: event.signal,
-          rejectOnAbort: false,
-        });
-      }
+    try {
+      const resolved = await active.ready;
       if (event.signal.aborted) {
         return;
       }
-    }
 
-    await this.applyCascade(matched, resolved, event);
+      if (resolved?.status === 'redirect' && resolved.redirect) {
+        if (!precommitRan) {
+          // no precommit on this browser: the refused url has shown, its slot becomes the redirect target,
+          // a task later so this handler is not aborted by its own replacement
+          this.navigator.deferNavigate(resolved.redirect, {
+            history: 'replace',
+          });
+        }
+        return;
+      }
+
+      if (loadingShownAt !== null && minMs > 0) {
+        const elapsed = Date.now() - loadingShownAt;
+        if (elapsed < minMs) {
+          await wait(minMs - elapsed, {
+            abortController: event.signal,
+            rejectOnAbort: false,
+          });
+        }
+        if (event.signal.aborted) {
+          return;
+        }
+      }
+
+      if (coldLoading) {
+        this.destroyView({ rendered: coldLoading });
+        coldLoading = null;
+      }
+      await this.applyCascade(matched, resolved, event);
+    }
+    finally {
+      if (coldLoading) {
+        this.destroyView({ rendered: coldLoading });
+      }
+    }
   }
 
   /*******************************
@@ -1291,10 +1346,14 @@ export class Router {
         route.update(page);
         this.onRouteUpdated(route, this.lifecycleContext(route, page, previous));
       }
+      else if ((before.at(-1) === route) !== (after.at(-1) === route)) {
+        // a kept route at the chain's end shows the page's view, and gives it up when the chain grows
+        route.update(page);
+      }
       else {
         // a kept route renders a slot again when a route below it took that slot or gave it back
         const crossed = Object.keys(route.slots).filter((slot) =>
-          route.slotDeclaredBelow(before, slot) !== route.slotDeclaredBelow(after, slot)
+          route.slotDeclaredBelow(previous, slot) !== route.slotDeclaredBelow(page, slot)
         );
         if (crossed.length) {
           route.update(page, { slots: crossed });
@@ -1346,10 +1405,17 @@ export class Router {
   }
 
   async permissionChanged(route, allowed) {
-    if (!inArray(route, this.page?.chain ?? [])) {
+    const chain = this.page?.chain ?? [];
+    // a navigation meanwhile brings its own chain, and the page it left is not this answer's to change
+    const stale = () => this.page?.chain !== chain;
+    if (!inArray(route, chain)) {
       return;
     }
-    if (await allowed) {
+    const result = await allowed;
+    if (stale()) {
+      return;
+    }
+    if (result) {
       // a forbidden page whose guard now allows enters the route, as a fresh navigation would
       if (this.page.status === 'forbidden') {
         this.navigator.reload();
@@ -1362,9 +1428,12 @@ export class Router {
       });
       return;
     }
-    this.page = { ...this.page, view: await this.resolveView(this.statusViews?.forbidden), status: 'forbidden' };
-    await this.renderPage(this.page);
-    this.notify();
+    const view = await this.resolveView(this.statusViews?.forbidden);
+    if (stale()) {
+      return;
+    }
+    this.dropSlices(route);
+    await this.updatePage(route, { view, status: 'forbidden', titles: this.page.titles });
   }
 
   async updateTitle(route, value) {
@@ -1418,11 +1487,8 @@ export class Router {
       if (stale()) {
         return;
       }
-      // the route and the routes below it lose their slices, the shape a not-found cascade has
-      slices.splice(slices.indexOf(slice));
-      this.page = { ...this.page, view, status: 'notFound' };
-      await this.renderPage(this.page);
-      this.notify();
+      this.dropSlices(route);
+      await this.updatePage(route, { view, status: 'notFound', titles: this.page.titles });
       return;
     }
     const data = isPlainObject(resolved) ? await this.resolveDataSlice(resolved) : {};
@@ -1441,16 +1507,27 @@ export class Router {
     return true;
   }
 
+  // the route's slice and those below it leave the page, the shape a page refused or not found at
+  // the route has, and their layouts and slots leave with them when the page is re-read
+  dropSlices(route) {
+    const { slices } = this.page;
+    const index = slices.findIndex((slice) => slice.route === route);
+    if (index >= 0) {
+      slices.splice(index);
+    }
+  }
+
   // the page re-read from its slices, which several updates in one tick share, so none of them
-  // writes over another's. the moved route and the routes below it are told at the render moment,
-  // since data flows down
-  async updatePage(route) {
+  // writes over another's, with whatever else moved: a status swap brings its view and keeps the
+  // titles, which name the page refused or not found as they do at navigation. the moved route and
+  // the routes below it are told at the render moment, since data flows down
+  async updatePage(route, changes = {}) {
     const { slices, chain = [] } = this.page;
     const data = {};
     each(slices, (slice) => extend(data, slice.data));
-    const titles = slices.map((slice) => slice.title).filter((title) => title !== null);
+    const titles = changes.titles ?? slices.map((slice) => slice.title).filter((title) => title !== null);
     const rendering = this.batch(() => {
-      this.page = { ...this.page, data, title: titles.at(-1) ?? '', titles };
+      this.page = { ...this.page, ...changes, data, title: titles.at(-1) ?? '', titles };
       if (globalThis.document && this.page.title) {
         globalThis.document.title = this.page.title;
       }
