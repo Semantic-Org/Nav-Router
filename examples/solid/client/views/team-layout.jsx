@@ -1,12 +1,16 @@
-import { isHere, orgs } from '../store.js';
+import { href, isCurrent } from 'nav-router';
+
+import { orgs } from '../store.js';
 
 export const TeamLayout = (props) => {
-  const base = () => `/team/${props.params.org}`;
-  const Tab = (tab) => (
-    <a href={base() + tab.path} class='tab' aria-current={isHere(base() + tab.path) ? 'page' : undefined}>
-      {tab.children}
-    </a>
-  );
+  const Tab = (tab) => {
+    const args = () => ({ org: props.params.org, ...tab.args });
+    return (
+      <a href={href(tab.route, args())} class='tab' aria-current={isCurrent(tab.route, args()) ? 'page' : undefined}>
+        {tab.children}
+      </a>
+    );
+  };
   return (
     <div class='team' data-org={props.params.org}>
       <div class='team-head'>
@@ -14,12 +18,12 @@ export const TeamLayout = (props) => {
           {orgs[props.params.org]?.name ?? props.params.org} <small>{orgs[props.params.org]?.region ?? ''}</small>
         </h2>
         <nav class='tabs' aria-label='Team'>
-          <Tab path=''>Overview</Tab>
-          <Tab path='/members'>Members</Tab>
-          <Tab path='/activity'>Activity</Tab>
-          <Tab path='/analytics'>Analytics</Tab>
-          <Tab path='/settings'>Settings</Tab>
-          <Tab path='/print'>Print</Tab>
+          <Tab route='team' args={{ tab: 'overview' }}>Overview</Tab>
+          <Tab route='team' args={{ tab: 'members' }}>Members</Tab>
+          <Tab route='team' args={{ tab: 'activity' }}>Activity</Tab>
+          <Tab route='analytics'>Analytics</Tab>
+          <Tab route='settings'>Settings</Tab>
+          <Tab route='print'>Print</Tab>
         </nav>
       </div>
       <div class='team-body'>

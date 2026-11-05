@@ -1,7 +1,15 @@
-import { isHere, signIn, user } from '../store.js';
+import { href, isActive, isCurrent } from 'nav-router';
 
+import { signIn, user } from '../store.js';
+
+// a link by route name: href builds it, and isActive or isCurrent reads the router's current page,
+// a cell under the scaffold, so aria-current follows every navigation with nothing wired
 const Link = (props) => (
-  <a href={props.href} class='nav-link' aria-current={isHere(props.href, { under: props.under }) ? 'page' : undefined}>
+  <a
+    href={href(props.route, props.args)}
+    class='nav-link'
+    aria-current={(props.under ? isActive : isCurrent)(props.route, props.args) ? 'page' : undefined}
+  >
     {props.children}
   </a>
 );
@@ -12,12 +20,12 @@ export const RootLayout = () => (
       <a href='/' class='brand'>Acme Console</a>
       <slot name='breadcrumbs'></slot>
       <nav class='links' aria-label='Primary'>
-        <Link href='/'>Overview</Link>
-        <Link href='/team/acme' under>Acme</Link>
-        <Link href='/team/globex' under>Globex</Link>
-        <Link href='/team/acme/analytics'>Analytics</Link>
-        <Link href='/team/acme/settings'>Settings</Link>
-        <Link href='/old-docs'>Old docs</Link>
+        <Link route='home'>Overview</Link>
+        <Link route='team' args={{ org: 'acme' }} under>Acme</Link>
+        <Link route='team' args={{ org: 'globex' }} under>Globex</Link>
+        <Link route='analytics' args={{ org: 'acme' }}>Analytics</Link>
+        <Link route='settings' args={{ org: 'acme' }}>Settings</Link>
+        <Link route='legacyDocs'>Old docs</Link>
       </nav>
       <div class='who'>
         <span class='badge' data-role={user()?.role ?? 'none'}>

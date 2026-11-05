@@ -55,15 +55,3 @@ export const addMember = (org) => {
     (list) => [...list, { id: `new${count}`, org, name: `New Member ${count}`, role: 'Trial', access: 'member' }],
   );
 };
-
-// the page as the router last announced it, for the chrome
-export const [page, setPage] = createSignal(null);
-
-export const isHere = (pathname, { under = false } = {}) => {
-  const current = page();
-  if (!current?.url) {
-    return false;
-  }
-  const here = new URL(current.url, location.origin).pathname;
-  return here === pathname || (under && pathname !== '/' && here.startsWith(`${pathname}/`));
-};

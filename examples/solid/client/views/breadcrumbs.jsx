@@ -1,3 +1,4 @@
-import { page } from '../store.js';
-
-export const Breadcrumbs = () => <nav class='crumbs' aria-label='Breadcrumb'>{(page()?.titles ?? []).join(' / ')}</nav>;
+// the page is the router's own cell under the scaffold, so a slot the root declares stays current
+export const Breadcrumbs = (props) => (
+  <nav class='crumbs' aria-label='Breadcrumb'>{(props.page.titles ?? []).join(' / ')}</nav>
+);
