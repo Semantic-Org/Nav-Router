@@ -102,25 +102,15 @@ export class ReactiveRouter extends Router {
 
   // identity as a function runs for the router's life, so the user moves on the standing page as it
   // does at a navigation, and a guard that read it lands where the navigation's own answer would.
-  // its latest answer is the one a navigation awaits, so identity is asked once for a boot and not
-  // again beside the reaction, and an older answer arriving after a newer one lands nothing
+  // a navigation takes the reaction's answer while no navigation has, the boot's among them, and
+  // asks again otherwise, once per navigation as core does: an identity reading nothing reactive,
+  // a cookie or a fetch, still moves with the page
   async start() {
     if (isFunction(this.identity)) {
       this.lifetime = new AbortController();
       this.identityRun = this.createReaction(() => {
-        const answer = Promise.resolve(this.identity({ signal: this.lifetime.signal, reload: false, previous: null }))
-          .then((user) => {
-            if (this.identityAnswer === answer && !this.lifetime.signal.aborted) {
-              this.user = user ?? null;
-            }
-          });
-        this.identityAnswer = answer;
-        // a failed answer is dropped: the navigation that awaited it fails with it, the next asks again
-        answer.catch(() => {
-          if (this.identityAnswer === answer) {
-            this.identityAnswer = null;
-          }
-        });
+        this.identityFresh = true;
+        this.askIdentity({ signal: this.lifetime.signal, reload: false, previous: null });
       });
     }
     return super.start();
@@ -134,9 +124,31 @@ export class ReactiveRouter extends Router {
     return super.stop();
   }
 
-  // a navigation awaits the reaction's latest answer; a reload asks identity again, as core does
   resolveIdentity(navigation) {
-    return this.identityAnswer && !navigation.reload ? this.identityAnswer : super.resolveIdentity(navigation);
+    if (!this.identityRun) {
+      return super.resolveIdentity(navigation);
+    }
+    const fresh = this.identityFresh && this.identityAnswer;
+    this.identityFresh = false;
+    return fresh || this.askIdentity(navigation);
+  }
+
+  // the answer lands only while it is still the latest and the lifetime stands, so a slower older
+  // answer never lands over a newer one; a failed answer is dropped, so the navigation that awaited
+  // it fails with it and the next asks again
+  askIdentity(context) {
+    const answer = Promise.resolve(this.identity(context)).then((user) => {
+      if (this.identityAnswer === answer && !this.lifetime.signal.aborted) {
+        this.user = user ?? null;
+      }
+    });
+    this.identityAnswer = answer;
+    answer.catch(() => {
+      if (this.identityAnswer === answer) {
+        this.identityAnswer = null;
+      }
+    });
+    return answer;
   }
 
   /*******************************
