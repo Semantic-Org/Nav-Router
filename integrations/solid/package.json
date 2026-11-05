@@ -10,6 +10,7 @@
     ".": "./index.js"
   },
   "peerDependencies": {
+    "@semantic-ui/utils": "*",
     "nav-router": "*",
     "solid-js": ">=1.9"
   }
