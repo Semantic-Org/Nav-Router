@@ -101,20 +101,26 @@ export class ReactiveRouter extends Router {
   *******************************/
 
   // identity as a function runs for the router's life, so the user moves on the standing page as it
-  // does at a navigation, and a guard that read it lands where the navigation's own answer would
+  // does at a navigation, and a guard that read it lands where the navigation's own answer would.
+  // its latest answer is the one a navigation awaits, so identity is asked once for a boot and not
+  // again beside the reaction, and an older answer arriving after a newer one lands nothing
   async start() {
     if (isFunction(this.identity)) {
       this.lifetime = new AbortController();
       this.identityRun = this.createReaction(() => {
-        const answer = this.identity({ signal: this.lifetime.signal, reload: false, previous: null });
-        if (isPromise(answer)) {
-          answer.then((user) => {
-            this.user = user ?? null;
+        const answer = Promise.resolve(this.identity({ signal: this.lifetime.signal, reload: false, previous: null }))
+          .then((user) => {
+            if (this.identityAnswer === answer && !this.lifetime.signal.aborted) {
+              this.user = user ?? null;
+            }
           });
-        }
-        else {
-          this.user = answer ?? null;
-        }
+        this.identityAnswer = answer;
+        // a failed answer is dropped: the navigation that awaited it fails with it, the next asks again
+        answer.catch(() => {
+          if (this.identityAnswer === answer) {
+            this.identityAnswer = null;
+          }
+        });
       });
     }
     return super.start();
@@ -123,8 +129,14 @@ export class ReactiveRouter extends Router {
   stop() {
     this.identityRun?.();
     this.identityRun = null;
+    this.identityAnswer = null;
     this.lifetime?.abort();
     return super.stop();
+  }
+
+  // a navigation awaits the reaction's latest answer; a reload asks identity again, as core does
+  resolveIdentity(navigation) {
+    return this.identityAnswer && !navigation.reload ? this.identityAnswer : super.resolveIdentity(navigation);
   }
 
   /*******************************
