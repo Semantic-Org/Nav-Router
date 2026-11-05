@@ -312,14 +312,14 @@ export class ReactiveRouter extends Router {
     let born = null;
     // what the hook sees of the user is live, a getter on its own bag, so a guard that read it runs
     // again when the user moves and a hook that did not read it is left alone
-    const bagFor = (extra) => {
+    const hookContext = (extra) => {
       const bag = { ...context, data: this.dataFor(slices), ...extra };
       Object.defineProperty(bag, 'user', { get: () => this.user, enumerable: true });
       return bag;
     };
     const stop = this.createReaction((isFirst) => {
       if (isFirst) {
-        first = fn(bagFor({}));
+        first = fn(hookContext({}));
         return;
       }
       const unadopted = born && !born.adopted;
@@ -328,7 +328,7 @@ export class ReactiveRouter extends Router {
       // run that throws is a rejected answer, landed as one
       let value;
       try {
-        value = fn(bagFor({ signal: unadopted ? signal : route.abortSignal }));
+        value = fn(hookContext({ signal: unadopted ? signal : route.abortSignal }));
       }
       catch (error) {
         value = Promise.reject(error);
