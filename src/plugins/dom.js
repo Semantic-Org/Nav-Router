@@ -117,6 +117,14 @@ export default ({ mount: defaultMount = 'body' } = {}, Router) => {
 
   const empty = (region) => each(contents(region), (node) => node.remove());
 
+  // the region leaves whole, and the slot's fallback comes back once it is empty
+  const remove = (region) => {
+    empty(region);
+    region.start.remove();
+    region.end.remove();
+    closeSlot(region.target);
+  };
+
   // a shadow host projects by the slot attribute, carried by the region's elements
   const stamp = (region, slot) => {
     if (region.target.shadowRoot) {
@@ -127,15 +135,22 @@ export default ({ mount: defaultMount = 'body' } = {}, Router) => {
     }
   };
 
-  // the region is the rendered value, carrying the dispose a mount returned and its update when it has one
+  // the region is the rendered value, carrying the dispose a mount returned and its update when it
+  // has one. a view that throws leaves nothing behind: the region goes and the slot shows its fallback
   proto.createView = function({ view, placement, context, mount }) {
     const region = openRegion(placement, this);
-    if (mount) {
-      const mounted = mount(region.target, region.end);
-      Object.assign(region, isFunction(mounted) ? { dispose: mounted } : mounted);
+    try {
+      if (mount) {
+        const mounted = mount(region.target, region.end);
+        Object.assign(region, isFunction(mounted) ? { dispose: mounted } : mounted);
+      }
+      else {
+        fill(region, renderOf(view, context));
+      }
     }
-    else {
-      fill(region, renderOf(view, context));
+    catch (error) {
+      remove(region);
+      throw error;
     }
     stamp(region, placement.slot);
     return region;
@@ -185,9 +200,6 @@ export default ({ mount: defaultMount = 'body' } = {}, Router) => {
 
   proto.destroyView = function({ rendered }) {
     rendered.dispose?.();
-    empty(rendered);
-    rendered.start.remove();
-    rendered.end.remove();
-    closeSlot(rendered.target);
+    remove(rendered);
   };
 };

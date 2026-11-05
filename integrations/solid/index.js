@@ -65,7 +65,14 @@ export class SolidRouter extends ReactiveRouter {
     const mount = (target, anchor) => ({
       update,
       dispose: createRoot((end) => {
-        insert(target, createComponent(view, props), anchor);
+        try {
+          insert(target, createComponent(view, props), anchor);
+        }
+        catch (error) {
+          // a view that threw leaves the root by the throw, its cleanups unrun until it is ended
+          end();
+          throw error;
+        }
         return end;
       }),
     });
