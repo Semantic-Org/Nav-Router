@@ -1,6 +1,6 @@
 import { each, extend, inArray, isBoolean, isDate, isNumber, isPlainObject, isString } from '@semantic-ui/utils';
 
-import { IS_ROUTE, IS_ROUTER } from './internal-helpers/identity.js';
+import { IS_ROUTE } from './internal-helpers/identity.js';
 
 export class Route {
   // brand route
@@ -17,19 +17,15 @@ export class Route {
     slots: {},
   };
 
-  constructor(options = {}, parent = null) {
+  // the root is made by its router, with no parent; every route below takes the router from its parent
+  constructor(options = {}, parent = null, router = parent?.router ?? null) {
     const { index, routes, ...routeOptions } = options;
 
     this.parent = parent;
-    this.router = parent ? parent.router : (this[IS_ROUTER] ? this : null);
+    this.router = router;
     this.children = [];
     this.indexRoute = null;
     this.active = false;
-
-    if (this.router === this) {
-      this.routesByName ??= new Map();
-      this.leaves ??= [];
-    }
 
     extend(this, Route.defaults, routeOptions, {
       params: { ...Route.defaults.params, ...routeOptions.params },

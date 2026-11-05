@@ -16,7 +16,7 @@ export default (options, Router) => {
       });
       each(route.children, walk);
     };
-    walk(this);
+    walk(this.root);
     return pages;
   };
 };

@@ -26,7 +26,7 @@ import { Route } from './route.js';
 // what a data() returns through notFound(), at navigation or on the standing page
 const NOT_FOUND = Symbol('notFound');
 
-export class Router extends Route {
+export class Router {
   // brand router
   get [IS_ROUTER]() {
     return true;
@@ -59,21 +59,32 @@ export class Router extends Route {
     loadingMin: '500ms',
     restoreScroll: null,
     attachGlobal: 'router',
+    errorRoute: null,
+    user: null,
+    onRender: null,
+    onChange: null,
     // whether data recomputed outside a navigation moved: a deep compare, since a render costs more
     // than the walk. plain data asks it of the whole slice, and a reactive slice asks its cells instead
     dataChanged: (previous, next) => !isEqual(next, previous),
   };
 
+  // one bag: the keys the defaults declare are the router's settings, every other key is the root
+  // route's, so the router holds nothing of a route's and the root nothing of the router's
   constructor(options = {}) {
-    super(extend({}, new.target.defaults, options));
-
+    const settings = {};
+    const routeOptions = {};
+    each(options, (value, key) => {
+      (key in new.target.defaults ? settings : routeOptions)[key] = value;
+    });
     // the resolved settings in one place, for the console and for anything that introspects
-    this.config = extend({}, new.target.defaults, options);
+    this.config = extend({}, new.target.defaults, settings);
+    extend(this, this.config);
     this.base = this.normalizeBase(this.base);
-    this.statusViews = { ...new.target.defaults.statusViews, ...options.statusViews };
+    this.statusViews = { ...new.target.defaults.statusViews, ...settings.statusViews };
 
-    this.routesByName ??= new Map();
-    this.leaves ??= [];
+    this.routesByName = new Map();
+    this.leaves = [];
+    this.root = new Route(routeOptions, null, this);
 
     this.current = null;
     this.page = null;
@@ -86,6 +97,19 @@ export class Router extends Route {
     this.activeAbort = null;
 
     this.navigator = new Navigator(this);
+  }
+
+  // the tree is built on the root, through the router
+  index(options) {
+    return this.root.index(options);
+  }
+
+  section(options) {
+    return this.root.section(options);
+  }
+
+  route(options) {
+    return this.root.route(options);
   }
 
   normalizeBase(base) {
@@ -117,9 +141,9 @@ export class Router extends Route {
     if (!matched) {
       const [view, views] = await Promise.all([
         this.resolveView(this.statusViews?.notFound),
-        this.resolveRouteViews([this]),
+        this.resolveRouteViews([this.root]),
       ]);
-      this.page = { view, views, chain: [this], status: 'notFound', url: initialUrl };
+      this.page = { view, views, chain: [this.root], status: 'notFound', url: initialUrl };
       this.settleRoutes(null, this.page);
       await this.renderPage(this.page);
       this.notify();
@@ -468,6 +492,9 @@ export class Router extends Route {
 
   // a name, a Route, or nothing: a literal path has no route and keeps every arg as query
   routeFor(target) {
+    if (target === this) {
+      return this.root;
+    }
     if (target instanceof Route) {
       return target;
     }
@@ -565,7 +592,7 @@ export class Router extends Route {
     return this.navigator.reload(options);
   }
 
-  back(fallback = this.name, args = {}) {
+  back(fallback = this.root.name, args = {}) {
     return this.navigator.back(fallback ? this.href(fallback, args) : (this.base || '/'));
   }
 
@@ -661,7 +688,7 @@ export class Router extends Route {
       // the routes on screen stay active under the error page, so the chain carries over
       this.page = {
         ...(pending ? this.pageFor(pending) : (this.page ?? {})),
-        chain: this.page?.chain ?? [this],
+        chain: this.page?.chain ?? [this.root],
         slices: this.page?.slices ?? [],
         views: this.page?.views ?? [],
         view,
