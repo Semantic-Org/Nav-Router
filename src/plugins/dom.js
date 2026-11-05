@@ -8,81 +8,80 @@ import { isArray, isFunction, isString } from '@semantic-ui/utils';
 // a light child carrying the slot attribute and the host projects it. an update renders the view
 // again and swaps the element where it stood, keeping its id and the focus inside it, or tells an
 // element that has an update() of its own. the root's parent is the mount
-// the native reading of a placement, for an integration as much as for this plugin: the mount for
-// the root, the host itself when it projects, otherwise the slot of that name inside the parent's
-// rendered layout, the layout itself when it wrote none
-export const targetOf = ({ parent, slot }, mount = 'body') => {
-  if (!parent) {
-    return isString(mount) ? document.querySelector(mount) : mount;
-  }
-  if (parent.shadowRoot) {
-    return parent;
-  }
-  return parent.querySelector(slot ? `slot[name="${slot}"]` : 'slot:not([name])') ?? parent;
-};
-
-// one element: markup parses, a fragment's children or several nodes wrap in a div
-export const toElement = (result) => {
-  let nodes;
-  if (isString(result)) {
-    const template = document.createElement('template');
-    template.innerHTML = result.trim();
-    nodes = [...template.content.childNodes];
-  }
-  else if (result instanceof Node) {
-    nodes = result.nodeType === Node.DOCUMENT_FRAGMENT_NODE ? [...result.childNodes] : [result];
-  }
-  else if (isArray(result)) {
-    nodes = result;
-  }
-  else {
-    throw new Error(`dom: a view returned ${typeof result}, not markup or nodes`);
-  }
-  if (nodes.length === 1 && nodes[0].nodeType === Node.ELEMENT_NODE) {
-    return nodes[0];
-  }
-  const wrapper = document.createElement('div');
-  wrapper.append(...nodes);
-  return wrapper;
-};
-
-// puts an element where its placement says, among siblings; a light-dom slot keeps its own fallback
-// children aside while something fills it, and a projected element carries the slot attribute
-export const place = (element, placement, mount) => {
-  const target = targetOf(placement, mount);
-  if (placement.parent?.shadowRoot) {
-    if (placement.slot) {
-      element.setAttribute('slot', placement.slot);
-    }
-    else {
-      element.removeAttribute('slot');
-    }
-  }
-  if (target.tagName === 'SLOT' && !target.fallback) {
-    target.fallback = [...target.childNodes];
-    target.replaceChildren();
-  }
-  target.appendChild(element);
-};
-
-// takes an element out, and gives a slot its fallback back when nothing fills it any more
-export const remove = (element) => {
-  const target = element.parentNode;
-  element.remove();
-  if (target?.fallback && !target.childElementCount) {
-    target.append(...target.fallback);
-    delete target.fallback;
-  }
-};
-
 export default ({ mount = 'body' } = {}, Router) => {
   const proto = Router.prototype;
 
+  const mountElement = () => (isString(mount) ? document.querySelector(mount) : mount);
+
   const renderOf = (view, context) => toElement(isFunction(view) ? view(context) : view);
+
+  // one element: markup parses, a fragment's children or several nodes wrap in a div
+  const toElement = (result) => {
+    let nodes;
+    if (isString(result)) {
+      const template = document.createElement('template');
+      template.innerHTML = result.trim();
+      nodes = [...template.content.childNodes];
+    }
+    else if (result instanceof Node) {
+      nodes = result.nodeType === Node.DOCUMENT_FRAGMENT_NODE ? [...result.childNodes] : [result];
+    }
+    else if (isArray(result)) {
+      nodes = result;
+    }
+    else {
+      throw new Error(`dom: a view returned ${typeof result}, not markup or nodes`);
+    }
+    if (nodes.length === 1 && nodes[0].nodeType === Node.ELEMENT_NODE) {
+      return nodes[0];
+    }
+    const wrapper = document.createElement('div');
+    wrapper.append(...nodes);
+    return wrapper;
+  };
+
+  // where the placement lands: the mount for the root, the host itself when it projects, otherwise
+  // the slot of that name inside the parent's rendered layout, the layout itself when it wrote none
+  const targetOf = ({ parent, slot }) => {
+    if (!parent) {
+      return mountElement();
+    }
+    if (parent.shadowRoot) {
+      return parent;
+    }
+    return parent.querySelector(slot ? `slot[name="${slot}"]` : 'slot:not([name])') ?? parent;
+  };
+
+  const place = (element, placement) => {
+    const target = targetOf(placement);
+    if (placement.parent?.shadowRoot) {
+      if (placement.slot) {
+        element.setAttribute('slot', placement.slot);
+      }
+      else {
+        element.removeAttribute('slot');
+      }
+    }
+    // a light-dom slot keeps its own fallback children aside while something fills it
+    if (target.tagName === 'SLOT' && !target.fallback) {
+      target.fallback = [...target.childNodes];
+      target.replaceChildren();
+    }
+    target.appendChild(element);
+  };
+
+  const remove = (element) => {
+    const target = element.parentNode;
+    element.remove();
+    if (target?.fallback && !target.childElementCount) {
+      target.append(...target.fallback);
+      delete target.fallback;
+    }
+  };
 
   proto.createView = function({ view, placement, context }) {
     const element = renderOf(view, context);
-    place(element, placement, mount);
+    place(element, placement);
     return element;
   };
 
@@ -106,7 +105,7 @@ export default ({ mount = 'body' } = {}, Router) => {
       rendered.replaceWith(next);
     }
     else {
-      place(next, placement, mount);
+      place(next, placement);
     }
     // the same control by id takes the focus back, with its selection where it was
     const again = focused?.id && next.querySelector(`#${CSS.escape(focused.id)}`);
