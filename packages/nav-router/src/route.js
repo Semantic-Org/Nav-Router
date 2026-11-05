@@ -292,7 +292,7 @@ export class Route {
         this.router.destroyView({ rendered });
       }
     });
-    Object.assign(this.rendered, { page: null, slots: {}, view: undefined, layout: keepLayout ? layout : undefined });
+    extend(this.rendered, { page: null, slots: {}, view: undefined, layout: keepLayout ? layout : undefined });
   }
 
   // the nearest rendered layout above this route, or null for the mount
