@@ -46,7 +46,7 @@ export default ({ mount: defaultMount = 'body' } = {}, Router) => {
   // what stands between a region's anchors, the view's own
   const contents = ({ start, end }) => {
     const nodes = [];
-    for (let node = start.nextSibling; node !== end; node = node.nextSibling) {
+    for (let node = start.nextSibling; node && node !== end; node = node.nextSibling) {
       nodes.push(node);
     }
     return nodes;
