@@ -224,6 +224,11 @@ export class Route {
         context,
       });
     }
+    else if (rendered.view) {
+      // the chain grew below: no longer the leaf, the route's view leaves
+      this.router.destroyView({ rendered: rendered.view });
+      rendered.view = undefined;
+    }
     rendered.page = page;
   }
 

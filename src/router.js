@@ -1332,6 +1332,10 @@ export class Router {
         route.update(page);
         this.onRouteUpdated(route, this.lifecycleContext(route, page, previous));
       }
+      else if ((before.at(-1) === route) !== (after.at(-1) === route)) {
+        // a kept route at the chain's end shows the page's view, and gives it up when the chain grows
+        route.update(page);
+      }
       else {
         // a kept route renders a slot again when a route below it took that slot or gave it back
         const crossed = Object.keys(route.slots).filter((slot) =>
