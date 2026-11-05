@@ -10,4 +10,9 @@ export default defineConfig({
   resolve: {
     preserveSymlinks: true,
   },
+  // the router and the integration are links into the repo, served from source rather than
+  // pre-bundled, so a change in src shows on the next load
+  optimizeDeps: {
+    exclude: ['nav-router', '@nav-router/solid'],
+  },
 });
