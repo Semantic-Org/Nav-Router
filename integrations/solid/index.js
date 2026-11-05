@@ -28,11 +28,18 @@ export class SolidRouter extends ReactiveRouter {
     createRoot((end) => {
       dispose = end;
       let first = true;
-      createComputed(() => {
-        const isFirst = first;
-        first = false;
-        fn(isFirst);
-      });
+      try {
+        createComputed(() => {
+          const isFirst = first;
+          first = false;
+          fn(isFirst);
+        });
+      }
+      catch (error) {
+        // a first run that threw leaves the root by the throw, its cleanups unrun until it is ended
+        end();
+        throw error;
+      }
     });
     return () => {
       dispose?.();
