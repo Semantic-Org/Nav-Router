@@ -117,24 +117,6 @@ export class ReactiveRouter extends Router {
     return super.stop();
   }
 
-  // what a hook sees of the user is live: a guard that read it runs again when the user moves
-  contextFor(route, matched, options) {
-    const context = super.contextFor(route, matched, options);
-    Object.defineProperty(context, 'user', { get: () => this.user, enumerable: true });
-    return context;
-  }
-
-  // the page's write, its settle and its render are one moment to a reader: inside a batch a view
-  // sees the page and the chain move together, and a leaving view, disposed before the batch flushes,
-  // never runs against the next page's keys
-  applyCascade(matched, resolved, event = null) {
-    return this.batch(() => super.applyCascade(matched, resolved, event));
-  }
-
-  updatePage(route) {
-    return this.batch(() => super.updatePage(route));
-  }
-
   /*******************************
             Provider
   *******************************/
@@ -276,16 +258,22 @@ export class ReactiveRouter extends Router {
     const { signal, slices } = context;
     let first;
     let born = null;
+    // what the hook sees of the user is live, a getter on its own bag, so a guard that read it runs
+    // again when the user moves and a hook that did not read it is left alone
+    const bagFor = (extra) => {
+      const bag = { ...context, data: this.dataFor(slices), ...extra };
+      Object.defineProperty(bag, 'user', { get: () => this.user, enumerable: true });
+      return bag;
+    };
     const stop = this.createReaction((isFirst) => {
-      const data = this.dataFor(slices);
       if (isFirst) {
-        first = fn({ ...context, data });
+        first = fn(bagFor({}));
         return;
       }
       const unadopted = born && !born.adopted;
       // a run born for a navigation in flight runs under that navigation's signal and lands nothing on
       // the standing page, whose route may be the same one: its latest value waits for adopt
-      const value = fn({ ...context, data, signal: unadopted ? signal : route.abortSignal });
+      const value = fn(bagFor({ signal: unadopted ? signal : route.abortSignal }));
       if (unadopted) {
         if (isPromise(value)) {
           value.catch(noop);

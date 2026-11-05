@@ -1211,18 +1211,26 @@ export class Router {
     }
     const { key } = this.getEntrySnapshot();
     const previous = this.page;
-    this.page = { ...this.pageFor(matched), ...resolved, chain: matched.chain, key, user: this.user };
-    this.settleRoutes(previous, this.page);
-
-    if (key && resolved.status === 'ok') {
-      this.entryCache?.set(key, { resolved, user: this.user });
-    }
-    if (globalThis.document && resolved.title) {
-      globalThis.document.title = resolved.title;
-    }
-
-    await this.renderPage(this.page, event);
+    // the page's write, its settle and its render are one moment to anything watching
+    const rendering = this.batch(() => {
+      this.page = { ...this.pageFor(matched), ...resolved, chain: matched.chain, key, user: this.user };
+      this.settleRoutes(previous, this.page);
+      if (key && resolved.status === 'ok') {
+        this.entryCache?.set(key, { resolved, user: this.user });
+      }
+      if (globalThis.document && resolved.title) {
+        globalThis.document.title = resolved.title;
+      }
+      return this.renderPage(this.page, event);
+    });
+    await rendering;
     this.notify();
+  }
+
+  // writes that belong together, one moment to anything watching: nothing here, where nothing
+  // watches, and the reactive scaffold's provider holds its notifications to the end
+  batch(fn) {
+    return fn();
   }
 
   pageFor({ route, url, params, query }) {
@@ -1423,12 +1431,15 @@ export class Router {
     const data = {};
     each(slices, (slice) => extend(data, slice.data));
     const titles = slices.map((slice) => slice.title).filter((title) => title !== null);
-    this.page = { ...this.page, data, title: titles.at(-1) ?? '', titles };
-    if (globalThis.document && this.page.title) {
-      globalThis.document.title = this.page.title;
-    }
-    each(chain.slice(chain.indexOf(route)), (moved) => moved.update(this.page));
-    await this.renderPage(this.page);
+    const rendering = this.batch(() => {
+      this.page = { ...this.page, data, title: titles.at(-1) ?? '', titles };
+      if (globalThis.document && this.page.title) {
+        globalThis.document.title = this.page.title;
+      }
+      each(chain.slice(chain.indexOf(route)), (moved) => moved.update(this.page));
+      return this.renderPage(this.page);
+    });
+    await rendering;
     this.notify();
   }
 
