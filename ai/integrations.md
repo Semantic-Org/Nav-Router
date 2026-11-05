@@ -16,11 +16,11 @@ If this page and the code are not enough to build on, the seam is wrong and not 
 
 | layer | holds | file |
 |---|---|---|
-| `Router` | the platform, the page, the cascade (guards, data, titles), the route lifecycle, the settings. Nothing of a route's, nothing of a view's. `router.root` is the root route | `src/router.js` |
-| `Route` | its data slice, its active life (an abort signal), its reactive runs, and what it shows under `rendered` | `src/route.js` |
-| a plugin | nothing. `Router.extend(plugin, options)` calls `plugin(options, Router, Navigator)` once; a plugin wraps a moment on a prototype and calls through | `src/plugins/*` |
-| the dom plugin | the native how for the three seams. The reference implementation of this page | `src/plugins/dom.js` |
-| `ReactiveRouter` | the scaffold a reactive integration extends: the five primitives, slices as per-key stores, hooks in reactions | `src/reactive-router.js` |
+| `Router` | the platform, the page, the cascade (guards, data, titles), the route lifecycle, the settings. Nothing of a route's, nothing of a view's. `router.root` is the root route | `packages/nav-router/src/router.js` |
+| `Route` | its data slice, its active life (an abort signal), its reactive runs, and what it shows under `rendered` | `packages/nav-router/src/route.js` |
+| a plugin | nothing. `Router.extend(plugin, options)` calls `plugin(options, Router, Navigator)` once; a plugin wraps a moment on a prototype and calls through | `packages/nav-router/src/plugins/*` |
+| the dom plugin | the native how for the three seams. The reference implementation of this page | `packages/nav-router/src/plugins/dom.js` |
+| `ReactiveRouter` | the scaffold a reactive integration extends: the five primitives, slices as per-key stores, hooks in reactions | `packages/nav-router/src/reactive-router.js` |
 | an integration | a class extending `Router` or `ReactiveRouter` that fills the seams, in its own package | `@nav-router/<name>` |
 
 ## A View, As the Core Sees It
