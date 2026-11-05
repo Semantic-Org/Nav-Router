@@ -1,7 +1,7 @@
 {
   "name": "@nav-router/solid",
   "version": "0.1.0",
-  "description": "Nav Router for Solid: views are Solid components of a props accessor, the reactive scaffold on Solid's signals",
+  "description": "Nav Router for Solid: views are Solid components of the router's live context, the reactive scaffold on Solid's signals",
   "license": "ISC",
   "type": "module",
   "sideEffects": false,
@@ -10,7 +10,6 @@
     ".": "./index.js"
   },
   "peerDependencies": {
-    "@semantic-ui/utils": "*",
     "nav-router": "*",
     "solid-js": ">=1.9"
   }
