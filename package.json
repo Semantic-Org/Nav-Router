@@ -21,10 +21,9 @@
     "./reactive": "./src/reactive-router.js"
   },
   "scripts": {
-    "demo": "node demo/serve.js flat",
-    "demo:flat": "node demo/serve.js flat",
-    "demo:nested": "node demo/serve.js nested",
-    "demo:solid": "node demo/serve.js solid",
+    "flat": "npm --prefix examples/flat run dev",
+    "nested": "npm --prefix examples/nested run dev",
+    "solid": "npm --prefix examples/solid run dev",
     "format": "npx dprint fmt",
     "setup": "npx simple-git-hooks"
   },

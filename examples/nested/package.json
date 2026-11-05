@@ -1,0 +1,14 @@
+{
+  "name": "nav-router-nested",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite"
+  },
+  "dependencies": {
+    "nav-router": "file:../.."
+  },
+  "devDependencies": {
+    "vite": "^6"
+  }
+}
