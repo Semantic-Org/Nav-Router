@@ -645,7 +645,7 @@ export class Router {
       return;
     }
     if (this.pending) {
-      this.pending.committed = true;
+      this.pending = { ...this.pending, committed: true };
     }
     const matched = this.match(entry?.url);
     if (matched) {
@@ -815,7 +815,7 @@ export class Router {
     const { matched } = active;
     // the handler runs only once the url has moved, so this is a commit even where the platform's event did not say so
     if (this.pending) {
-      this.pending.committed = true;
+      this.pending = { ...this.pending, committed: true };
     }
 
     const delayMs = toDuration(this.loadingDelay) ?? 0;
@@ -832,7 +832,7 @@ export class Router {
       if (!active.settled && !event.signal.aborted) {
         loadingShownAt = Date.now();
         if (this.pending) {
-          this.pending.loading = true;
+          this.pending = { ...this.pending, loading: true };
         }
         if (this.statusViews?.loading) {
           const loadingView = await this.resolveView(this.statusViews.loading);
