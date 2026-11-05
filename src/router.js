@@ -60,6 +60,8 @@ export class Router {
     restoreScroll: null,
     attachGlobal: 'router',
     errorRoute: null,
+    // the one state key declared here: the user the guards read, which the identity door writes
+    // after this, so config shows the one the router started with
     user: null,
     onRender: null,
     onChange: null,
@@ -69,7 +71,8 @@ export class Router {
   };
 
   // one bag: the keys the defaults declare are the router's settings, every other key is the root
-  // route's, so the router holds nothing of a route's and the root nothing of the router's
+  // route's, so the router holds nothing of a route's and the root nothing of the router's. a key
+  // neither knows lands on the root, unchecked, as it landed on the router before
   constructor(options = {}) {
     const defaults = new.target.defaults; // new.target so a subclass can declare its own defaults
     const settings = {};
