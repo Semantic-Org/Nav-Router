@@ -12,7 +12,7 @@ npm install       # from the repo root: the docs are a workspace
 npm run sandbox   # once: the playground's workers and the example libraries into public/
 npm run cert      # once: a local.navrouter.dev cert from the trusted dev CA (see cert/README.md)
 npm run dev       # https://local.navrouter.dev on :443; search uses /search-index.json
-npm run build     # static site in dist/, then a Pagefind index
+npm run build     # the sandbox, then the static site in dist/, then a Pagefind index
 npm run preview   # serve dist/, search uses Pagefind
 ```
 
@@ -23,6 +23,16 @@ Live examples (`/examples/`) run on `@semantic-ui/playground` from npm. `npm run
 workers into `public/sandbox/`, and the libraries the examples import into `public/libs/` (nav-router's
 source, and the one-file build of `@semantic-ui/utils`). Run it once after install; the copies are
 git-ignored.
+
+## Deploys
+
+CI builds and ships prebuilt to Vercel (project `navrouter`, Root Directory `docs`). Vercel's own
+Git deploys are off.
+
+| Trigger | Environment |
+|---|---|
+| Push to `main` touching `docs/` or `packages/` | staging, `staging.navrouter.dev` (`.github/workflows/staging-deploy.yml`) |
+| A `v*` tag, or Run workflow by hand | production, `navrouter.dev` (`.github/workflows/release-deploy.yml`) |
 
 ## Writing a page
 

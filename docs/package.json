@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev",
-    "build": "astro sync --force && astro build && pagefind --site dist",
+    "build": "npm run sandbox && astro sync --force && astro build && pagefind --site dist",
     "preview": "astro preview",
     "clean": "rm -rf dist .astro node_modules/.astro",
     "cert": "bash scripts/make-cert.sh",
