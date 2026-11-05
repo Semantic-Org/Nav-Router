@@ -409,27 +409,27 @@ export class ReactiveRouter extends Router {
   settleRoutes(previous, page) {
     this.writeLive(this.params, this.paramCells, page.params ?? {});
     this.writeLive(this.query, this.queryCells, page.query ?? {});
-    this.settling = new Set();
+    this.toldRoutes = new Set();
     super.settleRoutes(previous, page);
     each(page.chain ?? [], (route) => {
-      if (!this.settling.has(route)) {
+      if (!this.toldRoutes.has(route)) {
         this.adopt(route, 'guard');
       }
     });
-    this.settling = null;
+    this.toldRoutes = null;
     each(this.born, (born) => born.run.stop());
     this.born = [];
   }
 
   onRouteCreated(route, context) {
     route.abortSignal.addEventListener('abort', () => this.stopRuns(route), { once: true });
-    this.settling?.add(route);
+    this.toldRoutes?.add(route);
     this.adopt(route);
     return super.onRouteCreated(route, context);
   }
 
   onRouteUpdated(route, context) {
-    this.settling?.add(route);
+    this.toldRoutes?.add(route);
     this.adopt(route);
     return super.onRouteUpdated(route, context);
   }
