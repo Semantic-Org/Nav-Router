@@ -341,7 +341,7 @@ export class ReactiveRouter extends Router {
         return;
       }
       if (route.active) {
-        this.land(route, changed, value);
+        this.applyAnswer(route, changed, value);
       }
     });
     const run = { stop, kind };
@@ -381,7 +381,7 @@ export class ReactiveRouter extends Router {
       born.adopted = true;
       (route.runs ??= new Set()).add(born.run);
       if (born.latest) {
-        this.land(route, born.changed, born.latest.value);
+        this.applyAnswer(route, born.changed, born.latest.value);
       }
     });
   }
@@ -390,7 +390,7 @@ export class ReactiveRouter extends Router {
   // consequence reads the page before its first await and the page is a cell. a run aborted at its
   // route's teardown and a route since gone say nothing; a failure is logged with the page kept,
   // since the slice the route had still stands
-  land(route, changed, value) {
+  applyAnswer(route, changed, value) {
     const dropped = (error) => {
       if (error?.name !== 'AbortError' && route.active) {
         this.logError(error);
