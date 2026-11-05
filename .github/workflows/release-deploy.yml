@@ -1,0 +1,50 @@
+name: Release Deploy
+
+# Deploys the docs site to production (navrouter.dev) on a tagged release, so the live docs match
+# the last release while staging shows main. Builds here and ships prebuilt, as staging-deploy.yml
+# does. Run it by hand (Actions > Release Deploy > Run workflow) to ship before the first tag.
+# Requires: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_NAVROUTER_PROJECT_ID
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+concurrency:
+  group: release-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  docs:
+    name: Deploy docs to production
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_NAVROUTER_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: '.node-version'
+          cache: 'npm'
+
+      - uses: actions/cache@v6
+        with:
+          path: docs/node_modules/.astro
+          key: docs-astro-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            docs-astro-${{ runner.os }}-
+
+      # from the repo root, as in staging-deploy.yml
+      - name: Build and deploy docs to production
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          npx vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+          npx vercel build --prod --token="$VERCEL_TOKEN"
+          npx vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"

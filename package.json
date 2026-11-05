@@ -4,9 +4,11 @@
   "type": "module",
   "workspaces": [
     "packages/*",
-    "examples/*"
+    "examples/*",
+    "docs"
   ],
   "scripts": {
+    "docs": "npm -w docs run dev",
     "flat": "npm -w examples/flat run dev",
     "nested": "npm -w examples/nested run dev",
     "solid": "npm -w examples/solid run dev",

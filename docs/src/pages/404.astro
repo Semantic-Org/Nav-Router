@@ -1,0 +1,71 @@
+---
+// a page that isn't here: say which, and offer the ways on. the search is prefilled from the
+// missing path's last word, which usually names what was meant (/api/rooter/ → "rooter")
+import { getCollection } from 'astro:content';
+
+import '../styles/docs.css';
+import DocsTopbar from '../components/DocsTopbar.astro';
+import Base from '../layouts/Base.astro';
+import { navFor } from '../lib/nav.js';
+
+const ids = [...(await getCollection('docs')).map((e) => e.id), ...(await getCollection('examples')).map((e) => `examples/${e.id}`), 'plugins', 'examples'];
+const nav = navFor(ids, '');
+// every page that exists, for the did-you-mean
+const paths = ['/', ...ids.map((id) => `/${id}/`)];
+---
+<Base title="Page not found · nav-router" description="This page isn’t here." share={false}>
+  <DocsTopbar nav={nav} menu={false} />
+  <main class="doc not-found" id="content">
+    <p class="doc-crumb">404</p>
+    <h1>This page isn’t here</h1>
+    <p class="doc-lede">Nothing lives at <code data-missing-path>this address</code>. It may have moved, or the link may be mistyped.</p>
+    <p class="not-found-guess" data-guess hidden>Did you mean <a class="guess-link" data-guess-link href="/"></a>?</p>
+    <div class="not-found-actions">
+      <button class="btn primary" type="button" data-search-missing>Search the docs</button>
+      <a class="btn ghost" href="/">Go to the homepage</a>
+    </div>
+    <ul class="not-found-sections">
+      {nav.map((s) => <li><a class="nf-link" href={s.href}><span class="nf-title">{s.label}</span><span class="nf-sub">{s.groups.map((g) => g.label).join(', ')}</span></a></li>)}
+    </ul>
+  </main>
+  <script is:inline type="application/json" id="known-paths" set:html={JSON.stringify(paths)}></script>
+  <script>
+    import { init } from '../scripts/site.js';
+    init();
+    const path = location.pathname;
+    const word = path.split('/').filter(Boolean).pop()?.replace(/[-_]+/g, ' ') ?? '';
+    document.querySelector('[data-missing-path]').textContent = path;
+
+    // the closest real path by edit distance, offered only when it is plausibly what was meant
+    const distance = (a, b) => {
+      const row = Array.from({ length: b.length + 1 }, (_, i) => i);
+      for (let i = 1; i <= a.length; i++) {
+        let prev = row[0]++;
+        for (let j = 1; j <= b.length; j++) {
+          const cur = row[j];
+          row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+          prev = cur;
+        }
+      }
+      return row[b.length];
+    };
+    const wanted = `/${path.split('/').filter(Boolean).join('/')}/`.toLowerCase();
+    const [best] = JSON.parse(document.getElementById('known-paths').textContent)
+      .map((p) => ({ p, d: distance(wanted, p) })).sort((a, b) => a.d - b.d);
+    if (best && best.d > 0 && best.d <= Math.max(2, Math.round(wanted.length * 0.25))) {
+      const link = document.querySelector('[data-guess-link]');
+      link.href = best.p;
+      link.textContent = best.p;
+      document.querySelector('[data-guess]').hidden = false;
+    }
+
+    const button = document.querySelector('[data-search-missing]');
+    if (word) button.textContent = `Search for “${word}”`;
+    button.addEventListener('click', () => {
+      document.querySelector('.search-trigger').click();
+      const input = document.querySelector('dialog.search input');
+      input.value = word;
+      input.dispatchEvent(new Event('input'));
+    });
+  </script>
+</Base>

@@ -1,0 +1,76 @@
+---
+// the docs frame every docs page shares: topbar, sidebar, the main column and on-this-page.
+// a page passes what goes in main; `wide` drops on-this-page for index pages like /plugins/
+import { getCollection } from 'astro:content';
+
+import '../styles/docs.css';
+import { navFor } from '../lib/nav.js';
+import DocsTopbar from '../components/DocsTopbar.astro';
+import Base from './Base.astro';
+
+const { title, description, currentId, toc = [], wide = false, extraIds = [] } = Astro.props;
+const ids = [
+  ...(await getCollection('docs')).map((e) => e.id),
+  ...(await getCollection('examples')).map((e) => `examples/${e.id}`),
+  'plugins', 'examples', ...extraIds,
+];
+const nav = navFor(ids, currentId);
+const sectionKey = currentId.split('/')[0];
+const section = nav.find((s) => s.key === sectionKey);
+---
+<Base title={title} description={description} bodyAttrs={{ 'data-section': sectionKey }}>
+  <DocsTopbar nav={nav} sectionKey={sectionKey} />
+
+  <div class:list={['docs-shell', { 'is-wide': wide }]}>
+    <aside class="docs-sidebar" id="docs-sidebar" aria-label={section.label}>
+      <div class="sidebar-scroll">
+        <nav class="drawer-sections" aria-label="Sections">
+          {nav.map((s) => <a href={s.href} aria-current={s.key === sectionKey ? 'page' : undefined}>{s.label}</a>)}
+        </nav>
+        {/* live examples run the core version, so the framework choice doesn't apply there yet */}
+        {sectionKey !== 'examples' && (
+          <div class="framework-panel">
+            <p class="framework-label" id="framework-label">Your framework</p>
+            <div class="framework-select" data-framework-picker="lg"></div>
+          </div>
+        )}
+        {section.groups.map((g) => (
+          <div class="nav-group">
+            <h2 class="nav-group-label">{g.label}</h2>
+            <ul>
+              {g.items.map((it) => (
+                <li>
+                  {it.href
+                    ? <a class:list={['nav-link', { 'is-symbol': it.symbol }]} href={it.href} aria-current={it.current ? 'page' : undefined}>{it.title}</a>
+                    : <span class:list={['nav-link', 'is-stub', { 'is-symbol': it.symbol }]} title="Not written yet">{it.title}</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </aside>
+    <div class="drawer-scrim"></div>
+
+    <div class="docs-main">
+      <slot />
+    </div>
+
+    {!wide && toc.length > 0 && (
+      <aside class="docs-toc" aria-label="On this page">
+        <p class="toc-label">On this page</p>
+        <ul class="toc-list">
+          {toc.map((h) => <li class={`toc-h${h.depth}`}><a href={`#${h.slug}`} class:list={{ 'is-symbol': h.symbol }}>{h.text}</a></li>)}
+        </ul>
+      </aside>
+    )}
+  </div>
+
+  <slot name="after" />
+  <script>
+    import { init } from '../scripts/site.js';
+    import { mountDocs } from '../scripts/docs-client.js';
+    init();
+    mountDocs();
+  </script>
+</Base>

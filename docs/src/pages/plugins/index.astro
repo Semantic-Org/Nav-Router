@@ -1,0 +1,110 @@
+---
+// the plugins landing: every plugin as a card or a row, filterable, with its size measured at build
+import { getCollection } from 'astro:content';
+
+import DocsChrome from '../../layouts/DocsChrome.astro';
+import { inline } from '../../lib/markdown/inline.js';
+import { PLUGINS, sampleFor } from '../../lib/plugins.js';
+import { formatSize, sizeOf } from '../../lib/sizes.js';
+
+const written = new Set((await getCollection('docs')).map((e) => e.id));
+const plugins = await Promise.all(PLUGINS.map(async (p) => {
+  const bytes = await sizeOf(p.name);
+  return {
+    ...p,
+    bytes,
+    size: formatSize(bytes),
+    href: written.has(`plugins/${p.name}`) ? `/plugins/${p.name}/` : null,
+    // what the filter matches against
+    text: `${p.name} ${p.category} ${p.description}`.toLowerCase().replace(/`/g, ''),
+  };
+}));
+const coreBytes = await sizeOf('core');
+// the sample starts empty; the page fills it from the reader's picks (and ?use= in the url)
+const EXAMPLE = sampleFor([]);
+const lede = 'The core does one job. Each plugin wraps one moment in the router and calls through, so you ship only the ones you install. Select the ones you want and copy the setup.';
+
+const ICONS = {
+  filter: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
+  cards: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>',
+  list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1" fill="currentColor"/><circle cx="4.5" cy="12" r="1" fill="currentColor"/><circle cx="4.5" cy="18" r="1" fill="currentColor"/></svg>',
+};
+---
+<DocsChrome title="Plugins · nav-router" description={lede} currentId="plugins" wide extraIds={['plugins']}>
+  <main class="doc is-wide" id="content" data-pagefind-body>
+    <span hidden data-pagefind-meta="title:Plugins"></span>
+    <span hidden data-pagefind-meta="section:Plugins"></span>
+    <span hidden data-pagefind-meta="crumb:Plugins"></span>
+
+    <h1>Plugins</h1>
+    <p class="doc-lede">{lede}</p>
+
+    <div class="plugins-intro" data-pagefind-ignore>
+      <div class="code" data-plugin-sample>
+        <div class="code-head">
+          <span class="code-file">app.js</span>
+          <button class="clear-picks" type="button" data-clear-picks hidden>Clear</button>
+          <button class="copy" type="button" data-copy></button>
+        </div>
+<pre data-hl set:text={EXAMPLE} />
+      </div>
+      <dl class="plugins-stats" data-core-bytes={coreBytes ?? 0} aria-live="polite">
+        <div><dt>Selected</dt><dd><span data-picked-count>0</span> <small>of {plugins.length}</small></dd></div>
+        <div><dt>Plugin Size</dt><dd><span data-picked-size>0.0 kB</span> <abbr title="minified and Brotli compressed">min+br</abbr></dd></div>
+        <div><dt>Total Size</dt><dd><span data-total-size>{formatSize(coreBytes) ?? '–'}</span> <abbr title="minified and Brotli compressed">min+br</abbr></dd></div>
+      </dl>
+    </div>
+
+    <div class="plugin-toolbar" data-pagefind-ignore>
+      <label class="plugin-filter">
+        <Fragment set:html={ICONS.filter} />
+        <span class="visually-hidden">Filter plugins</span>
+        <input type="search" placeholder="Filter by name, category or what it does" autocomplete="off" spellcheck="false" data-plugin-filter aria-controls="plugin-list">
+        <span class="swap plugin-count" aria-live="polite">
+          <span data-count-all>{plugins.length} plugins</span>
+          <span data-count-some hidden>{plugins.length} of {plugins.length}</span>
+        </span>
+      </label>
+      <div class="view-toggle" role="radiogroup" aria-label="Show plugins as">
+        <button type="button" role="radio" aria-checked="true" data-view="cards" aria-label="Cards" title="Cards" set:html={ICONS.cards} />
+        <button type="button" role="radio" aria-checked="false" data-view="list" aria-label="List" title="List" set:html={ICONS.list} />
+      </div>
+    </div>
+
+    <ul class="plugin-list" id="plugin-list" data-view="cards" role="list">
+      {plugins.map((p) => (
+        <li class="plugin" data-text={p.text} data-name={p.name} data-bytes={p.bytes ?? 0}>
+          <input class="plugin-pick" type="checkbox" id={`pick-${p.name}`} value={p.name} />
+          {/* the whole card toggles the pick; the name (to its page) and the tag sit above it */}
+          <label class="plugin-hit" for={`pick-${p.name}`}><span class="visually-hidden">Add {p.name}</span></label>
+          <h2 class="plugin-name">{p.href ? <a class="plugin-link" href={p.href}>{p.name}</a> : p.name}</h2>
+          <button class="plugin-tag" type="button" data-tag={p.category} aria-label={`Show ${p.category} plugins`}>{p.category}</button>
+          <p class="plugin-desc" set:html={inline(p.description)} />
+          <span class="plugin-size"><b>{p.size ?? '–'}</b> min+br</span>
+        </li>
+      ))}
+    </ul>
+    <script is:inline>
+      // the reader's last view, set before paint so the list never jumps from cards to rows
+      try { const v = localStorage.getItem('nr:plugin-view'); if (v) document.getElementById('plugin-list').dataset.view = v; } catch {}
+    </script>
+
+    <div class="plugin-empty" hidden data-plugin-empty>
+      <p>No plugin matches &ldquo;<span data-empty-query></span>&rdquo;.</p>
+      <button class="btn" type="button" data-clear-filter>Clear filter</button>
+    </div>
+
+    <div class="callout" data-kind="tip">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.6.5 1.1 1.3 1.1 2.2h5c0-.9.5-1.7 1.1-2.2A6 6 0 0 0 12 3Z"/></svg>
+      <div>
+        <p class="callout-title">Need something else?</p>
+        <p>A plugin is a function of the options, <code>Router</code> and <code>Navigator</code> that wraps one moment and calls through. <a href="/guides/writing-a-plugin/">Writing a plugin</a> covers the moments you can wrap.</p>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    import { mountPlugins } from '../../scripts/plugins.js';
+    mountPlugins();
+  </script>
+</DocsChrome>

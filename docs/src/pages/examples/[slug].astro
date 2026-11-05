@@ -1,0 +1,60 @@
+---
+// one live example: what it shows and what to try, the playground, then what just happened
+import { getCollection, render } from 'astro:content';
+
+import Playground from '../../components/Playground.astro';
+import DocsChrome from '../../layouts/DocsChrome.astro';
+import { filesFor } from '../../lib/examples.js';
+import { inline } from '../../lib/markdown/inline.js';
+import { SECTIONS } from '../../lib/nav.js';
+
+export async function getStaticPaths() {
+  const entries = await getCollection('examples');
+  return entries.map((entry) => ({ params: { slug: entry.id }, props: { entry } }));
+}
+
+const { entry } = Astro.props;
+const { Content } = await render(entry);
+const { title, description, tabs, try: steps, related } = entry.data;
+const files = filesFor(entry.id);
+
+// previous and next in the section's order
+const order = SECTIONS.find((s) => s.key === 'examples').groups.flatMap((g) => g.items)
+  .map((it) => it.slug).filter((slug) => slug.startsWith('examples/'));
+const at = order.indexOf(`examples/${entry.id}`);
+const titleOf = (slug) => SECTIONS.find((s) => s.key === 'examples').groups.flatMap((g) => g.items).find((it) => it.slug === slug)?.title;
+const prev = order[at - 1];
+const next = order[at + 1];
+const group = SECTIONS.find((s) => s.key === 'examples').groups.find((g) => g.items.some((it) => it.slug === `examples/${entry.id}`));
+---
+<DocsChrome title={`${title} · Examples · nav-router`} description={description} currentId={`examples/${entry.id}`} wide>
+  <main class="doc is-wide example-page" id="content" data-pagefind-body>
+    <span hidden data-pagefind-meta={`title:${title}`}></span>
+    <span hidden data-pagefind-meta="section:Examples"></span>
+    <span hidden data-pagefind-meta={`crumb:${group?.label ?? 'Examples'}`}></span>
+
+    <p class="doc-crumb" data-pagefind-ignore><a class="crumb" href="/examples/">Examples</a> / {group?.label}</p>
+    <h1>{title}</h1>
+    <p class="doc-lede" set:html={inline(description)} />
+
+    <div class="example-try" data-pagefind-ignore>
+      <p class="example-try-label">Try this</p>
+      <ol>{steps.map((s) => <li set:html={inline(s)} />)}</ol>
+    </div>
+
+    <div data-pagefind-ignore><Playground files={files} tabs={tabs} label={`${title}, live`} /></div>
+
+    <div class="example-notes">
+      <h2 id="how-it-works">How it works</h2>
+      <Content />
+      {related.length > 0 && (
+        <p class="example-related">Read more: {related.map((r, i) => <>{i > 0 && ', '}<a href={r.href} set:html={inline(r.title)} /></>)}.</p>
+      )}
+    </div>
+
+    <nav class="pager" aria-label="Examples" data-pagefind-ignore>
+      {prev ? <a class="pager-link is-prev" href={`/${prev}/`}><span class="pager-dir">Previous</span><span class="pager-title">{titleOf(prev)}</span></a> : <span></span>}
+      {next ? <a class="pager-link is-next" href={`/${next}/`}><span class="pager-dir">Next</span><span class="pager-title">{titleOf(next)}</span></a> : <span></span>}
+    </nav>
+  </main>
+</DocsChrome>
