@@ -47,13 +47,13 @@ jobs:
             docs-astro-${{ runner.os }}-
 
       # from the repo root: the project's Root Directory is docs/, which vercel applies relative to
-      # the working directory. the CLI pairs --environment (pull) with --target (build, deploy) for
-      # a custom environment. `vercel build` runs the project's install and `npm run build`, which
-      # syncs the sandbox first, so the output matches a remote build
+      # the working directory. --environment names the custom environment for all three steps.
+      # `vercel build` runs the project's install and `npm run build`, which syncs the sandbox
+      # first, so the output matches a remote build
       - name: Build and deploy docs to staging
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           npx vercel pull --yes --environment=staging --token="$VERCEL_TOKEN"
-          npx vercel build --target=staging --token="$VERCEL_TOKEN"
-          npx vercel deploy --prebuilt --target=staging --token="$VERCEL_TOKEN"
+          npx vercel build --environment=staging --token="$VERCEL_TOKEN"
+          npx vercel deploy --prebuilt --environment=staging --token="$VERCEL_TOKEN"
