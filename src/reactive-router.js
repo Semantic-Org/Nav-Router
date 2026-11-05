@@ -1,4 +1,4 @@
-import { each, inArray, isEqual, isFunction, isPromise, noop } from '@semantic-ui/utils';
+import { each, inArray, isFunction, isPromise, noop } from '@semantic-ui/utils';
 
 import { Router } from './router.js';
 
@@ -19,9 +19,10 @@ export class ReactiveRouter extends Router {
   // deep, the slices by their members since the router builds that array fresh at every update,
   // and the page by identity since it carries the route and the router, which a walk would enter
   static equality = {
-    cell: isEqual,
+    // a snapshot carries routes and the router, which a walk would enter: current, page, pending, error
+    snapshot: Object.is,
+    // the router builds a view's slices array fresh at every update; the same slices in it are the same
     slices: (a, b) => a.length === b.length && a.every((slice, index) => slice === b[index]),
-    page: Object.is,
   };
 
   constructor(options) {
@@ -30,6 +31,53 @@ export class ReactiveRouter extends Router {
     this.entryCache = null;
     // the runs the navigation in flight has born and no route has adopted yet
     this.born = [];
+    // the router's own state as cells, so whatever reads current, page, pending, error or user is live,
+    // the helpers and an app's chrome among them. core writes the fields as it always has
+    const { equality } = this.constructor;
+    each(['current', 'page', 'pending', 'error'], (key) => this.cellFor(key, equality.snapshot));
+    this.cellFor('user', (before, after) => !this.dataChanged(before, after));
+  }
+
+  // a field of the router backed by a cell: the write is the field's, the read tracks it
+  cellFor(key, equals) {
+    const cell = this.createSignal(this[key], { equals });
+    Object.defineProperty(this, key, { get: cell.get, set: cell.set, enumerable: true, configurable: true });
+  }
+
+  // the navigator's readouts move when the current entry does, so reading current first makes them live
+  get canGoBack() {
+    return this.current && this.navigator.canGoBack;
+  }
+
+  get canGoForward() {
+    return this.current && this.navigator.canGoForward;
+  }
+
+  get entry() {
+    return this.current && this.navigator.entry;
+  }
+
+  get entries() {
+    return this.current ? this.navigator.entries : [];
+  }
+
+  get transition() {
+    return this.pending && this.navigator.transition;
+  }
+
+  /*******************************
+              Moments
+  *******************************/
+
+  // the page's write, its settle and its render are one moment to a reader: inside a batch a view
+  // sees the page and the chain move together, and a leaving view, disposed before the batch flushes,
+  // never runs against the next page's keys
+  applyCascade(matched, resolved, event = null) {
+    return this.batch(() => super.applyCascade(matched, resolved, event));
+  }
+
+  updatePage(route) {
+    return this.batch(() => super.updatePage(route));
   }
 
   /*******************************
@@ -61,7 +109,11 @@ export class ReactiveRouter extends Router {
     const cells = new Map();
     const cell = (key) => {
       if (!cells.has(key)) {
-        cells.set(key, this.createSignal(initialValue[key], { equals: this.constructor.equality.cell }));
+        // a data cell compares as the router's dataChanged says, the instance's word on data
+        cells.set(
+          key,
+          this.createSignal(initialValue[key], { equals: (before, after) => !this.dataChanged(before, after) }),
+        );
       }
       return cells.get(key);
     };
@@ -83,7 +135,7 @@ export class ReactiveRouter extends Router {
     const { equality } = this.constructor;
     const store = this.createStore({ params: context.params, query: context.query, user: context.user });
     const slices = this.createSignal(context.slices, { equals: equality.slices });
-    const page = this.createSignal(context.page, { equals: equality.page });
+    const page = this.createSignal(context.page, { equals: equality.snapshot });
     const live = { route: context.route, router: context.router, signal: context.signal };
     each(['params', 'query', 'user'], (key) => {
       Object.defineProperty(live, key, { get: () => store.get(key), enumerable: true });
@@ -175,7 +227,8 @@ export class ReactiveRouter extends Router {
         return;
       }
       if (route.active) {
-        changed(value);
+        // untracked: a consequence reads the page before its first await, and the page is a cell
+        this.untrack(() => changed(value));
       }
     });
     const run = { stop, kind };
@@ -215,7 +268,7 @@ export class ReactiveRouter extends Router {
       born.adopted = true;
       (route.runs ??= new Set()).add(born.run);
       if (born.latest) {
-        born.changed(born.latest.value);
+        this.untrack(() => born.changed(born.latest.value));
       }
     });
   }
