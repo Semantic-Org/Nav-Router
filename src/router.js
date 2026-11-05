@@ -842,6 +842,7 @@ export class Router {
     const delayMs = toDuration(this.loadingDelay) ?? 0;
     const minMs = toDuration(this.loadingMin) ?? 0;
     let loadingShownAt = null;
+    let coldLoading = null;
 
     if (!active.settled) {
       if (delayMs > 0) {
@@ -858,14 +859,26 @@ export class Router {
         if (this.statusViews?.loading) {
           const loadingView = await this.resolveView(this.statusViews.loading);
           if (!active.settled && !event.signal.aborted) {
-            // page stays the settled page: a loading view is rendered over it, pending.loading says so
+            // page stays the settled page: a loading view is rendered over it with its slices, so a
+            // leaf's own slots re-render against what stands, and pending.loading says so. on a cold
+            // boot nothing stands to render it inside, so it is made at the mount and leaves before
+            // the page lands, or with the navigation
             const loading = {
               ...this.pageFor(matched),
               views: this.page?.views ?? [],
               chain: this.page?.chain ?? [],
+              slices: this.page?.slices ?? [],
+              data: this.page?.data ?? {},
               view: loadingView,
               status: 'loading',
             };
+            if (!this.page) {
+              coldLoading = this.createView({
+                view: loadingView,
+                placement: { parent: null, slot: undefined },
+                context: this.root.viewContext(loading),
+              });
+            }
             await this.renderPage(loading, event);
           }
         }
@@ -873,36 +886,47 @@ export class Router {
       }
     }
 
-    const resolved = await active.ready;
-    if (event.signal.aborted) {
-      return;
-    }
-
-    if (resolved?.status === 'redirect' && resolved.redirect) {
-      if (!precommitRan) {
-        // no precommit on this browser: the refused url has shown, its slot becomes the redirect target,
-        // a task later so this handler is not aborted by its own replacement
-        this.navigator.deferNavigate(resolved.redirect, {
-          history: 'replace',
-        });
-      }
-      return;
-    }
-
-    if (loadingShownAt !== null && minMs > 0) {
-      const elapsed = Date.now() - loadingShownAt;
-      if (elapsed < minMs) {
-        await wait(minMs - elapsed, {
-          abortController: event.signal,
-          rejectOnAbort: false,
-        });
-      }
+    try {
+      const resolved = await active.ready;
       if (event.signal.aborted) {
         return;
       }
-    }
 
-    await this.applyCascade(matched, resolved, event);
+      if (resolved?.status === 'redirect' && resolved.redirect) {
+        if (!precommitRan) {
+          // no precommit on this browser: the refused url has shown, its slot becomes the redirect target,
+          // a task later so this handler is not aborted by its own replacement
+          this.navigator.deferNavigate(resolved.redirect, {
+            history: 'replace',
+          });
+        }
+        return;
+      }
+
+      if (loadingShownAt !== null && minMs > 0) {
+        const elapsed = Date.now() - loadingShownAt;
+        if (elapsed < minMs) {
+          await wait(minMs - elapsed, {
+            abortController: event.signal,
+            rejectOnAbort: false,
+          });
+        }
+        if (event.signal.aborted) {
+          return;
+        }
+      }
+
+      if (coldLoading) {
+        this.destroyView({ rendered: coldLoading });
+        coldLoading = null;
+      }
+      await this.applyCascade(matched, resolved, event);
+    }
+    finally {
+      if (coldLoading) {
+        this.destroyView({ rendered: coldLoading });
+      }
+    }
   }
 
   /*******************************
