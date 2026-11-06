@@ -10,7 +10,7 @@ input { font: inherit; padding: 4px 8px; border: 1px solid var(--line); border-r
 .brand { font-weight: 700; color: inherit; }
 .crumbs { color: #666; font-size: 14px; }
 .links { display: flex; gap: 12px; }
-.nav-link[aria-current="page"], .tab[aria-current="page"] { font-weight: 700; color: inherit; border-bottom: 2px solid var(--accent); }
+.links a[aria-current="page"], .tab[aria-current="page"] { font-weight: 700; color: inherit; border-bottom: 2px solid var(--accent); }
 .who { margin-left: auto; display: flex; gap: 6px; align-items: center; }
 .badge { padding: 2px 8px; border-radius: 999px; background: #eee; font-size: 13px; }
 .badge[data-role="admin"] { background: #dbe8ff; }

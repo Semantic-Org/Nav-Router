@@ -1,14 +1,17 @@
 import { href, isActive, isCurrent } from 'nav-router';
+import { splitProps } from 'solid-js';
 
 import { signIn, user } from '../store.js';
 
 // a link by route name: href builds it, and isActive or isCurrent reads the router's current page,
-// a cell under the scaffold, so aria-current follows every navigation with nothing wired
+// a cell under the scaffold, so aria-current follows every navigation with nothing wired. the
+// anchor is the app's: every other prop passes through to it and the component adds nothing of its own
 const Link = (props) => {
-  const current = () => (props.under ? isActive(props.route, props.args) : isCurrent(props.route, props.args));
+  const [own, rest] = splitProps(props, ['route', 'args', 'under', 'children']);
+  const current = () => (own.under ? isActive(own.route, own.args) : isCurrent(own.route, own.args));
   return (
-    <a href={href(props.route, props.args)} class='nav-link' aria-current={current() ? 'page' : undefined}>
-      {props.children}
+    <a href={href(own.route, own.args)} aria-current={current() ? 'page' : undefined} {...rest}>
+      {own.children}
     </a>
   );
 };
