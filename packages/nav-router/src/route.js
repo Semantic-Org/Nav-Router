@@ -27,10 +27,11 @@ export class Route {
     this.indexRoute = null;
     this.active = false;
 
-    extend(this, Route.defaults, routeOptions, {
-      params: { ...Route.defaults.params, ...routeOptions.params },
-      query: { ...Route.defaults.query, ...routeOptions.query },
-      slots: { ...Route.defaults.slots, ...routeOptions.slots },
+    const defaults = new.target.defaults;
+    extend(this, defaults, routeOptions, {
+      params: { ...defaults.params, ...routeOptions.params },
+      query: { ...defaults.query, ...routeOptions.query },
+      slots: { ...defaults.slots, ...routeOptions.slots },
     });
 
     this.path = this.normalizePath(routeOptions.path, parent);
@@ -195,11 +196,11 @@ export class Route {
     const { rendered } = this;
     const { layout, slots } = page.views?.find((entry) => entry.route === this) ?? {};
     const context = () => this.viewContext(page);
-    const framed = this.hasSlice(page);
+    const hasSlice = this.hasSlice(page);
     const layoutBefore = rendered.layout;
     rendered.layout = this.createOrUpdateView({
       prior: rendered.layout,
-      view: framed ? layout : null,
+      view: hasSlice ? layout : null,
       placement: { parent: this.parentLayout(), slot: undefined },
       context,
     });
@@ -240,9 +241,9 @@ export class Route {
     const { slots = {} } = page.views?.find((entry) => entry.route === this) ?? {};
     const parent = this.rendered.layout ?? this.parentLayout();
     const context = () => this.viewContext(page);
-    const framed = this.hasSlice(page);
+    const hasSlice = this.hasSlice(page);
     each(names, (slot) => {
-      const view = framed && !this.slotDeclaredBelow(page, slot) ? slots[slot] : null;
+      const view = hasSlice && !this.slotDeclaredBelow(page, slot) ? slots[slot] : null;
       this.rendered.slots[slot] = this.createOrUpdateView({
         prior: this.rendered.slots[slot],
         view,
@@ -291,7 +292,7 @@ export class Route {
         this.router.destroyView({ rendered });
       }
     });
-    Object.assign(this.rendered, { page: null, slots: {}, view: undefined, layout: keepLayout ? layout : undefined });
+    extend(this.rendered, { page: null, slots: {}, view: undefined, layout: keepLayout ? layout : undefined });
   }
 
   // the nearest rendered layout above this route, or null for the mount

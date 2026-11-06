@@ -158,10 +158,10 @@ export default ({ mount: defaultMount = 'body' } = {}, Router) => {
 
   proto.updateView = function({ rendered, view, placement, context }) {
     const held = contents(rendered);
-    const told = rendered.dispose ? rendered.update : held.length === 1 ? held[0].update : null;
+    const update = rendered.dispose ? rendered.update : held.length === 1 ? held[0].update : null;
     // a mounted view is told through its update, or left as it stands; so is an element with one of its own
-    if (rendered.dispose || isFunction(told)) {
-      told?.(context);
+    if (rendered.dispose || isFunction(update)) {
+      update?.(context);
       stamp(rendered, placement.slot);
       return rendered;
     }
