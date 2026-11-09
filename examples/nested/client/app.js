@@ -61,8 +61,8 @@ function renderInspector() {
   const page = app.page;
   const route = current?.route;
   const pending = app.pending;
-  // the page's chain is the active set
-  const activeRouteIds = (page?.chain ?? []).map((item) => item.id);
+  // the page's routes are the active set
+  const activeRouteIds = (page?.routes ?? []).map((item) => item.id);
   const entries = globalThis.navigation?.entries?.() ?? app.entries ?? [];
   const currentEntryKey = globalThis.navigation?.currentEntry?.key ?? current?.key;
 
