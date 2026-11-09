@@ -16,6 +16,7 @@ import { TeamOverviewPage } from './views/team-overview-page.js';
 import { TeamSidebar } from './views/team-sidebar.js';
 
 export const app = router({
+  mount: '#app-mount',
   name: 'home',
   title: 'Acme Console',
   layout: RootLayout,

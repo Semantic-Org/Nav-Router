@@ -255,12 +255,8 @@ signInRoute: 'signIn',
         <p>Like day.js, the core does one job and plugins add the rest. Each one wraps a single moment in the router and calls through, so you only ship what you install.</p>
 <div class="code">
 <pre data-hl>
-import { Router } from 'nav-router';
-import head from 'nav-router/plugins/head';
-import viewTransitions from 'nav-router/plugins/view-transitions';
-
-Router.extend(head);
-Router.extend(viewTransitions);
+import 'nav-router/plugins/head';
+import 'nav-router/plugins/view-transitions';
 </pre>
 </div>
         <a class="text-link" href="#">Browse all plugins</a>

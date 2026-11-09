@@ -2,21 +2,22 @@
 title: head
 kind: plugin
 lede: Writes each page’s title, meta tags and canonical link into `document.head`, merged down the routes that are active.
-import: import head from 'nav-router/plugins/head'
+import: import 'nav-router/plugins/head'
 size: head
 updated: 2026-11-05
 ---
 
 ## Install
 
-Extend the router once, before it starts. A plugin wraps one moment in the router and calls through, so installing it changes nothing else.
+Import the plugin once. A plugin wraps one moment in the router and calls through, so importing it changes nothing else, and its options are the router's own.
 
 ```js title="app.js"
-import { Router } from 'nav-router';
-import head from 'nav-router/plugins/head';
+import 'nav-router/plugins/head';
+import { router } from 'nav-router';
 
-Router.extend(head, {
+const app = router({
   formatTitle: (title) => `${title} · Acme`,
+  // the routes
 });
 ```
 
@@ -24,7 +25,7 @@ Router.extend(head, {
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `defaults` | `object` | `{}` | Tags every page starts from, before routes add theirs. |
+| `metaDefaults` | `object` | `{}` | Tags every page starts from, before routes add theirs. |
 | `formatTitle` | `function` | `null` | Turns a route’s title into the document title. |
 
 ## The `meta` route option

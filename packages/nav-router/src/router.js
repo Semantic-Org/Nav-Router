@@ -35,18 +35,6 @@ export class Router {
     return !!value?.[IS_ROUTER];
   }
 
-  // the day.js shape: a plugin is a function of (options, Router, Navigator) that patches a prototype.
-  // it wraps a moment and calls through, never replaces one, or adds a method the core would
-  // otherwise make every page carry. installed between navigations it takes effect on the next
-  static extend(plugin, options) {
-    // the plugin carries its own mark, as day.js marks one
-    if (!plugin.installed) {
-      plugin.installed = true;
-      plugin(options, Router, Navigator);
-    }
-    return Router;
-  }
-
   static defaults = {
     base: '',
     // the view for each status a page can stand in: loading, notFound, forbidden, error

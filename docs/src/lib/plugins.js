@@ -63,20 +63,21 @@ export const PLUGINS = [
 // the binding a plugin imports under: view-transitions → viewTransitions
 export const bindingFor = (name) => name.replace(/-(\w)/g, (_, c) => c.toUpperCase());
 
-// options a plugin needs to do anything, shown in the setup: dom renders into a mount
-const REQUIRED_OPTIONS = { dom: "{ mount: '#app' }" };
+// options a plugin needs to do anything, shown in the setup as the router's own: dom renders into a mount
+const REQUIRED_OPTIONS = { dom: "mount: '#app'" };
 
-// the setup for a set of plugins, as nav-router's own examples write it, day.js style: one import
-// and one Router.extend() per plugin. dom goes first, the renderer the others build on
+// the setup for a set of plugins, as nav-router's own examples write it: one import per plugin, for
+// its effect, dom first, the renderer the others build on, and the plugins' options on the router
 export function sampleFor(names) {
   const picked = PLUGINS.map((p) => p.name).filter((n) => names.includes(n))
     .sort((a, b) => (b === 'dom') - (a === 'dom'));
-  const lines = ["import { Router } from 'nav-router';"];
-  picked.forEach((n) => lines.push(`import ${bindingFor(n)} from 'nav-router/plugins/${n}';`));
-  lines.push('');
+  const lines = [];
+  picked.forEach((n) => lines.push(`import 'nav-router/plugins/${n}';`));
   if (!picked.length) { lines.push('// select plugins below to add them here'); }
-  picked.forEach((n) =>
-    lines.push(`Router.extend(${bindingFor(n)}${REQUIRED_OPTIONS[n] ? `, ${REQUIRED_OPTIONS[n]}` : ''});`)
-  );
+  lines.push("import { router } from 'nav-router';", '');
+  const options = picked.map((n) => REQUIRED_OPTIONS[n]).filter(Boolean);
+  lines.push('const app = router({');
+  options.forEach((option) => lines.push(`  ${option},`));
+  lines.push('  // the routes', '});');
   return lines.join('\n');
 }

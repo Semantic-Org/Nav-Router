@@ -1,5 +1,5 @@
-import { Router, router } from 'nav-router';
-import dom from 'nav-router/plugins/dom';
+import 'nav-router/plugins/dom';
+import { router } from 'nav-router';
 
 import { routes } from './routes.js';
 
@@ -8,9 +8,7 @@ import { routes } from './routes.js';
 const base = new URL('.', import.meta.url).pathname.replace(/\/$/, '');
 /* playground-hide-end */
 
-Router.extend(dom, { mount: '#app' });
-
-const app = router({ base, ...routes });
+const app = router({ base, mount: '#app', ...routes });
 await app.start();
 
 const USERS = {

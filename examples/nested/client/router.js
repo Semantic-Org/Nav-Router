@@ -7,6 +7,7 @@ import { NotFoundPage } from './views/not-found-page.js';
 import { RootLayout } from './views/root-layout.js';
 
 export const router = defineRouter({
+  mount: '#app-mount',
   name: 'home',
   title: 'Acme Console',
   layout: RootLayout,
