@@ -341,7 +341,7 @@ export class ReactiveRouter extends Router {
         run.latest = { value };
         return;
       }
-      if (route.active) {
+      if (this.onPage(route)) {
         this.applyHookResult(route, changed, value);
       }
     });
@@ -391,7 +391,7 @@ export class ReactiveRouter extends Router {
   // since the slice the route had still stands
   applyHookResult(route, changed, value) {
     const onError = (error) => {
-      if (error?.name !== 'AbortError' && route.active) {
+      if (error?.name !== 'AbortError' && this.onPage(route)) {
         this.logError(error);
       }
     };
@@ -408,16 +408,42 @@ export class ReactiveRouter extends Router {
   settleRoutes(previous, page) {
     this.writeLive(this.params, this.paramCells, page.params ?? {});
     this.writeLive(this.query, this.queryCells, page.query ?? {});
+    // the standing page settled again, a refusal or a not-found landing on it in place: the route it
+    // landed on is no longer active, and keeps its runs across the end of its life so the one that
+    // watches for the refusal lifting still does
+    const inPlace = page.slices === previous?.slices;
+    const [refused] = page.unresolvedRoutes ?? [];
+    const kept = inPlace && refused?.runs;
+    if (kept) {
+      refused.runs = null;
+    }
     this.changedRoutes = new Set();
     super.settleRoutes(previous, page);
-    each(page.routes ?? [], (route) => {
-      if (!this.changedRoutes.has(route)) {
-        this.attachRuns(route, 'guard');
+    if (kept) {
+      refused.runs = kept;
+    }
+    if (!inPlace) {
+      each(page.activeRoutes ?? [], (route) => {
+        if (!this.changedRoutes.has(route)) {
+          this.attachRuns(route, 'guard');
+        }
+      });
+      // an unresolved route's runs are the page's: they watch for it to resolve, and end with the page
+      each(page.unresolvedRoutes ?? [], (route) => this.attachRuns(route));
+      each(this.pendingRuns, (run) => run.stop());
+      this.pendingRuns = [];
+    }
+    each(previous?.unresolvedRoutes ?? [], (route) => {
+      if (!inArray(route, this.matchedRoutes(page))) {
+        this.stopRuns(route);
       }
     });
     this.changedRoutes = null;
-    each(this.pendingRuns, (run) => run.stop());
-    this.pendingRuns = [];
+  }
+
+  // a hook's later value lands while its route is on the standing page, active or waiting unresolved
+  onPage(route) {
+    return route.active || inArray(route, this.page?.unresolvedRoutes ?? []);
   }
 
   onRouteCreated(route, context) {

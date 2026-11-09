@@ -197,25 +197,31 @@ export class Route {
     const { rendered } = this;
     const { layout, slots } = page.views?.find((entry) => entry.route === this) ?? {};
     const context = () => this.viewContext(page);
-    const hasSlice = this.hasSlice(page);
     const layoutBefore = rendered.layout;
     rendered.layout = this.createOrUpdateView({
       prior: rendered.layout,
-      view: hasSlice ? layout : null,
+      view: layout,
       placement: { parent: this.parentLayout(), slot: undefined },
       context,
     });
     if (layoutBefore !== undefined && rendered.layout !== layoutBefore) {
       // the routes below that stand; one not yet active renders when it activates
-      const routes = page.routes ?? [];
+      const routes = page.activeRoutes;
       const routesBelow = routes.slice(routes.indexOf(this) + 1).filter((route) => route.active);
       each([...routesBelow].reverse(), (route) => route.destroyViews());
       this.destroyViews({ keepLayout: true });
       each(routesBelow, (route) => route.render(page));
     }
-    const parent = rendered.layout ?? this.parentLayout();
     this.renderSlots(page, Object.keys(slots ?? {}));
-    if (page.routes?.at(-1) === this) {
+    this.renderView(page);
+  }
+
+  // the page's view, which the last active route shows: its own as the leaf, or a status view
+  // standing in for the routes below that are not on the page. a route that only became the last, or
+  // stopped being it, is told this alone, its layout and slots left as they stand
+  renderView(page) {
+    const { rendered } = this;
+    if (page.activeRoutes.at(-1) === this) {
       if (rendered.view && rendered.page?.view !== page.view) {
         this.router.destroyView({ rendered: rendered.view });
         rendered.view = undefined;
@@ -223,12 +229,11 @@ export class Route {
       rendered.view = this.createOrUpdateView({
         prior: rendered.view,
         view: page.view,
-        placement: { parent, slot: undefined },
-        context,
+        placement: { parent: rendered.layout ?? this.parentLayout(), slot: undefined },
+        context: () => this.viewContext(page),
       });
     }
     else if (rendered.view) {
-      // a route was added below: no longer the leaf, the route's view leaves
       this.router.destroyView({ rendered: rendered.view });
       rendered.view = undefined;
     }
@@ -242,9 +247,8 @@ export class Route {
     const { slots = {} } = page.views?.find((entry) => entry.route === this) ?? {};
     const parent = this.rendered.layout ?? this.parentLayout();
     const context = () => this.viewContext(page);
-    const hasSlice = this.hasSlice(page);
     each(names, (slot) => {
-      const view = hasSlice && !this.hasSlotBelow(page, slot) ? slots[slot] : null;
+      const view = this.hasSlotBelow(page, slot) ? null : slots[slot];
       this.rendered.slots[slot] = this.createOrUpdateView({
         prior: this.rendered.slots[slot],
         view,
@@ -254,18 +258,10 @@ export class Route {
     });
   }
 
-  // whether a route below this one on the page declares the slot, an explicit empty included; a
-  // route that frames nothing on the page declares nothing
+  // whether an active route below this one on the page declares the slot, an explicit empty included
   hasSlotBelow(page, slot) {
-    const routes = page?.routes ?? [];
-    return routes.slice(routes.indexOf(this) + 1).some((other) => other.hasSlice(page) && slot in other.slots);
-  }
-
-  // a route frames the page, its layout and its slots, while it holds a slice on it: on a page
-  // refused or not found at a route, that route and the routes below it hold none, so the status
-  // view stands in the nearest layout above that has what it read
-  hasSlice(page) {
-    return (page?.slices ?? []).some((slice) => slice.route === this);
+    const routes = page?.activeRoutes ?? [];
+    return routes.slice(routes.indexOf(this) + 1).some((other) => slot in other.slots);
   }
 
   // prior is the rendered view as it stands, context a thunk built only for a view that is created or told

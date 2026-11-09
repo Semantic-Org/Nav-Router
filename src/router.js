@@ -187,7 +187,7 @@ export class Router {
     const page = {
       view,
       views,
-      routes: [this.root],
+      ...this.routesOf(slices, []),
       data,
       slices,
       status: 'notFound',
@@ -229,9 +229,10 @@ export class Router {
     this.timers.clear();
 
     each(
-      [...(this.page?.routes ?? [])].reverse(),
+      [...(this.page?.activeRoutes ?? [])].reverse(),
       (route) => this.destroyRoute(route, this.lifecycleContext(route, null)),
     );
+    this.clearMountView();
     this.page =
       this.current =
       this.pending =
@@ -727,20 +728,21 @@ export class Router {
       if (!view) {
         this.logError(error);
       }
-      // the routes on screen stay active under the error page, so the routes carry over. a cold
-      // error, nothing yet shown, is the root's to show: framed by its layout when the root has no
-      // data of its own, since the data that failed may be the root's, and bare at the mount otherwise
+      // the routes on screen stay active under the error page. a cold error, nothing yet shown, is
+      // framed by the root when it has no data of its own, since the data that failed may be the
+      // root's, and stands at the mount with no route active otherwise
       const views = previous?.views ?? await this.resolveRouteViews([this.root]).catch(() => []);
       // a newer navigation began or landed while the views loaded: the error page is not this one's
       // to write. a navigation that failed is finished, so its signal says nothing of what came after
       if (this.pending || this.page !== previous) {
         return;
       }
+      const slices = previous?.slices ?? (this.root.data === undefined ? [this.createSlice(this.root, {})] : []);
       await this.batch(() => {
         this.page = {
           ...(pending ? this.pageFor(pending) : (previous ?? {})),
-          routes: previous?.routes ?? [this.root],
-          slices: previous?.slices ?? (this.root.data === undefined ? [this.createSlice(this.root, {})] : []),
+          slices,
+          ...this.routesOf(slices, pending?.routes ?? []),
           views,
           view,
           status: 'error',
@@ -868,7 +870,6 @@ export class Router {
     const delayMs = toDuration(this.config.loadingDelay) ?? 0;
     const minMs = toDuration(this.config.loadingMin) ?? 0;
     let loadingShownAt = null;
-    let coldLoading = null;
 
     if (!active.settled) {
       if (delayMs > 0) {
@@ -885,26 +886,18 @@ export class Router {
         if (this.config.statusViews?.loading) {
           const loadingView = await this.resolveView(this.config.statusViews.loading);
           if (!active.settled && !event.signal.aborted) {
-            // page stays the settled page: a loading view is rendered over it with its slices, so a
-            // leaf's own slots re-render against what stands, and pending.loading says so. on a cold
-            // boot nothing stands to render it inside, so it is made at the mount and leaves before
-            // the page lands, or with the navigation
+            // page stays the settled page: a loading view is rendered over it by its last active
+            // route, and pending.loading says so. on a cold boot no route is active, so the render
+            // shows it at the mount, where the page that lands replaces it
             const loading = {
               ...this.pageFor(matched),
               views: this.page?.views ?? [],
-              routes: this.page?.routes ?? [],
+              activeRoutes: this.page?.activeRoutes ?? [],
               slices: this.page?.slices ?? [],
               data: this.page?.data ?? {},
               view: loadingView,
               status: 'loading',
             };
-            if (!this.page) {
-              coldLoading = this.createView({
-                view: loadingView,
-                placement: { parent: null, slot: undefined },
-                context: this.root.viewContext(loading),
-              });
-            }
             await this.renderPage(loading, event);
           }
         }
@@ -942,15 +935,12 @@ export class Router {
         }
       }
 
-      if (coldLoading) {
-        this.destroyView({ rendered: coldLoading });
-        coldLoading = null;
-      }
       await this.applyCascade(matched, resolved, event);
     }
     finally {
-      if (coldLoading) {
-        this.destroyView({ rendered: coldLoading });
+      // a cold boot's loading view, shown at the mount, leaves with a navigation that was aborted
+      if (event.signal.aborted) {
+        this.clearMountView();
       }
     }
   }
@@ -1064,20 +1054,20 @@ export class Router {
           const routesAbove = routes.slice(0, routes.indexOf(ancestor));
           const { data, slices, notFound } = await this.runSlices(routesAbove, matched, navigation);
           if (notFound) {
-            return this.notFoundResult(matched, viewsReady, { data, slices, signal });
+            return this.notFoundResult(matched, viewsReady, { data, slices });
           }
-          const [view, views, { title, titles }] = await Promise.all([
+          const [view, views] = await Promise.all([
             this.resolveView(this.config.statusViews?.forbidden),
             viewsReady,
-            this.evaluateTitles(routes, matched, { data, slices, signal }),
           ]);
+          const titles = this.titlesOf(slices);
           return this.buildCascadeResult(matched, {
             status: 'forbidden',
             view,
             views,
             data,
             slices,
-            title,
+            title: titles[0] ?? '',
             titles,
           });
         }
@@ -1111,7 +1101,7 @@ export class Router {
 
     const { data, slices, notFound } = await this.runSlices(routes, matched, navigation);
     if (notFound) {
-      return this.notFoundResult(matched, viewsReady, { data, slices, signal });
+      return this.notFoundResult(matched, viewsReady, { data, slices });
     }
     const views = await viewsReady;
     const titles = this.titlesOf(slices);
@@ -1178,13 +1168,18 @@ export class Router {
     return { data, slices, notFound: false };
   }
 
-  async notFoundResult(matched, viewsReady, { data, slices, signal }) {
-    const [views, view, { title, titles }] = await Promise.all([
-      viewsReady,
-      this.resolveView(this.config.statusViews?.notFound),
-      this.evaluateTitles(matched.routes, matched, { data, slices, signal }),
-    ]);
-    return this.buildCascadeResult(matched, { status: 'notFound', view, views, data, slices, title, titles });
+  async notFoundResult(matched, viewsReady, { data, slices }) {
+    const [views, view] = await Promise.all([viewsReady, this.resolveView(this.config.statusViews?.notFound)]);
+    const titles = this.titlesOf(slices);
+    return this.buildCascadeResult(matched, {
+      status: 'notFound',
+      view,
+      views,
+      data,
+      slices,
+      title: titles[0] ?? '',
+      titles,
+    });
   }
 
   // a route's share of the page. the reactive scaffold gives it a signal the routes below read
@@ -1216,19 +1211,6 @@ export class Router {
 
   titleText(value) {
     return value === undefined || value === null || value === '' ? null : String(value);
-  }
-
-  async evaluateTitles(routes, matched, { data = {}, slices = [], signal } = {}) {
-    const titles = [];
-    for (const ancestor of routes) {
-      if (ancestor.title !== undefined) {
-        const title = await this.resolveTitle(ancestor, matched, { data, slices, titles: [...titles], signal });
-        if (title !== null) {
-          titles.unshift(title);
-        }
-      }
-    }
-    return { title: titles[0] ?? '', titles };
   }
 
   buildCascadeResult({ route, params, query }, resolved) {
@@ -1310,7 +1292,13 @@ export class Router {
     const previous = this.page;
     // the page's write, its settle and its render are one moment to anything watching
     const rendering = this.batch(() => {
-      this.page = { ...this.pageFor(matched), ...resolved, routes: matched.routes, key, user: this.user };
+      this.page = {
+        ...this.pageFor(matched),
+        ...resolved,
+        ...this.routesOf(resolved.slices, matched.routes),
+        key,
+        user: this.user,
+      };
       this.settleRoutes(previous, this.page);
       if (key && resolved.status === 'ok') {
         this.entryCache?.set(key, { resolved, user: this.user });
@@ -1348,12 +1336,25 @@ export class Router {
           Route Lifecycles
   *******************************/
 
-  // the page's routes are the active set. settle diffs it against the page before: destroyed in
+  // the routes a page holds: the active ones, each with what it loaded, and the unresolved, the
+  // matched routes from the one that refused, was not found or failed down to the leaf, which are
+  // not on the page and have no life on it
+  routesOf(slices, matched) {
+    const activeRoutes = slices.map((slice) => slice.route);
+    return { activeRoutes, unresolvedRoutes: matched.filter((route) => !inArray(route, activeRoutes)) };
+  }
+
+  // every route the page's url matched, active or not
+  matchedRoutes(page) {
+    return [...(page?.activeRoutes ?? []), ...(page?.unresolvedRoutes ?? [])];
+  }
+
+  // the page's active routes are the active set. settle diffs it against the page before: destroyed in
   // reverse, then created and updated in route order. a retained route whose slice is the one it
   // had did not move and hears nothing
   settleRoutes(previous, page) {
-    const before = previous?.routes ?? [];
-    const after = page.routes ?? [];
+    const before = previous?.activeRoutes ?? [];
+    const after = page.activeRoutes ?? [];
     const findSlice = (page, route) => page?.slices?.find((slice) => slice.route === route) ?? null;
 
     each([...before].reverse(), (route) => {
@@ -1371,8 +1372,8 @@ export class Router {
         this.onRouteUpdated(route, this.lifecycleContext(route, page, previous));
       }
       else if ((before.at(-1) === route) !== (after.at(-1) === route)) {
-        // a kept route at the end of the routes shows the page's view, and gives it up when a route is added below
-        route.update(page);
+        // a kept route that became the last active shows the page's view, and gives it up when a route enters below
+        route.renderView(page);
       }
       else {
         // a kept route renders a slot again when a route below it took that slot or gave it back
@@ -1423,16 +1424,16 @@ export class Router {
 
   async redirectChanged(route, target) {
     const resolved = await target;
-    if (resolved && inArray(route, this.page?.routes ?? [])) {
+    if (resolved && inArray(route, this.matchedRoutes(this.page))) {
       this.navigator.navigate(this.href(resolved, this.paramsFor(resolved, this.page.params)), { history: 'replace' });
     }
   }
 
   async permissionChanged(route, allowed) {
-    const routes = this.page?.routes ?? [];
-    // a navigation meanwhile brings its own routes, and the page it left is not this answer's to change
-    const stale = () => this.page?.routes !== routes;
-    if (!inArray(route, routes)) {
+    const page = this.page;
+    // a navigation or another answer meanwhile brings its own page, which is not this answer's to change
+    const stale = () => this.page !== page;
+    if (!inArray(route, this.matchedRoutes(page))) {
       return;
     }
     const result = await allowed;
@@ -1457,7 +1458,7 @@ export class Router {
       return;
     }
     this.dropSlices(route);
-    await this.updatePage(route, { view, status: 'forbidden', titles: this.page.titles });
+    await this.updatePage(route, { view, status: 'forbidden' });
   }
 
   async updateTitle(route, value) {
@@ -1486,13 +1487,12 @@ export class Router {
     const slices = page?.slices;
     const slice = slices?.find((item) => item.route === route);
     if (!slice) {
-      // on a not-found page the route that returned it is the first without a slice, and its data arriving is the reload
-      const returnedNotFound = page?.status === 'notFound'
-        && page.routes?.find((item) => !slices.some((other) => other.route === item)) === route;
+      // on a not-found page the route that returned it is the first unresolved, and its data arriving is the reload
+      const returnedNotFound = page?.status === 'notFound' && page.unresolvedRoutes?.[0] === route;
       // the standing page is known by its routes: a parent's data moving in the same tick re-reads the
       // page from its slices, which keeps them, while a navigation brings a new one
       if (
-        returnedNotFound && (await value) !== NOT_FOUND && this.page?.routes === page.routes
+        returnedNotFound && (await value) !== NOT_FOUND && this.page?.activeRoutes === page.activeRoutes
         && this.page.status === 'notFound'
       ) {
         this.navigator.reload();
@@ -1512,7 +1512,7 @@ export class Router {
         return;
       }
       this.dropSlices(route);
-      await this.updatePage(route, { view, status: 'notFound', titles: this.page.titles });
+      await this.updatePage(route, { view, status: 'notFound' });
       return;
     }
     const data = isPlainObject(resolved) ? await this.resolveDataSlice(resolved) : {};
@@ -1532,7 +1532,7 @@ export class Router {
   }
 
   // the route's slice and those below it leave the page, the shape a page refused or not found at
-  // the route has, and their layouts and slots leave with them when the page is re-read
+  // the route has: when the page is re-read those routes are no longer active, and settle ends them
   dropSlices(route) {
     const { slices } = this.page;
     const index = slices.findIndex((slice) => slice.route === route);
@@ -1542,20 +1542,27 @@ export class Router {
   }
 
   // the page re-read from its slices, which several updates in one tick share, so none of them
-  // writes over another's, with whatever else moved: a status swap brings its view and keeps the
-  // titles, which name the page refused or not found as they do at navigation. the moved route and
-  // the routes below it are told at the render moment, since data flows down
+  // writes over another's. data moving tells the moved route and the routes below it at the render
+  // moment, since data flows down. a status swap brings its view and settles the page again, the
+  // routes that lost their slices no longer active on it
   async updatePage(route, changes = {}) {
-    const { slices, routes = [] } = this.page;
+    const previous = this.page;
+    const { slices, activeRoutes } = previous;
     const data = {};
     each(slices, (slice) => extend(data, slice.data));
-    const titles = changes.titles ?? this.titlesOf(slices);
+    const titles = this.titlesOf(slices);
     const rendering = this.batch(() => {
-      this.page = { ...this.page, ...changes, data, title: titles[0] ?? '', titles };
+      this.page = { ...previous, ...changes, data, title: titles[0] ?? '', titles };
       if (globalThis.document && this.page.title) {
         globalThis.document.title = this.page.title;
       }
-      each(routes.slice(routes.indexOf(route)), (moved) => moved.update(this.page));
+      if (changes.status) {
+        extend(this.page, this.routesOf(slices, this.matchedRoutes(previous)));
+        this.settleRoutes(previous, this.page);
+      }
+      else {
+        each(activeRoutes.slice(activeRoutes.indexOf(route)), (moved) => moved.update(this.page));
+      }
       return this.renderPage(this.page);
     });
     await rendering;
@@ -1564,12 +1571,30 @@ export class Router {
 
   // awaited, so the platform's focus reset and scroll find the new dom. a traverse puts the named
   // containers back here, at the swap, which a view transition's update is part of
+  clearMountView() {
+    if (this.mountView) {
+      this.destroyView({ rendered: this.mountView });
+      this.mountView = null;
+    }
+  }
+
   async renderPage(page, event = null) {
-    // the leaf route shows the page's view, so a view swapped in place, a status view or the
-    // loading view, is told here, once, for every path that swaps one
-    const leaf = page.routes?.at(-1);
+    // the last active route shows the page's view, so a view swapped in place, a status view or
+    // the loading view, is told here, once, for every path that swaps one; its layout and slots
+    // stand as settle left them
+    const leaf = page.activeRoutes?.at(-1);
     if (leaf?.rendered && leaf.rendered.page !== page) {
-      leaf.update(page);
+      leaf.renderView(page);
+    }
+    // a page with no route active, refused or failed at the root or loading on a cold boot, shows
+    // its view at the mount
+    this.clearMountView();
+    if (!leaf && page.view) {
+      this.mountView = this.createView({
+        view: page.view,
+        placement: { parent: null, slot: undefined },
+        context: this.root.viewContext(page),
+      });
     }
     await this.onRender?.(page, event);
     if (event?.navigationType === 'traverse' && this.config.restoreScroll && page.status !== 'loading') {

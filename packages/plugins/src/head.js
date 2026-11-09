@@ -146,7 +146,7 @@ proto.writeHead = function(page) {
   }
 
   const merged = {};
-  each(page.routes ?? [], (route) => {
+  each(page.activeRoutes ?? [], (route) => {
     const meta = this.headMeta?.get(route)?.value;
     if (meta) {
       extend(merged, meta);
