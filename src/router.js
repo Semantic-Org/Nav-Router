@@ -1453,6 +1453,10 @@ export class Router {
       });
       return;
     }
+    // a route already refused has nothing more to lose
+    if (!route.active) {
+      return;
+    }
     const view = await this.resolveView(this.config.statusViews?.forbidden);
     if (stale()) {
       return;

@@ -441,9 +441,11 @@ export class ReactiveRouter extends Router {
     this.changedRoutes = null;
   }
 
-  // a hook's later value lands while its route is on the standing page, active or waiting unresolved
+  // a hook's later value lands while its route is on the standing page, active or waiting
+  // unresolved. untracked: the page is a cell, and a hook that depended on it would run again at
+  // every page its own consequence wrote
   onPage(route) {
-    return route.active || inArray(route, this.page?.unresolvedRoutes ?? []);
+    return route.active || this.untrack(() => inArray(route, this.page?.unresolvedRoutes ?? []));
   }
 
   onRouteCreated(route, context) {
