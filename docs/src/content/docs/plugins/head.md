@@ -25,7 +25,6 @@ const app = router({
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `metaTags` | `object` | `{}` | Tags every page starts from, before routes add theirs. |
 | `formatTitle` | `function` | `null` | Turns a route’s title into the document title. |
 
 ## The `meta` route option
