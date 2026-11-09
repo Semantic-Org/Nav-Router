@@ -3,14 +3,14 @@ import { Router } from '../router.js';
 
 // draws navigation and cascade spans on the devtools performance panel through @semantic-ui/utils.
 // every entry point is throw-safe, and tooltip prose folds at the callsite in production builds
-Router.defaults.trackGroup ??= 'router';
+Router.defaults.timelineGroup ??= 'router';
 const proto = Router.prototype;
 const { start, intercepted, settled, failed, runGuards, runData, renderPage, updateData, stop } = proto;
 
 const routeLabel = (target) => target?.route?.name || target?.pathname || target?.url || 'unknown';
 
 const detail = (router, track, color, properties, tooltipText = 0) => ({
-  trackGroup: router.config.trackGroup,
+  trackGroup: router.config.timelineGroup,
   track,
   color,
   ...(properties?.length ? { properties } : {}),
