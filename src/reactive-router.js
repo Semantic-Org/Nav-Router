@@ -121,6 +121,9 @@ export class ReactiveRouter extends Router {
     this.stopIdentity = null;
     this.identityPromise = null;
     this.abortController?.abort();
+    // an unresolved route has no signal to end its runs, so the page's watch ends here
+    this.pageAbort?.abort();
+    each(this.page?.unresolvedRoutes ?? [], (route) => this.stopRuns(route));
     return super.stop();
   }
 
@@ -329,7 +332,7 @@ export class ReactiveRouter extends Router {
       // attached. a later run that throws is a rejected promise, applied as one
       let value;
       try {
-        value = fn(createHookContext({ signal: run.attached ? route.abortSignal : signal }));
+        value = fn(createHookContext({ signal: run.attached ? this.signalOf(route) : signal }));
       }
       catch (error) {
         value = Promise.reject(error);
@@ -423,6 +426,8 @@ export class ReactiveRouter extends Router {
       refused.runs = kept;
     }
     if (!inPlace) {
+      this.pageAbort?.abort();
+      this.pageAbort = new AbortController();
       each(page.activeRoutes ?? [], (route) => {
         if (!this.changedRoutes.has(route)) {
           this.attachRuns(route, 'guard');
@@ -439,6 +444,12 @@ export class ReactiveRouter extends Router {
       }
     });
     this.changedRoutes = null;
+  }
+
+  // the signal a hook's later run is handed: its route's while it is active, and for an unresolved
+  // route, which has no life of its own, one that lives as long as the page it waits on
+  signalOf(route) {
+    return route.active ? route.abortSignal : this.pageAbort?.signal;
   }
 
   // a hook's later value lands while its route is on the standing page, active or waiting
