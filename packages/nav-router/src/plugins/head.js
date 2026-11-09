@@ -3,7 +3,7 @@ import { Router } from '../router.js';
 
 const PROPERTY_PREFIX = /^(og|article|profile|book|fb):/;
 
-// cascades route.meta across the active chain into document.head and formats document.title.
+// cascades route.meta across the active routes into document.head and formats document.title.
 // meta is a hook on the router's door: evaluated when its route is created or updated, and on a
 // reactive router again when what it read moves, so the tags follow live data. the merge and the
 // writes are synchronous at render, off the swap path, and an async answer lands when it resolves.
@@ -65,7 +65,7 @@ proto.evaluateMeta = function(route) {
   const context = this.contextFor(route, this.page, { data, slices });
   const value = this.evaluateHook(route, route.meta, context, {
     kind: 'slice',
-    changed: (answer) => this.metaChanged(route, answer),
+    changed: (value) => this.metaChanged(route, value),
   });
   if (isPromise(value)) {
     this.metaChanged(route, value);
@@ -146,7 +146,7 @@ proto.writeHead = function(page) {
   }
 
   const merged = {};
-  each(page.chain ?? [], (route) => {
+  each(page.routes ?? [], (route) => {
     const meta = this.headMeta?.get(route)?.value;
     if (meta) {
       extend(merged, meta);

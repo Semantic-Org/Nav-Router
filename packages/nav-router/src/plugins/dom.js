@@ -41,7 +41,7 @@ const toNodes = (result) => {
   throw new Error(`dom: a view returned ${typeof result}, not markup or nodes`);
 };
 
-const renderOf = (view, context) => toNodes(isFunction(view) ? view(context) : view);
+const renderView = (view, context) => toNodes(isFunction(view) ? view(context) : view);
 
 // what stands between a region's anchors, the view's own
 const contents = ({ start, end }) => {
@@ -56,7 +56,7 @@ const elements = (region) => contents(region).filter((node) => node.nodeType ===
 
 // the slot element a region's layout wrote for the selector: the host when an element of it
 // projects one, otherwise the match among the layout's own nodes or inside one
-const slotIn = (region, selector) => {
+const findSlot = (region, selector) => {
   const roots = elements(region);
   const host = roots.find((element) => element.shadowRoot);
   if (host) {
@@ -75,13 +75,13 @@ const slotIn = (region, selector) => {
 // wrote. a named slot is the nearest layout's above that wrote it, across layouts that did not,
 // so a leaf's override of a slot the root declares lands in the root's; content for a slot no
 // layout wrote goes in the parent's first element
-const targetOf = ({ parent, slot }, router) => {
+const findTarget = ({ parent, slot }, router) => {
   if (!parent) {
     return mountElement(router);
   }
   const selector = slot ? `slot[name="${slot}"]` : 'slot:not([name])';
   for (let region = parent; region; region = slot ? region.parent : null) {
-    const found = slotIn(region, selector);
+    const found = findSlot(region, selector);
     if (found) {
       return found;
     }
@@ -93,7 +93,7 @@ const targetOf = ({ parent, slot }, router) => {
 // so the app leads whatever else the mount holds, and at the end otherwise, since a slot holds one
 // occupant. a light-dom slot keeps its own fallback children aside while something fills it
 const openRegion = (placement, router) => {
-  const target = targetOf(placement, router);
+  const target = findTarget(placement, router);
   if (target.tagName === 'SLOT' && !target.fallback) {
     target.fallback = [...target.childNodes];
     target.replaceChildren();
@@ -126,7 +126,7 @@ const remove = (region) => {
 };
 
 // a shadow host projects by the slot attribute, carried by the region's elements
-const stamp = (region, slot) => {
+const setSlotAttribute = (region, slot) => {
   if (region.target.shadowRoot) {
     each(
       elements(region),
@@ -145,42 +145,43 @@ proto.createView = function({ view, placement, context, mount }) {
       Object.assign(region, isFunction(mounted) ? { dispose: mounted } : mounted);
     }
     else {
-      fill(region, renderOf(view, context));
+      fill(region, renderView(view, context));
     }
   }
   catch (error) {
     remove(region);
     throw error;
   }
-  stamp(region, placement.slot);
+  setSlotAttribute(region, placement.slot);
   return region;
 };
 
 proto.updateView = function({ rendered, view, placement, context }) {
-  const held = contents(rendered);
-  const told = rendered.dispose ? rendered.update : held.length === 1 ? held[0].update : null;
+  const previous = contents(rendered);
+  const update = rendered.dispose ? rendered.update : previous.length === 1 ? previous[0].update : null;
   // a mounted view is told through its update, or left as it stands; so is an element with one of its own
-  if (rendered.dispose || isFunction(told)) {
-    told?.(context);
-    stamp(rendered, placement.slot);
+  if (rendered.dispose || isFunction(update)) {
+    update?.(context);
+    setSlotAttribute(rendered, placement.slot);
     return rendered;
   }
-  const nodes = renderOf(view, context);
-  if (nodes.length === 1 && held.length === 1 && nodes[0] === held[0]) {
+  const nodes = renderView(view, context);
+  if (nodes.length === 1 && previous.length === 1 && nodes[0] === previous[0]) {
     return rendered;
   }
   // one element in for one out keeps its id, so a control the page addresses by id stays addressed
   if (
-    held.length === 1 && nodes.length === 1 && held[0].id && nodes[0].nodeType === Node.ELEMENT_NODE && !nodes[0].id
+    previous.length === 1 && nodes.length === 1 && previous[0].id && nodes[0].nodeType === Node.ELEMENT_NODE
+    && !nodes[0].id
   ) {
-    nodes[0].id = held[0].id;
+    nodes[0].id = previous[0].id;
   }
-  const focused = held.some((node) => node.contains(document.activeElement)) ? document.activeElement : null;
+  const focused = previous.some((node) => node.contains(document.activeElement)) ? document.activeElement : null;
   empty(rendered);
   fill(rendered, nodes);
-  stamp(rendered, placement.slot);
+  setSlotAttribute(rendered, placement.slot);
   // the same control by id takes the focus back, with its selection where it was
-  const again = focused?.id && elements(rendered)
+  const focusTarget = focused?.id && elements(rendered)
     .map((
       element,
     ) => (element.matches(`#${CSS.escape(focused.id)}`)
@@ -188,11 +189,11 @@ proto.updateView = function({ rendered, view, placement, context }) {
       : element.querySelector(`#${CSS.escape(focused.id)}`))
     )
     .find(Boolean);
-  if (again) {
-    again.focus();
-    if (isFunction(again.setSelectionRange) && focused.selectionStart !== null) {
+  if (focusTarget) {
+    focusTarget.focus();
+    if (isFunction(focusTarget.setSelectionRange) && focused.selectionStart !== null) {
       try {
-        again.setSelectionRange(focused.selectionStart, focused.selectionEnd);
+        focusTarget.setSelectionRange(focused.selectionStart, focused.selectionEnd);
       }
       catch {}
     }
