@@ -1,14 +1,9 @@
 import { escapeHTML } from '@semantic-ui/utils';
-import { Router, update } from 'nav-router';
-import preloadIntent from 'nav-router/plugins/preload-intent';
-
-import dom from 'nav-router/plugins/dom';
+import 'nav-router/plugins/preload-intent';
+import { update } from 'nav-router';
 
 import { router as app } from './routes.js';
 import { Breadcrumbs } from './views/breadcrumbs.js';
-
-Router.extend(preloadIntent);
-Router.extend(dom, { mount: '#app-mount' });
 
 const demoUsers = {
   none: null,

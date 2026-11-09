@@ -1,21 +1,14 @@
-import { Router } from 'nav-router';
-import dom from 'nav-router/plugins/dom';
+import 'nav-router/plugins/dom';
 import { ReactiveRouter } from 'nav-router/reactive';
 import { batch, createComputed, createRoot, createSignal, untrack } from 'solid-js';
 import { createComponent, insert } from 'solid-js/web';
 
-// the second example of the door, on the dom plugin's seams: the plugin places, this renders. a
+// the second example of the door, on the dom plugin's seams, which the import above brings: the
+// plugin places, this renders. a
 // view is a solid component whose props are the scaffold's live context, so a component reads
 // props.params.id or props.data.v and is woken by the key it read and by no other. the scaffold
 // runs on solid's signals and computeds
 export class SolidRouter extends ReactiveRouter {
-  // the dom plugin places what this renders, so the integration brings it; an install made earlier
-  // with its own mount stands, and the router's mount option names the container either way
-  constructor(options) {
-    Router.extend(dom);
-    super(options);
-  }
-
   // a thunk to the setter, so a function value is stored and not called; the comparator is the
   // scaffold's, from its equality table
   createSignal(initialValue, { equals }) {

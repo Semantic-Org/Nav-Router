@@ -1,5 +1,6 @@
 import { wait } from '@semantic-ui/utils';
 import { lazy, router } from 'nav-router';
+import 'nav-router/plugins/dom';
 
 import { MEMBERS } from './data.js';
 import { ErrorPage } from './views/error-page.js';
@@ -16,6 +17,7 @@ import { TeamOverviewPage } from './views/team-overview-page.js';
 import { TeamSidebar } from './views/team-sidebar.js';
 
 export const app = router({
+  mount: '#app-mount',
   name: 'home',
   title: 'Acme Console',
   layout: RootLayout,
