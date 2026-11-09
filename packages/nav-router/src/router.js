@@ -81,11 +81,15 @@ export class Router {
       const owner = key in defaults ? settings : routeOptions;
       owner[key] = value;
     });
-    // the resolved settings in one place, for the console and for anything that introspects
+    // the resolved settings, read from here and nowhere else; a plugin's default lands here too
     this.config = extend({}, defaults, settings);
-    extend(this, this.config);
-    this.base = this.normalizeBase(this.base);
-    this.statusViews = { ...defaults.statusViews, ...settings.statusViews };
+    this.config.base = this.normalizeBase(this.config.base);
+    this.config.statusViews = { ...defaults.statusViews, ...settings.statusViews };
+    // not settings, though declared among the defaults so the constructor keeps them from the root
+    // route: the user is state the identity door writes, the two callbacks are the app's to assign
+    this.user = this.config.user;
+    this.onRender = this.config.onRender;
+    this.onChange = this.config.onChange;
 
     this.routesByName = new Map();
     this.leaves = [];
@@ -134,13 +138,13 @@ export class Router {
     // the helpers reach the started router. one per document is the common case, so it also lives
     // on window under this name for the console; a second router names itself otherwise
     setRouter(this);
-    if (this.attachGlobal && globalThis.window) {
-      globalThis[this.attachGlobal] = this;
+    if (this.config.attachGlobal && globalThis.window) {
+      globalThis[this.config.attachGlobal] = this;
     }
 
     const initialUrl = this.navigator.entry?.url
       ?? globalThis.location?.href
-      ?? (this.base || '/');
+      ?? (this.config.base || '/');
 
     const matched = this.match(initialUrl);
     this.commitRoute(matched);
@@ -182,7 +186,7 @@ export class Router {
     const navigation = { signal: event.signal, reload: false, previous: null };
     await this.resolveIdentity(navigation);
     const [view, views, { data, slices }] = await Promise.all([
-      this.resolveView(this.statusViews?.notFound),
+      this.resolveView(this.config.statusViews?.notFound),
       this.resolveRouteViews([this.root]),
       this.runSlices([this.root], { params: {}, query: {} }, navigation),
     ]);
@@ -215,8 +219,8 @@ export class Router {
   stop() {
     this.navigator.detach();
     setRouter(null);
-    if (this.attachGlobal && globalThis[this.attachGlobal] === this) {
-      delete globalThis[this.attachGlobal];
+    if (this.config.attachGlobal && globalThis[this.config.attachGlobal] === this) {
+      delete globalThis[this.config.attachGlobal];
     }
     this.activeAbort?.abort();
     this.activeAbort = null;
@@ -300,14 +304,14 @@ export class Router {
   }
 
   stripBase(rawPathname) {
-    if (!this.base) {
+    if (!this.config.base) {
       return this.normalizePathname(rawPathname);
     }
-    if (rawPathname === this.base) {
+    if (rawPathname === this.config.base) {
       return '/';
     }
-    if (rawPathname.startsWith(`${this.base}/`)) {
-      return this.normalizePathname(rawPathname.slice(this.base.length));
+    if (rawPathname.startsWith(`${this.config.base}/`)) {
+      return this.normalizePathname(rawPathname.slice(this.config.base.length));
     }
     return null;
   }
@@ -571,9 +575,9 @@ export class Router {
   }
 
   prependBase(path) {
-    if (!this.base) { return path; }
-    if (path === '/') { return this.base; }
-    return path.startsWith('/') ? `${this.base}${path}` : `${this.base}/${path}`;
+    if (!this.config.base) { return path; }
+    if (path === '/') { return this.config.base; }
+    return path.startsWith('/') ? `${this.config.base}${path}` : `${this.config.base}/${path}`;
   }
 
   // the address a sign-in redirect carries back: a path under base, so the sign-in page can navigate to it
@@ -631,7 +635,7 @@ export class Router {
   }
 
   back(fallback = this.root.name, args = {}) {
-    return this.navigator.back(fallback ? this.href(fallback, args) : (this.base || '/'));
+    return this.navigator.back(fallback ? this.href(fallback, args) : (this.config.base || '/'));
   }
 
   forward() {
@@ -715,12 +719,12 @@ export class Router {
     };
     // a failure before commit left the standing page in place; only a committed one is shown as an error
     const committed = !pending || pending.committed;
-    if (committed && this.errorRoute) {
-      this.navigator.deferNavigate(this.href(this.errorRoute), { history: 'replace' });
+    if (committed && this.config.errorRoute) {
+      this.navigator.deferNavigate(this.href(this.config.errorRoute), { history: 'replace' });
     }
     else if (committed) {
       const previous = this.page;
-      const view = await this.resolveView(this.statusViews?.error).catch(() => null);
+      const view = await this.resolveView(this.config.statusViews?.error).catch(() => null);
       if (!view) {
         this.logError(error);
       }
@@ -780,10 +784,11 @@ export class Router {
   // the guard phase answers before the url may move, the data phase may run on after commit
   // read once per navigation, ahead of the guards and under holdCommit with them. absent, user is whatever the app set
   async resolveIdentity(navigation) {
-    if (this.identity == null) {
+    if (this.config.identity == null) {
       return;
     }
-    const user = (await (isFunction(this.identity) ? this.identity(navigation) : this.identity)) ?? null;
+    const user = (await (isFunction(this.config.identity) ? this.config.identity(navigation) : this.config.identity))
+      ?? null;
     if (!navigation.signal?.aborted) {
       this.user = user;
     }
@@ -793,7 +798,8 @@ export class Router {
     const entryKey = event.navigationType === 'traverse' ? event.destination.key : null;
     // the visit's result rides its entry: a traverse back shows what was seen for the same user, reload() refreshes it
     const remembered = entryKey ? this.entryCache?.get(entryKey) : null;
-    const cached = () => (remembered && !this.dataChanged(remembered.user, this.user) ? remembered.resolved : null);
+    const cached =
+      () => (remembered && !this.config.dataChanged(remembered.user, this.user) ? remembered.resolved : null);
     // what the cascade knows of the navigation: its signal, whether it is a reload, the page it leaves
     const navigation = { signal: event.signal, reload: event.navigationType === 'reload', previous: this.page };
     const work = {
@@ -844,7 +850,7 @@ export class Router {
     }
 
     // a fast load settles before the url moves, a slow one commits into its loading state
-    const holdMs = toDuration(this.holdCommit) ?? 0;
+    const holdMs = toDuration(this.config.holdCommit) ?? 0;
     if (!active.settled && holdMs > 0) {
       await Promise.race([
         active.ready.catch(noop),
@@ -861,8 +867,8 @@ export class Router {
       this.pending = { ...this.pending, committed: true };
     }
 
-    const delayMs = toDuration(this.loadingDelay) ?? 0;
-    const minMs = toDuration(this.loadingMin) ?? 0;
+    const delayMs = toDuration(this.config.loadingDelay) ?? 0;
+    const minMs = toDuration(this.config.loadingMin) ?? 0;
     let loadingShownAt = null;
     let coldLoading = null;
 
@@ -878,8 +884,8 @@ export class Router {
         if (this.pending) {
           this.pending = { ...this.pending, loading: true };
         }
-        if (this.statusViews?.loading) {
-          const loadingView = await this.resolveView(this.statusViews.loading);
+        if (this.config.statusViews?.loading) {
+          const loadingView = await this.resolveView(this.config.statusViews.loading);
           if (!active.settled && !event.signal.aborted) {
             // page stays the settled page: a loading view is rendered over it with its slices, so a
             // leaf's own slots re-render against what stands, and pending.loading says so. on a cold
@@ -1043,11 +1049,11 @@ export class Router {
           this.contextFor(ancestor, matched, { signal }),
         );
         if (!allowed) {
-          if ((!this.user || !this.statusViews?.forbidden) && this.signInRoute) {
+          if ((!this.user || !this.config.statusViews?.forbidden) && this.config.signInRoute) {
             // the return address rides to the sign-in page, which reads it as query.returnTo
             return {
               status: 'redirect',
-              redirect: this.href(this.signInRoute, { returnTo: this.returnAddress(matched) }),
+              redirect: this.href(this.config.signInRoute, { returnTo: this.returnAddress(matched) }),
               route,
               params,
               query,
@@ -1063,7 +1069,7 @@ export class Router {
             return this.notFoundResult(matched, viewsReady, { data, slices, signal });
           }
           const [view, views, { title, titles }] = await Promise.all([
-            this.resolveView(this.statusViews?.forbidden),
+            this.resolveView(this.config.statusViews?.forbidden),
             viewsReady,
             this.evaluateTitles(currentRoutes, matched, { data, slices, signal }),
           ]);
@@ -1090,7 +1096,7 @@ export class Router {
   // when the url as the route sees it did not move, unless every route runs again, on a reload or
   // for another user
   keptSlice(route, matched, { reload = false, previous = null }) {
-    if (!previous || reload || this.dataChanged(previous.user, this.user)) {
+    if (!previous || reload || this.config.dataChanged(previous.user, this.user)) {
       return null;
     }
     const slice = previous.slices?.find((item) => item.route === route);
@@ -1172,7 +1178,7 @@ export class Router {
   async notFoundResult(matched, viewsReady, { data, slices, signal }) {
     const [views, view, { title, titles }] = await Promise.all([
       viewsReady,
-      this.resolveView(this.statusViews?.notFound),
+      this.resolveView(this.config.statusViews?.notFound),
       this.evaluateTitles(matched.currentRoutes, matched, { data, slices, signal }),
     ]);
     return this.buildCascadeResult(matched, { status: 'notFound', view, views, data, slices, title, titles });
@@ -1430,13 +1436,13 @@ export class Router {
       }
       return;
     }
-    if ((!this.user || !this.statusViews?.forbidden) && this.signInRoute) {
-      this.navigator.navigate(this.href(this.signInRoute, { returnTo: this.returnAddress(this.current) }), {
+    if ((!this.user || !this.config.statusViews?.forbidden) && this.config.signInRoute) {
+      this.navigator.navigate(this.href(this.config.signInRoute, { returnTo: this.returnAddress(this.current) }), {
         history: 'replace',
       });
       return;
     }
-    const view = await this.resolveView(this.statusViews?.forbidden);
+    const view = await this.resolveView(this.config.statusViews?.forbidden);
     if (stale()) {
       return;
     }
@@ -1491,7 +1497,7 @@ export class Router {
       return;
     }
     if (resolved === NOT_FOUND) {
-      const view = await this.resolveView(this.statusViews?.notFound);
+      const view = await this.resolveView(this.config.statusViews?.notFound);
       if (stale()) {
         return;
       }
@@ -1508,7 +1514,7 @@ export class Router {
   // sets the slice and says whether it moved, one dataChanged compare. the reactive scaffold
   // writes each key through its cell and lets the cell's equality say
   setSlice(slice, data) {
-    if (!this.dataChanged(slice.data, data)) {
+    if (!this.config.dataChanged(slice.data, data)) {
       return false;
     }
     slice.data = data;
@@ -1556,7 +1562,7 @@ export class Router {
       leaf.update(page);
     }
     await this.onRender?.(page, event);
-    if (event?.navigationType === 'traverse' && this.restoreScroll && page.status !== 'loading') {
+    if (event?.navigationType === 'traverse' && this.config.restoreScroll && page.status !== 'loading') {
       this.navigator.restoreScroll(this.navigator.entry);
     }
   }

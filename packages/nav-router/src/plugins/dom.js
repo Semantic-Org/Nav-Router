@@ -21,7 +21,7 @@ export default ({ mount: defaultMount = 'body' } = {}, Router) => {
   Router.defaults.mount ??= defaultMount;
 
   const mountElement = (router) => {
-    const target = router.mount ?? defaultMount;
+    const target = router.config.mount ?? defaultMount;
     return isString(target) ? document.querySelector(target) : target;
   };
 

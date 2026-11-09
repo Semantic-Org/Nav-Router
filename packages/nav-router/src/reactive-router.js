@@ -35,7 +35,7 @@ export class ReactiveRouter extends Router {
     // the helpers and an app's chrome among them. core writes the fields as it always has
     const { equality } = this.constructor;
     each(['current', 'page', 'pending', 'error'], (key) => this.cellFor(key, equality.snapshot));
-    this.cellFor('user', (before, after) => !this.dataChanged(before, after));
+    this.cellFor('user', (before, after) => !this.config.dataChanged(before, after));
     // the page's params and query, live by key: params.org tracks org alone. the page's and so the
     // router's, written once per settle, which is what keeps a kept layout's reads current
     this.paramCells = this.createStore({});
@@ -106,7 +106,7 @@ export class ReactiveRouter extends Router {
   // boot's among them, and asks again otherwise, once per navigation as core does: an identity
   // reading nothing reactive, a cookie or a fetch, still moves with the page
   async start() {
-    if (isFunction(this.identity)) {
+    if (isFunction(this.config.identity)) {
       this.lifetime = new AbortController();
       this.identityRun = this.createReaction(() => {
         this.identityFresh = true;
@@ -138,7 +138,7 @@ export class ReactiveRouter extends Router {
   // and an aborted navigation's lands nothing. settled, it is no navigation's to take; failed, it
   // is dropped, so the navigation that awaited it fails with it and the next asks again
   askIdentity(context) {
-    const answer = Promise.resolve(this.identity(context)).then((user) => {
+    const answer = Promise.resolve(this.config.identity(context)).then((user) => {
       if (this.identityAnswer === answer && !context.signal?.aborted) {
         this.user = user ?? null;
       }
@@ -188,7 +188,7 @@ export class ReactiveRouter extends Router {
         // a data cell compares as the router's dataChanged says, the instance's word on data
         cells.set(
           key,
-          this.createSignal(initialValue[key], { equals: (before, after) => !this.dataChanged(before, after) }),
+          this.createSignal(initialValue[key], { equals: (before, after) => !this.config.dataChanged(before, after) }),
         );
       }
       return cells.get(key);
