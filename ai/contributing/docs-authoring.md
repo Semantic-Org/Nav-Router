@@ -26,7 +26,7 @@ This file will be revised when the nav-router docs are finalized. Conventions ar
 
 ## Before You Build
 
-**A curriculum pass.** Before writing anything, tour the running nav-router docs in a browser and note, in your own words, how each design element is executed. The code shows mechanics; the running site shows feel and timing. Go in this order:
+**A curriculum pass.** Before writing anything, tour the running nav-router docs in a browser to see how each design element is executed. The code shows mechanics; the running site shows feel and timing. Go in this order:
 
 1. The homepage at 1440px in dark mode: play the hero's navigation trace, watch the slots graphic loop, scroll to the playground and watch it load, change the install picker's framework and note the width holding, hover the integration cards.
 2. The same in light mode: the sheen, bevels and callout tones in both themes.
