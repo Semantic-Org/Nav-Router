@@ -131,7 +131,7 @@ proto.writeHead = function(page) {
   }
 
   if (isFunction(this.config.formatTitle)) {
-    const baseTitle = isArray(page.titles) ? (page.titles.at(-1) ?? '') : (page.title ?? '');
+    const baseTitle = isArray(page.titles) ? (page.titles[0] ?? '') : (page.title ?? '');
     const formatted = this.config.formatTitle(baseTitle, page.titles ?? [], page);
     if (formatted != null) {
       page.title = String(formatted);

@@ -183,7 +183,7 @@ export class Router {
     if (event.signal.aborted) {
       return;
     }
-    const titles = slices.map((slice) => slice.title).filter((title) => title !== null);
+    const titles = this.titlesOf(slices);
     const page = {
       view,
       views,
@@ -192,7 +192,7 @@ export class Router {
       slices,
       status: 'notFound',
       url,
-      title: titles.at(-1) ?? '',
+      title: titles[0] ?? '',
       titles,
       user: this.user,
     };
@@ -1114,14 +1114,14 @@ export class Router {
       return this.notFoundResult(matched, viewsReady, { data, slices, signal });
     }
     const views = await viewsReady;
-    const titles = slices.map((slice) => slice.title).filter((title) => title !== null);
+    const titles = this.titlesOf(slices);
     return this.buildCascadeResult(matched, {
       status: 'ok',
       view: views.at(-1)?.view ?? null,
       views,
       data,
       slices,
-      title: titles.at(-1) ?? '',
+      title: titles[0] ?? '',
       titles,
     });
   }
@@ -1168,6 +1168,7 @@ export class Router {
         slice.title = await this.resolveTitle(route, matched, {
           data: { ...data },
           slices: [...slices, slice],
+          titles: this.titlesOf(slices),
           signal,
         });
       }
@@ -1197,11 +1198,18 @@ export class Router {
       || Object.keys(route.querySpecs).some((key) => !isEqual(previous.query?.[key], matched.query[key]));
   }
 
-  async resolveTitle(route, matched, { data = {}, slices = [], signal } = {}) {
+  // the titles a page carries, nearest first: the leaf's, its parent's, up to the root's
+  titlesOf(slices) {
+    return slices.map((slice) => slice.title).filter((title) => title !== null).reverse();
+  }
+
+  // a title function is handed the titles above it, nearest first, so the common full title is a
+  // spread: ({ data, titles }) => [data.member.name, ...titles].join(' | ')
+  async resolveTitle(route, matched, { data, slices, titles, signal }) {
     const value = await this.evaluateTitle(
       route,
       route.title,
-      this.contextFor(route, matched, { data, slices, signal }),
+      { ...this.contextFor(route, matched, { data, slices, signal }), titles },
     );
     return this.titleText(value);
   }
@@ -1214,13 +1222,13 @@ export class Router {
     const titles = [];
     for (const ancestor of routes) {
       if (ancestor.title !== undefined) {
-        const title = await this.resolveTitle(ancestor, matched, { data, slices, signal });
+        const title = await this.resolveTitle(ancestor, matched, { data, slices, titles: [...titles], signal });
         if (title !== null) {
-          titles.push(title);
+          titles.unshift(title);
         }
       }
     }
-    return { title: titles.at(-1) ?? '', titles };
+    return { title: titles[0] ?? '', titles };
   }
 
   buildCascadeResult({ route, params, query }, resolved) {
@@ -1541,9 +1549,9 @@ export class Router {
     const { slices, routes = [] } = this.page;
     const data = {};
     each(slices, (slice) => extend(data, slice.data));
-    const titles = changes.titles ?? slices.map((slice) => slice.title).filter((title) => title !== null);
+    const titles = changes.titles ?? this.titlesOf(slices);
     const rendering = this.batch(() => {
-      this.page = { ...this.page, ...changes, data, title: titles.at(-1) ?? '', titles };
+      this.page = { ...this.page, ...changes, data, title: titles[0] ?? '', titles };
       if (globalThis.document && this.page.title) {
         globalThis.document.title = this.page.title;
       }

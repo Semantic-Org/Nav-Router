@@ -1,7 +1,8 @@
 import { escapeHTML } from '@semantic-ui/utils';
 
 export function Breadcrumbs({ page }) {
-  const titles = page.titles ?? [];
+  // the page's titles are nearest first, a trail reads root first
+  const titles = (page.titles ?? []).toReversed();
   if (!titles.length) {
     return '';
   }
