@@ -2,7 +2,7 @@
 title: head
 kind: plugin
 lede: Writes each page’s title, meta tags and canonical link into `document.head`, merged down the routes that are active.
-import: import 'nav-router/plugins/head'
+import: import '@nav-router/plugins/head'
 size: head
 updated: 2026-11-05
 ---
@@ -12,7 +12,7 @@ updated: 2026-11-05
 Import the plugin once. A plugin wraps one moment in the router and calls through, so importing it changes nothing else, and its options are the router's own.
 
 ```js title="app.js"
-import 'nav-router/plugins/head';
+import '@nav-router/plugins/head';
 import { router } from 'nav-router';
 
 const app = router({

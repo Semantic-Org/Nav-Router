@@ -7,9 +7,7 @@
   "homepage": "https://navrouter.dev",
   "license": "ISC",
   "type": "module",
-  "sideEffects": [
-    "./src/plugins/*.js"
-  ],
+  "sideEffects": false,
   "engines": {
     "node": ">=24"
   },
@@ -19,7 +17,6 @@
     ".": {
       "import": "./src/index.js"
     },
-    "./plugins/*": "./src/plugins/*.js",
     "./reactive": "./src/reactive-router.js"
   },
   "files": [
@@ -43,7 +40,6 @@
     "setup": "npx simple-git-hooks"
   },
   "dependencies": {
-    "@nav-router/plugins": "0.1.0",
     "@semantic-ui/utils": "^0.18.0"
   },
   "devDependencies": {
