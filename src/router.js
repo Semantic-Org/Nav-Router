@@ -1292,6 +1292,8 @@ export class Router {
     const previous = this.page;
     // the page's write, its settle and its render are one moment to anything watching
     const rendering = this.batch(() => {
+      // what stood at the mount with no route active leaves before the page's routes are created
+      this.clearMountView();
       this.page = {
         ...this.pageFor(matched),
         ...resolved,
@@ -1371,10 +1373,6 @@ export class Router {
         route.update(page);
         this.onRouteUpdated(route, this.lifecycleContext(route, page, previous));
       }
-      else if ((before.at(-1) === route) !== (after.at(-1) === route)) {
-        // a kept route that became the last active shows the page's view, and gives it up when a route enters below
-        route.renderView(page);
-      }
       else {
         // a kept route renders a slot again when a route below it took that slot or gave it back
         const changedSlots = Object.keys(route.slots).filter((slot) =>
@@ -1382,6 +1380,10 @@ export class Router {
         );
         if (changedSlots.length) {
           route.update(page, { slots: changedSlots });
+        }
+        // and one that became the last active shows the page's view, or gives it up when a route enters below
+        if ((before.at(-1) === route) !== (after.at(-1) === route)) {
+          route.renderView(page);
         }
       }
     });
@@ -1561,6 +1563,8 @@ export class Router {
         globalThis.document.title = this.page.title;
       }
       if (changes.status) {
+        // the entry's cached result held these slices as an ok page, which it no longer is
+        this.entryCache?.delete(previous.key);
         extend(this.page, this.routesOf(slices, this.matchedRoutes(previous)));
         this.settleRoutes(previous, this.page);
       }
@@ -1592,8 +1596,11 @@ export class Router {
     }
     // a page with no route active, refused or failed at the root or loading on a cold boot, shows
     // its view at the mount
-    this.clearMountView();
-    if (!leaf && page.view) {
+    if (leaf || this.mountPage?.view !== page.view) {
+      this.clearMountView();
+    }
+    if (!leaf && page.view && !this.mountView) {
+      this.mountPage = page;
       this.mountView = this.createView({
         view: page.view,
         placement: { parent: null, slot: undefined },
