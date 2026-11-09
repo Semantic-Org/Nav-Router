@@ -72,7 +72,7 @@ export function sampleFor(names) {
   const picked = PLUGINS.map((p) => p.name).filter((n) => names.includes(n))
     .sort((a, b) => (b === 'dom') - (a === 'dom'));
   const lines = [];
-  picked.forEach((n) => lines.push(`import 'nav-router/plugins/${n}';`));
+  picked.forEach((n) => lines.push(`import '@nav-router/plugins/${n}';`));
   if (!picked.length) { lines.push('// select plugins below to add them here'); }
   lines.push("import { router } from 'nav-router';", '');
   const options = picked.map((n) => REQUIRED_OPTIONS[n]).filter(Boolean);

@@ -47,8 +47,10 @@ app.start();
 
 | Package | Description |
 | --- | --- |
-| [nav-router](packages/nav-router) | The router, its plugins and the reactive scaffold integrations build on |
-| [@nav-router/solid](packages/solid) | Nav Router for Solid |
+| [nav-router](src) | The router and the reactive scaffold integrations build on |
+| [@nav-router/plugins](packages/plugins) | The plugins, each installed by importing it |
+| [@nav-router/solid](integrations/solid) | Nav Router for Solid |
+| [@nav-router/core](packages/core) | The router under its scoped name, a thin re-export |
 
 ## Examples
 

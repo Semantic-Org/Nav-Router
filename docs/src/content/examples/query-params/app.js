@@ -1,4 +1,4 @@
-import 'nav-router/plugins/dom';
+import '@nav-router/plugins/dom';
 import { router, update } from 'nav-router';
 
 import { routes } from './routes.js';

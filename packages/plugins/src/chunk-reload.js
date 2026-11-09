@@ -1,7 +1,7 @@
 import { isObject, isPromise } from '@semantic-ui/utils';
 
-import { isLazy } from '../helpers/lazy.js';
-import { Router } from '../router.js';
+import { isLazy } from 'nav-router';
+import { Router } from 'nav-router';
 
 // recovers once per url when a fresh deploy invalidates an old lazy view chunk.
 // hover preloads swallow rejections, so only an actual failed navigation triggers a document load.

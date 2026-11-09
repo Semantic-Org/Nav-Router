@@ -1,4 +1,4 @@
-import { href, isCurrent } from 'nav-router';
+import { href, isCurrent } from '@nav-router/solid';
 
 import { orgs } from '../store.js';
 

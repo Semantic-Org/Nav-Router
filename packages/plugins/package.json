@@ -1,0 +1,24 @@
+{
+  "name": "@nav-router/plugins",
+  "version": "0.1.0",
+  "description": "The plugins of Nav Router, each installed by importing it",
+  "author": "Jack Lukic",
+  "homepage": "https://navrouter.dev",
+  "license": "ISC",
+  "type": "module",
+  "sideEffects": [
+    "./src/*.js"
+  ],
+  "exports": {
+    "./*": "./src/*.js"
+  },
+  "dependencies": {
+    "@semantic-ui/utils": "^0.18.0"
+  },
+  "peerDependencies": {
+    "nav-router": "^0.1.0"
+  },
+  "files": [
+    "src"
+  ]
+}

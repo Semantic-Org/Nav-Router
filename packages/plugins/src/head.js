@@ -1,5 +1,5 @@
 import { each, extend, inArray, isArray, isFunction, isPlainObject, isPromise } from '@semantic-ui/utils';
-import { Router } from '../router.js';
+import { Router } from 'nav-router';
 
 const PROPERTY_PREFIX = /^(og|article|profile|book|fb):/;
 
