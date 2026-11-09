@@ -1,4 +1,4 @@
-import { navigate } from 'nav-router';
+import { navigate } from '@nav-router/solid';
 
 import { signIn } from '../store.js';
 

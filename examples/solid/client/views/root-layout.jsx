@@ -1,4 +1,4 @@
-import { href, isActive, isCurrent } from 'nav-router';
+import { href, isActive, isCurrent } from '@nav-router/solid';
 import { splitProps } from 'solid-js';
 
 import { signIn, user } from '../store.js';

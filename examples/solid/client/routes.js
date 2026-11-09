@@ -1,6 +1,5 @@
-import { solidRouter } from '@nav-router/solid';
+import { lazy, router } from '@nav-router/solid';
 import { wait } from '@semantic-ui/utils';
-import { lazy } from 'nav-router';
 
 import { members, user } from './store.js';
 import { Breadcrumbs } from './views/breadcrumbs.jsx';
@@ -19,7 +18,7 @@ import { TeamLayout } from './views/team-layout.jsx';
 import { TeamOverviewPage } from './views/team-overview-page.jsx';
 import { TeamSidebar } from './views/team-sidebar.jsx';
 
-export const app = solidRouter({
+export const app = router({
   name: 'home',
   mount: '#app',
   title: 'Acme Console',
