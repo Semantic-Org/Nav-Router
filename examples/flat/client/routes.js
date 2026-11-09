@@ -1,5 +1,6 @@
 import { wait } from '@semantic-ui/utils';
 import { lazy, router } from 'nav-router';
+import 'nav-router/plugins/dom';
 
 import { MEMBERS } from './data.js';
 import { ErrorPage } from './views/error-page.js';

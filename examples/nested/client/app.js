@@ -1,5 +1,4 @@
 import { escapeHTML } from '@semantic-ui/utils';
-import 'nav-router/plugins/dom';
 import 'nav-router/plugins/preload-intent';
 import { update } from 'nav-router';
 
