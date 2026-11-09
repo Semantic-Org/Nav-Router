@@ -1,5 +1,5 @@
 import { each, isArray, isFunction, isString } from '@semantic-ui/utils';
-import { Router } from '../router.js';
+import { Router } from 'nav-router';
 
 // the native how for what appears. every view lives in a region, the house's DynamicRegion: two
 // empty text nodes, which serialize to nothing and have no box, a start at the place the plugin

@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
 const here = dirname(fileURLToPath(import.meta.url));
 const pub = resolve(here, '../public');
-const NAV_ROUTER = resolve(here, '../../packages/nav-router');
+const NAV_ROUTER = resolve(here, '../..');
 
 const copy = async (from, to) => {
   await fs.rm(to, { recursive: true, force: true });
@@ -23,6 +23,7 @@ const copy = async (from, to) => {
 const playgroundAssets = resolve(dirname(require.resolve('@semantic-ui/playground/package.json')), 'dist/assets');
 await copy(playgroundAssets, resolve(pub, 'sandbox'));
 await copy(resolve(NAV_ROUTER, 'src'), resolve(pub, 'libs/nav-router'));
+await copy(resolve(NAV_ROUTER, 'packages/plugins'), resolve(pub, 'libs/plugins'));
 // the package doesn't export its package.json, so it's found from its entry
 const utilsEntry = require.resolve('@semantic-ui/utils');
 const utilsDir = utilsEntry.slice(0, utilsEntry.lastIndexOf('@semantic-ui/utils') + '@semantic-ui/utils'.length);

@@ -1,4 +1,4 @@
-import { Router } from '../router.js';
+import { Router } from 'nav-router';
 
 // crosses to the page inside a view transition: settle and render are the one moment it snapshots
 // around, so what leaves animates out and what appears animates in. the handler settles on the

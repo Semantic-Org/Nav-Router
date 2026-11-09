@@ -16,7 +16,7 @@ npm run build     # the sandbox, then the static site in dist/, then a Pagefind 
 npm run preview   # serve dist/, search uses Pagefind
 ```
 
-Plugin and core sizes are measured at build from `../packages/nav-router` (`src/lib/sizes.js`),
+Plugin and core sizes are measured at build from the repo root (`src/lib/sizes.js`),
 so they are always the package's own. A size that can't be measured fails the build.
 
 Live examples (`/examples/`) run on `@semantic-ui/playground` from npm. `npm run sandbox` copies its

@@ -1,5 +1,5 @@
 import { isDevelopment, markTimeline, measureTimeline } from '@semantic-ui/utils';
-import { Router } from '../router.js';
+import { Router } from 'nav-router';
 
 // draws navigation and cascade spans on the devtools performance panel through @semantic-ui/utils.
 // every entry point is throw-safe, and tooltip prose folds at the callsite in production builds

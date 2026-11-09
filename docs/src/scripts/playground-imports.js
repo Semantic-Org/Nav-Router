@@ -14,7 +14,10 @@ export const IMPORT_MAP = {
         'timeline',
         'view-transitions',
       ]
-        .map((name) => [`nav-router/plugins/${name}`, `/libs/nav-router/plugins/${name}.js`]),
+        .flatMap((name) => [
+          [`nav-router/plugins/${name}`, `/libs/nav-router/plugins/${name}.js`],
+          [`@nav-router/plugins/${name}`, `/libs/plugins/${name}.js`],
+        ]),
     ),
     '@semantic-ui/utils': '/libs/utils/index.js',
   },

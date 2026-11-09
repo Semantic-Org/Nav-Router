@@ -1,4 +1,4 @@
-import 'nav-router/plugins/dom';
+import '@nav-router/plugins/dom';
 import { ReactiveRouter } from 'nav-router/reactive';
 import { batch, createComputed, createRoot, createSignal, untrack } from 'solid-js';
 import { createComponent, insert } from 'solid-js/web';

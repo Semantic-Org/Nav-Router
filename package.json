@@ -1,9 +1,36 @@
 {
-  "name": "nav-router-monorepo",
-  "private": true,
+  "name": "nav-router",
+  "version": "0.1.0",
+  "title": "Nav Router",
+  "description": "A thin Navigation API router built on web standards",
+  "author": "Jack Lukic",
+  "homepage": "https://navrouter.dev",
+  "license": "ISC",
   "type": "module",
+  "sideEffects": [
+    "./src/plugins/*.js"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "main": "src/index.js",
+  "module": "src/index.js",
+  "exports": {
+    ".": {
+      "import": "./src/index.js"
+    },
+    "./plugins/*": "./src/plugins/*.js",
+    "./reactive": "./src/reactive-router.js"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
   "workspaces": [
+    ".",
     "packages/*",
+    "integrations/*",
     "examples/*",
     "docs"
   ],
@@ -14,6 +41,10 @@
     "solid": "npm -w examples/solid run dev",
     "format": "npx dprint fmt",
     "setup": "npx simple-git-hooks"
+  },
+  "dependencies": {
+    "@nav-router/plugins": "0.1.0",
+    "@semantic-ui/utils": "^0.18.0"
   },
   "devDependencies": {
     "dprint": "^0.57.1",

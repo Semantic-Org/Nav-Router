@@ -1,5 +1,5 @@
 import { each, isString } from '@semantic-ui/utils';
-import { Router } from '../router.js';
+import { Router } from 'nav-router';
 
 // every route in the tree as a page a crawler or a generator can read. paths keep their patterns,
 // so a generator expands the params it knows. adds router.sitemap()
