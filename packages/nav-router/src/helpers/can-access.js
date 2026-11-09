@@ -14,7 +14,7 @@ const defaultParams = (route) => {
 
 // the door a menu needs: may this user enter the route. sync guards answer at once, an async
 // guard answers as a promise, so a menu that must be sync writes sync guards. a plain read, not
-// the cascade: nothing is born here
+// the cascade: no reactive run is created here
 export const canAccess = (target, args = {}) => {
   const instance = getRouter();
   const route = instance.routeFor(target);
@@ -26,8 +26,7 @@ export const canAccess = (target, args = {}) => {
     route,
     params: { ...defaultParams(route), ...params },
     query,
-    chain: route.ancestors,
-    currentRoutes: route.ancestors,
+    routes: route.ancestors,
   };
   const results = [];
   for (const ancestor of route.ancestors) {

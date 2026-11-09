@@ -223,7 +223,7 @@ Goes back one entry. When there is no earlier entry in this app, such as a page 
 
 | Property | Type | Description |
 |---|---|---|
-| `current` | `Match` | The committed match: route, params, query and chain. |
+| `current` | `Match` | The committed match: route, params, query and routes. |
 | `page` | `Page` | What is on screen, including its status. |
 | `pending` | `Pending \| null` | The navigation in flight, with `committed` and `loading` flags. |
 | `canGoBack` | `boolean` | Whether there is an earlier entry in this app. |

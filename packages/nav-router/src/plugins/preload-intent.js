@@ -9,7 +9,7 @@ const { attach, detach } = proto;
 const events = ['pointerover', 'focusin', 'touchstart'];
 
 Router.prototype.preloadViews = function(matched) {
-  return this.resolveRouteViews(matched.currentRoutes);
+  return this.resolveRouteViews(matched.routes);
 };
 
 // nothing is returned because nothing was decided

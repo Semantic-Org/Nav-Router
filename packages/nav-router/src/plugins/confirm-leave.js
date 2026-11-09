@@ -39,25 +39,17 @@ const runChecks = (checks, context, index = 0) => {
 routerProto.hasLeaveBlockers = function() {
   return Boolean(
     this.leaveGuards?.size
-      || this.page?.chain?.some((route) => route.canLeave !== undefined),
+      || this.page?.routes?.some((route) => route.canLeave !== undefined),
   );
 };
 
 routerProto.onBeforeUnload = function(event) {
   const context = { router: this, from: this.page, destination: null, navigationType: 'unload', event };
-  let blocked = false;
-  each([...(this.page?.chain ?? [])].reverse(), (route) => {
-    if (!blocked && route.canLeave !== undefined) {
-      const result = isFunction(route.canLeave) ? route.canLeave({ ...context, route }) : route.canLeave;
-      blocked = result === false || (isString(result) && result.length > 0);
-    }
-  });
-  each(this.leaveGuards ?? [], (guard) => {
-    if (!blocked) {
-      const result = guard(context);
-      blocked = result === false || (isString(result) && result.length > 0);
-    }
-  });
+  const blocks = (result) => result === false || (isString(result) && result.length > 0);
+  const blocked = [...(this.page?.routes ?? [])].reverse().some((route) =>
+    route.canLeave !== undefined
+    && blocks(isFunction(route.canLeave) ? route.canLeave({ ...context, route }) : route.canLeave)
+  ) || [...(this.leaveGuards ?? [])].some((guard) => blocks(guard(context)));
   if (blocked) {
     event.preventDefault();
     event.returnValue = '';
@@ -131,11 +123,11 @@ navProto.onNavigate = function(event) {
     event,
   };
 
-  each([...(router.page?.chain ?? [])].reverse(), (route) => {
+  each([...(router.page?.routes ?? [])].reverse(), (route) => {
     if (route.canLeave === undefined) {
       return;
     }
-    const leaving = !matched || !inArray(route, matched.chain) || router.keysMoved(route, router.page, matched);
+    const leaving = !matched || !inArray(route, matched.routes) || router.keysMoved(route, router.page, matched);
     if (leaving) {
       checks.push(() => (isFunction(route.canLeave) ? route.canLeave({ ...context, route }) : route.canLeave));
     }
@@ -165,7 +157,7 @@ navProto.onNavigate = function(event) {
     }
   }
   // a refusal the event cannot cancel, a traverse after a reload, rolls back after commit instead
-  const answer = isPromise(decision) ? decision : Promise.resolve(false);
+  const decisionPromise = isPromise(decision) ? decision : Promise.resolve(false);
 
   // external or unrouted links never enter intercept, so async confirmation resumes them explicitly.
   // the approved url is let through once, with beforeunload disarmed, so the modal does not reopen
@@ -173,7 +165,7 @@ navProto.onNavigate = function(event) {
     if (event.cancelable) {
       event.preventDefault();
     }
-    answer.then((allowed) => {
+    decisionPromise.then((allowed) => {
       if (allowed && event.destination?.url && globalThis.location) {
         router.leaveApproved = event.destination.url;
         router.disarmBeforeUnload();
@@ -183,7 +175,7 @@ navProto.onNavigate = function(event) {
     return;
   }
 
-  const pending = { signal: event.signal ?? null, decision: answer, fromKey, fromUrl };
+  const pending = { signal: event.signal ?? null, decision: decisionPromise, fromKey, fromUrl };
   router.pendingLeave = pending;
   event.signal?.addEventListener('abort', () => {
     if (router.pendingLeave === pending) {
@@ -215,7 +207,7 @@ routerProto.beforeCommit = async function(work, event, controller) {
   return beforeCommit.call(this, work, event, controller);
 };
 
-routerProto.afterCommit = async function(work, event, precommitRan) {
+routerProto.afterCommit = async function(work, event, { precommitRan = false } = {}) {
   const pending = !precommitRan ? this.pendingLeave : null;
   if (pending && (!event?.signal || pending.signal === event.signal)) {
     this.pendingLeave = null;
@@ -233,7 +225,7 @@ routerProto.afterCommit = async function(work, event, precommitRan) {
       throw new DOMException('Navigation cancelled', 'AbortError');
     }
   }
-  return afterCommit.call(this, work, event, precommitRan);
+  return afterCommit.call(this, work, event, { precommitRan });
 };
 
 routerProto.applyCascade = async function(matched, resolved, event = null) {

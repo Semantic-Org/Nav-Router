@@ -39,7 +39,7 @@ proto.ensureAnnouncer = function() {
   return this.announcer;
 };
 
-const speak = (announcer, text) => {
+const announce = (announcer, text) => {
   if (announcer.element) {
     announcer.element.textContent = text;
   }
@@ -79,14 +79,14 @@ proto.renderPage = async function(page, event = null) {
     announcer.queued = text;
   }
   else {
-    speak(announcer, text);
+    announce(announcer, text);
   }
 };
 
 proto.settled = function(event) {
   const result = settled.call(this, event);
   if (this.announcer?.queued) {
-    speak(this.announcer, this.announcer.queued);
+    announce(this.announcer, this.announcer.queued);
     this.announcer.queued = null;
   }
   return result;
