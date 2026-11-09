@@ -1,0 +1,20 @@
+{
+  "name": "@nav-router/core",
+  "version": "0.1.0",
+  "description": "Nav Router under its scoped name, a thin re-export of nav-router",
+  "author": "Jack Lukic",
+  "homepage": "https://navrouter.dev",
+  "license": "ISC",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./index.js"
+  },
+  "dependencies": {
+    "nav-router": "0.1.0"
+  },
+  "files": [
+    "index.js",
+    "README.md"
+  ]
+}
