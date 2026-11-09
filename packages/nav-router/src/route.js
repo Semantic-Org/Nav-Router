@@ -27,10 +27,11 @@ export class Route {
     this.indexRoute = null;
     this.active = false;
 
-    extend(this, Route.defaults, routeOptions, {
-      params: { ...Route.defaults.params, ...routeOptions.params },
-      query: { ...Route.defaults.query, ...routeOptions.query },
-      slots: { ...Route.defaults.slots, ...routeOptions.slots },
+    const defaults = new.target.defaults;
+    extend(this, defaults, routeOptions, {
+      params: { ...defaults.params, ...routeOptions.params },
+      query: { ...defaults.query, ...routeOptions.query },
+      slots: { ...defaults.slots, ...routeOptions.slots },
     });
 
     this.path = this.normalizePath(routeOptions.path, parent);
@@ -87,7 +88,7 @@ export class Route {
 
   assertPathPrefix(path, parent) {
     if (parent?.path && parent.path !== '/' && path !== parent.path && !path.startsWith(`${parent.path}/`)) {
-      throw new Error(`Route: path "${path}" must start with parent path "${parent.path}".`);
+      throw new Error(`Route: path "${path}" must start with parent path "${parent.path}"`);
     }
   }
 
@@ -154,7 +155,7 @@ export class Route {
 
   // a route's active life is its signal: whatever it stores while active hangs on it, and
   // onDestroyed is where that is released. what it shows lives with it too: its layout, its named
-  // slot content and, as the chain's leaf, the page's view go through the router's seams when it
+  // slot content and, as the leaf route, the page's view go through the router's seams when it
   // activates, are told when it or the data above it moves, and are destroyed when it deactivates.
   // rendered mirrors those three declarations with what the seams returned, a rendered element or
   // component, and the page they were rendered for
@@ -195,25 +196,25 @@ export class Route {
     const { rendered } = this;
     const { layout, slots } = page.views?.find((entry) => entry.route === this) ?? {};
     const context = () => this.viewContext(page);
-    const framed = this.hasSlice(page);
+    const hasSlice = this.hasSlice(page);
     const layoutBefore = rendered.layout;
     rendered.layout = this.createOrUpdateView({
       prior: rendered.layout,
-      view: framed ? layout : null,
+      view: hasSlice ? layout : null,
       placement: { parent: this.parentLayout(), slot: undefined },
       context,
     });
     if (layoutBefore !== undefined && rendered.layout !== layoutBefore) {
       // the routes below that stand; one not yet active renders when it activates
-      const chain = page.chain ?? [];
-      const below = chain.slice(chain.indexOf(this) + 1).filter((route) => route.active);
-      each([...below].reverse(), (route) => route.destroyViews());
+      const routes = page.routes ?? [];
+      const routesBelow = routes.slice(routes.indexOf(this) + 1).filter((route) => route.active);
+      each([...routesBelow].reverse(), (route) => route.destroyViews());
       this.destroyViews({ keepLayout: true });
-      each(below, (route) => route.render(page));
+      each(routesBelow, (route) => route.render(page));
     }
     const parent = rendered.layout ?? this.parentLayout();
     this.renderSlots(page, Object.keys(slots ?? {}));
-    if (page.chain?.at(-1) === this) {
+    if (page.routes?.at(-1) === this) {
       if (rendered.view && rendered.page?.view !== page.view) {
         this.router.destroyView({ rendered: rendered.view });
         rendered.view = undefined;
@@ -226,7 +227,7 @@ export class Route {
       });
     }
     else if (rendered.view) {
-      // the chain grew below: no longer the leaf, the route's view leaves
+      // a route was added below: no longer the leaf, the route's view leaves
       this.router.destroyView({ rendered: rendered.view });
       rendered.view = undefined;
     }
@@ -240,9 +241,9 @@ export class Route {
     const { slots = {} } = page.views?.find((entry) => entry.route === this) ?? {};
     const parent = this.rendered.layout ?? this.parentLayout();
     const context = () => this.viewContext(page);
-    const framed = this.hasSlice(page);
+    const hasSlice = this.hasSlice(page);
     each(names, (slot) => {
-      const view = framed && !this.slotDeclaredBelow(page, slot) ? slots[slot] : null;
+      const view = hasSlice && !this.hasSlotBelow(page, slot) ? slots[slot] : null;
       this.rendered.slots[slot] = this.createOrUpdateView({
         prior: this.rendered.slots[slot],
         view,
@@ -254,9 +255,9 @@ export class Route {
 
   // whether a route below this one on the page declares the slot, an explicit empty included; a
   // route that frames nothing on the page declares nothing
-  slotDeclaredBelow(page, slot) {
-    const chain = page?.chain ?? [];
-    return chain.slice(chain.indexOf(this) + 1).some((other) => other.hasSlice(page) && slot in other.slots);
+  hasSlotBelow(page, slot) {
+    const routes = page?.routes ?? [];
+    return routes.slice(routes.indexOf(this) + 1).some((other) => other.hasSlice(page) && slot in other.slots);
   }
 
   // a route frames the page, its layout and its slots, while it holds a slice on it: on a page
@@ -291,7 +292,7 @@ export class Route {
         this.router.destroyView({ rendered });
       }
     });
-    Object.assign(this.rendered, { page: null, slots: {}, view: undefined, layout: keepLayout ? layout : undefined });
+    extend(this.rendered, { page: null, slots: {}, view: undefined, layout: keepLayout ? layout : undefined });
   }
 
   // the nearest rendered layout above this route, or null for the mount

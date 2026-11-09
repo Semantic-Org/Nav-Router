@@ -8,8 +8,8 @@ import { Router } from './router.js';
 // a redirect moves the page, a refused permission redirects or shows forbidden, data updates its
 // slice, and a title updates its title. a slice is a store with a cell per key, and merged data
 // reads each key through its cell, so a key that moved wakes only the functions that read it, the
-// cell's own equality deciding what moved. a route holds its runs, and a run born while its
-// navigation is in flight belongs to that navigation until the route adopts it at settle: it ends
+// cell's own equality deciding what moved. a route holds its runs, and a run made while its
+// navigation is in flight belongs to that navigation until it is attached to the route at settle: it ends
 // with the navigation's signal before, and with the route's after. a provider supplies the four
 // primitives below; the fifth, the per-key store, is built from signals unless the provider has a
 // native one ($state, a store, reactive())
@@ -29,13 +29,13 @@ export class ReactiveRouter extends Router {
     super(options);
     // a tracked page is live; a cached result would not be
     this.entryCache = null;
-    // the runs the navigation in flight has born and no route has adopted yet
-    this.born = [];
+    // the runs the navigation in flight made and not yet attached to a route
+    this.pendingRuns = [];
     // the router's own state as cells, so whatever reads current, page, pending, error or user is live,
     // the helpers and an app's chrome among them. core writes the fields as it always has
     const { equality } = this.constructor;
-    each(['current', 'page', 'pending', 'error'], (key) => this.cellFor(key, equality.snapshot));
-    this.cellFor('user', (before, after) => !this.config.dataChanged(before, after));
+    each(['current', 'page', 'pending', 'error'], (key) => this.defineCell(key, equality.snapshot));
+    this.defineCell('user', (a, b) => !this.config.dataChanged(a, b));
     // the page's params and query, live by key: params.org tracks org alone. the page's and so the
     // router's, written once per settle, which is what keeps a kept layout's reads current
     this.paramCells = this.createStore({});
@@ -70,7 +70,7 @@ export class ReactiveRouter extends Router {
   }
 
   // a field of the router backed by a cell: the write is the field's, the read tracks it
-  cellFor(key, equals) {
+  defineCell(key, equals) {
     const cell = this.createSignal(this[key], { equals });
     Object.defineProperty(this, key, { get: cell.get, set: cell.set, enumerable: true, configurable: true });
   }
@@ -101,59 +101,59 @@ export class ReactiveRouter extends Router {
   *******************************/
 
   // identity as a function runs for the router's life, so the user moves on the standing page as it
-  // does at a navigation, and a guard that read it lands where the navigation's own answer would.
-  // a navigation takes the reaction's answer while it is in flight and no navigation has, the
+  // does at a navigation, and a guard that read it lands where the navigation's own read would.
+  // a navigation uses the reaction's read while it is in flight and no navigation has, the
   // boot's among them, and asks again otherwise, once per navigation as core does: an identity
   // reading nothing reactive, a cookie or a fetch, still moves with the page
   async start() {
     if (isFunction(this.config.identity)) {
-      this.lifetime = new AbortController();
-      this.identityRun = this.createReaction(() => {
-        this.identityFresh = true;
-        this.askIdentity({ signal: this.lifetime.signal, reload: false, previous: null });
+      this.abortController = new AbortController();
+      this.stopIdentity = this.createReaction(() => {
+        this.hasNewIdentity = true;
+        this.readIdentity({ signal: this.abortController.signal, reload: false, previous: null });
       });
     }
     return super.start();
   }
 
   stop() {
-    this.identityRun?.();
-    this.identityRun = null;
-    this.identityAnswer = null;
-    this.lifetime?.abort();
+    this.stopIdentity?.();
+    this.stopIdentity = null;
+    this.identityPromise = null;
+    this.abortController?.abort();
     return super.stop();
   }
 
   resolveIdentity(navigation) {
-    if (!this.identityRun) {
+    if (!this.stopIdentity) {
       return super.resolveIdentity(navigation);
     }
-    const fresh = !navigation.reload && this.identityFresh && this.identityAnswer;
-    this.identityFresh = false;
-    return fresh || this.askIdentity(navigation);
+    const pendingIdentity = !navigation.reload && this.hasNewIdentity && this.identityPromise;
+    this.hasNewIdentity = false;
+    return pendingIdentity || this.readIdentity(navigation);
   }
 
-  // the answer lands only while it is still the latest and what asked it still stands, the
-  // navigation's signal or the lifetime's, so a slower older answer never lands over a newer one
+  // the user is set only while the read is still the latest and what started it still stands, the
+  // navigation's signal or the router's own, so a slower older read never lands over a newer one
   // and an aborted navigation's lands nothing. settled, it is no navigation's to take; failed, it
   // is dropped, so the navigation that awaited it fails with it and the next asks again
-  askIdentity(context) {
-    const answer = Promise.resolve(this.config.identity(context)).then((user) => {
-      if (this.identityAnswer === answer && !context.signal?.aborted) {
+  readIdentity(context) {
+    const promise = Promise.resolve(this.config.identity(context)).then((user) => {
+      if (this.identityPromise === promise && !context.signal?.aborted) {
         this.user = user ?? null;
       }
     });
-    this.identityAnswer = answer;
-    answer.then(() => {
-      if (this.identityAnswer === answer) {
-        this.identityFresh = false;
+    this.identityPromise = promise;
+    promise.then(() => {
+      if (this.identityPromise === promise) {
+        this.hasNewIdentity = false;
       }
     }, () => {
-      if (this.identityAnswer === answer) {
-        this.identityAnswer = null;
+      if (this.identityPromise === promise) {
+        this.identityPromise = null;
       }
     });
-    return answer;
+    return promise;
   }
 
   /*******************************
@@ -188,7 +188,7 @@ export class ReactiveRouter extends Router {
         // a data cell compares as the router's dataChanged says, the instance's word on data
         cells.set(
           key,
-          this.createSignal(initialValue[key], { equals: (before, after) => !this.config.dataChanged(before, after) }),
+          this.createSignal(initialValue[key], { equals: (a, b) => !this.config.dataChanged(a, b) }),
         );
       }
       return cells.get(key);
@@ -200,9 +200,6 @@ export class ReactiveRouter extends Router {
     };
   }
 
-  // merges ancestor slices behind per-key getters, so reading data.team tracks team's cell alone.
-  // a getter exists for the keys a slice holds, so a key a run returns only sometimes is read plain
-  // on the runs it is absent: a data() returns every key every run, undefined when it has none
   // the view's context made live, for an integration to render with. params, query, user and page
   // are the router's own cells, so a kept layout's reads stay current without the route being told;
   // data reads through the slices' own cells, so one key moving wakes its reader alone; the slices are
@@ -225,8 +222,8 @@ export class ReactiveRouter extends Router {
     }
     const slices = this.createSignal(context.slices, { equals: this.constructor.equality.slices });
     // the merged data is built once per slices array, the cells inside it doing the tracking
-    let builtFor = null;
-    let built = null;
+    let cachedSlices = null;
+    let cachedData = null;
     const live = {
       route: context.route,
       router,
@@ -244,16 +241,19 @@ export class ReactiveRouter extends Router {
       },
       get data() {
         const current = slices.get();
-        if (current !== builtFor) {
-          builtFor = current;
-          built = router.dataFor(current);
+        if (current !== cachedSlices) {
+          cachedSlices = current;
+          cachedData = router.dataFor(current);
         }
-        return built;
+        return cachedData;
       },
     };
     return { context: live, update: (next) => slices.set(next.slices) };
   }
 
+  // merges ancestor slices behind per-key getters, so reading data.team tracks team's cell alone.
+  // a getter exists for the keys a slice holds, so a key a run returns only sometimes is read plain
+  // on the runs it is absent: a data() returns every key every run, undefined when it has none
   dataFor(slices) {
     const data = {};
     each(slices, (slice) => {
@@ -272,8 +272,8 @@ export class ReactiveRouter extends Router {
               Slices
   *******************************/
 
-  sliceOf(route, data) {
-    const slice = super.sliceOf(route, data);
+  createSlice(route, data) {
+    const slice = super.createSlice(route, data);
     slice.store = this.createStore(data);
     return slice;
   }
@@ -309,26 +309,27 @@ export class ReactiveRouter extends Router {
     }
     const { signal, slices } = context;
     let first;
-    let born = null;
-    // what the hook sees of the user is live, a getter on its own bag, so a guard that read it runs
-    // again when the user moves and a hook that did not read it is left alone
-    const bagFor = (extra) => {
-      const bag = { ...context, data: this.dataFor(slices), ...extra };
-      Object.defineProperty(bag, 'user', { get: () => this.user, enumerable: true });
-      return bag;
-    };
-    const stop = this.createReaction((isFirst) => {
+    // what the hook sees of the user is live, a getter on its own context, so a guard that read it
+    // runs again when the user moves and a hook that did not read it is left alone
+    const createHookContext = (extra) =>
+      Object.defineProperty({ ...context, data: this.dataFor(slices), ...extra }, 'user', {
+        get: () => this.user,
+        enumerable: true,
+      });
+    // a run under the route's own signal is the route's from the start; one under a navigation's
+    // is the navigation's until it is attached to the route at settle
+    const run = { kind, route, changed, latest: null, attached: signal === route.abortSignal };
+    run.stop = this.createReaction((isFirst) => {
       if (isFirst) {
-        first = fn(bagFor({}));
+        first = fn(createHookContext({}));
         return;
       }
-      const unadopted = born && !born.adopted;
-      // a run born for a navigation in flight runs under that navigation's signal and lands nothing on
-      // the standing page, whose route may be the same one: its latest value waits for adopt. a later
-      // run that throws is a rejected answer, landed as one
+      // a run the navigation in flight made runs under that navigation's signal and lands nothing on
+      // the standing page, whose route may be the same one: its latest value waits until it is
+      // attached. a later run that throws is a rejected promise, applied as one
       let value;
       try {
-        value = fn(bagFor({ signal: unadopted ? signal : route.abortSignal }));
+        value = fn(createHookContext({ signal: run.attached ? route.abortSignal : signal }));
       }
       catch (error) {
         value = Promise.reject(error);
@@ -336,28 +337,26 @@ export class ReactiveRouter extends Router {
       if (isPromise(value)) {
         value.catch(noop);
       }
-      if (unadopted) {
-        born.latest = { value };
+      if (!run.attached) {
+        run.latest = { value };
         return;
       }
       if (route.active) {
-        this.land(route, changed, value);
+        this.applyHookResult(route, changed, value);
       }
     });
-    const run = { stop, kind };
-    if (signal === route.abortSignal) {
+    if (run.attached) {
       (route.runs ??= new Set()).add(run);
     }
     else {
-      born = { route, run, adopted: false, changed, latest: null };
       signal?.addEventListener('abort', () => {
-        if (!born.adopted) {
-          stop();
-          // its navigation is gone, so nothing of it waits for adopt
-          this.born = this.born.filter((other) => other !== born);
+        if (!run.attached) {
+          run.stop();
+          // its navigation is gone, so nothing of it waits to be attached
+          this.pendingRuns = this.pendingRuns.filter((other) => other !== run);
         }
       }, { once: true });
-      this.born.push(born);
+      this.pendingRuns.push(run);
     }
     return first;
   }
@@ -371,66 +370,66 @@ export class ReactiveRouter extends Router {
     });
   }
 
-  // the runs born for the route in the navigation that settled replace the last run's, by kind: a
-  // kept route keeps its slice runs and takes only its new guard runs, which ran this navigation
-  adopt(route, kind = null) {
-    const mine = this.born.filter((born) => born.route === route && (kind === null || born.run.kind === kind));
-    this.born = this.born.filter((born) => !inArray(born, mine));
+  // the runs the settled navigation made for the route replace the ones it had, by kind: a kept
+  // route keeps its slice runs and attaches only its new guard runs, which ran this navigation
+  attachRuns(route, kind = null) {
+    const routeRuns = this.pendingRuns.filter((run) => run.route === route && (kind === null || run.kind === kind));
+    this.pendingRuns = this.pendingRuns.filter((run) => !inArray(run, routeRuns));
     this.stopRuns(route, kind);
-    each(mine, (born) => {
-      born.adopted = true;
-      (route.runs ??= new Set()).add(born.run);
-      if (born.latest) {
-        this.land(route, born.changed, born.latest.value);
+    each(routeRuns, (run) => {
+      run.attached = true;
+      (route.runs ??= new Set()).add(run);
+      if (run.latest) {
+        this.applyHookResult(route, run.changed, run.latest.value);
       }
     });
   }
 
-  // a later answer landing on the standing page through its consequence, untracked since a
+  // a later value applied to the standing page through its consequence, untracked since a
   // consequence reads the page before its first await and the page is a cell. a run aborted at its
   // route's teardown and a route since gone say nothing; a failure is logged with the page kept,
   // since the slice the route had still stands
-  land(route, changed, value) {
-    const dropped = (error) => {
+  applyHookResult(route, changed, value) {
+    const onError = (error) => {
       if (error?.name !== 'AbortError' && route.active) {
         this.logError(error);
       }
     };
     try {
-      Promise.resolve(this.untrack(() => changed(value))).catch(dropped);
+      Promise.resolve(this.untrack(() => changed(value))).catch(onError);
     }
     catch (error) {
-      dropped(error);
+      onError(error);
     }
   }
 
-  // after settle nothing is left unborn: what was not adopted belonged to a branch this navigation
-  // abandoned, a precommit redirect's first chain among them
+  // after settle nothing is left pending: a run no route attached belonged to a branch this navigation
+  // abandoned, a precommit redirect's first routes among them
   settleRoutes(previous, page) {
     this.writeLive(this.params, this.paramCells, page.params ?? {});
     this.writeLive(this.query, this.queryCells, page.query ?? {});
-    this.settling = new Set();
+    this.changedRoutes = new Set();
     super.settleRoutes(previous, page);
-    each(page.chain ?? [], (route) => {
-      if (!this.settling.has(route)) {
-        this.adopt(route, 'guard');
+    each(page.routes ?? [], (route) => {
+      if (!this.changedRoutes.has(route)) {
+        this.attachRuns(route, 'guard');
       }
     });
-    this.settling = null;
-    each(this.born, (born) => born.run.stop());
-    this.born = [];
+    this.changedRoutes = null;
+    each(this.pendingRuns, (run) => run.stop());
+    this.pendingRuns = [];
   }
 
   onRouteCreated(route, context) {
     route.abortSignal.addEventListener('abort', () => this.stopRuns(route), { once: true });
-    this.settling?.add(route);
-    this.adopt(route);
+    this.changedRoutes?.add(route);
+    this.attachRuns(route);
     return super.onRouteCreated(route, context);
   }
 
   onRouteUpdated(route, context) {
-    this.settling?.add(route);
-    this.adopt(route);
+    this.changedRoutes?.add(route);
+    this.attachRuns(route);
     return super.onRouteUpdated(route, context);
   }
 }

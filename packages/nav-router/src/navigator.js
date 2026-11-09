@@ -51,7 +51,7 @@ export class Navigator {
       globalThis.window.addEventListener('pageshow', this.handlePageShow);
     }
     this.attached = true;
-    this.project();
+    this.updateEntries();
 
     // a back or forward pressed before this listener existed left activation and currentEntry apart
     if (nav?.activation?.entry?.key && nav.currentEntry?.key && nav.activation.entry.key !== nav.currentEntry.key) {
@@ -82,7 +82,7 @@ export class Navigator {
   *******************************/
 
   // the platform's current truth, re-read at every moment that can move it
-  project() {
+  updateEntries() {
     const nav = globalThis.navigation;
     this.entry = nav?.currentEntry ?? null;
     this.entries = nav?.entries?.() ?? [];
@@ -292,7 +292,7 @@ export class Navigator {
     const interceptOptions = {
       scroll: resetScroll ? 'after-transition' : 'manual',
       focusReset: resetFocus ? 'after-transition' : 'manual',
-      handler: () => this.router.afterCommit(getWork(), event, precommitRan),
+      handler: () => this.router.afterCommit(getWork(), event, { precommitRan }),
     };
 
     if (event.cancelable) {
@@ -342,7 +342,7 @@ export class Navigator {
   *******************************/
 
   onEntryChange(event) {
-    this.project();
+    this.updateEntries();
     this.router.entryChanged(this.entry, event);
   }
 
@@ -361,7 +361,7 @@ export class Navigator {
       return;
     }
     // the document came back intact: re-read the platform, re-run nothing
-    this.project();
+    this.updateEntries();
     this.router.restored();
   }
 
