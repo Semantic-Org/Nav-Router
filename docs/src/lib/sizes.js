@@ -31,7 +31,7 @@ function measureFromSource(name) {
       stdin: { contents: "import { router } from './src/index.js'; console.log(router);", resolveDir: ROOT },
     })
     : measure({
-      entryPoints: [resolve(ROOT, 'packages/plugins', `${name}.js`)],
+      entryPoints: [resolve(ROOT, 'packages/plugins/src', `${name}.js`)],
       external: ['@semantic-ui/utils', 'nav-router'],
     });
 }

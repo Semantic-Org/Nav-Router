@@ -7,10 +7,10 @@
   "license": "ISC",
   "type": "module",
   "sideEffects": [
-    "./*.js"
+    "./src/*.js"
   ],
   "exports": {
-    "./*": "./*.js"
+    "./*": "./src/*.js"
   },
   "dependencies": {
     "@semantic-ui/utils": "^0.18.0"
@@ -19,6 +19,6 @@
     "nav-router": "^0.1.0"
   },
   "files": [
-    "*.js"
+    "src"
   ]
 }
