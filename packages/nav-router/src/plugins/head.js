@@ -8,7 +8,7 @@ const PROPERTY_PREFIX = /^(og|article|profile|book|fb):/;
 // reactive router again when what it read moves, so the tags follow live data. the merge and the
 // writes are synchronous at render, off the swap path, and an async answer lands when it resolves.
 // existing static tags are updated in place and restored when a later route clears them
-Router.defaults.metaDefaults ??= {};
+Router.defaults.metaTags ??= {};
 Router.defaults.formatTitle ??= null;
 
 const proto = Router.prototype;
@@ -146,7 +146,7 @@ proto.writeHead = function(page) {
     return;
   }
 
-  const merged = extend({}, this.config.metaDefaults);
+  const merged = extend({}, this.config.metaTags);
   each(page.chain ?? [], (route) => {
     const meta = this.headMeta?.get(route)?.value;
     if (meta) {

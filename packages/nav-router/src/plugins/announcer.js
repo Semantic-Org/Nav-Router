@@ -9,10 +9,17 @@ const STATUS_WORDS = { forbidden: 'Access denied', notFound: 'Not found', error:
 // a render during a navigation is announced once it settles, a render of the standing page at once:
 // a guard refusing in place, an error page, or a title that moved on a data re-run, on purpose. the
 // initial load, hash jumps and same-title query keystrokes stay quiet
-Router.defaults.announcerPoliteness ??= 'polite';
-Router.defaults.formatAnnouncement ??= (page) =>
-  [STATUS_WORDS[page.status], page.title || (page.url ? new URL(page.url, 'http://x').pathname : '')].filter(Boolean)
-    .join(', ');
+const defaults = {
+  politeness: 'polite',
+  format: (page) =>
+    [STATUS_WORDS[page.status], page.title || (page.url ? new URL(page.url, 'http://x').pathname : '')].filter(Boolean)
+      .join(', '),
+};
+
+// the plugin's own namespace on the router, router({ announcer: { politeness, format } }), merged
+// over its defaults here since the router's merge is shallow
+Router.defaults.announcer ??= {};
+const settingsOf = (router) => ({ ...defaults, ...router.config.announcer });
 
 const proto = Router.prototype;
 const { start, intercepted, renderPage, settled, failed, stop } = proto;
@@ -22,7 +29,7 @@ proto.ensureAnnouncer = function() {
   this.announcer ??= { element: null, queued: null, lastText: '', lastPage: null };
   if (!this.announcer.element && globalThis.document?.body) {
     const element = globalThis.document.createElement('div');
-    element.setAttribute('aria-live', this.config.announcerPoliteness);
+    element.setAttribute('aria-live', settingsOf(this).politeness);
     element.setAttribute('aria-atomic', 'true');
     element.setAttribute('data-router-announcer', '');
     element.style.cssText = LIVE_REGION_STYLE;
@@ -64,7 +71,7 @@ proto.renderPage = async function(page, event = null) {
   const moved = !lastPage || lastPage.route !== page.route || !isEqual(lastPage.params, page.params)
     || event?.navigationType === 'reload';
   announcer.lastPage = { route: page.route, params: page.params };
-  const text = String(this.config.formatAnnouncement(page) ?? '');
+  const text = String(settingsOf(this).format(page) ?? '');
   if (!lastPage || event?.initial || !text || (!moved && text === announcer.lastText)) {
     return;
   }
