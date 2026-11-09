@@ -73,6 +73,7 @@ export class Route {
 
     if (this.isLeaf && this.router) {
       this.router.leaves.push(this);
+      this.router.routeAdded?.();
     }
   }
 

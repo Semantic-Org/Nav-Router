@@ -154,6 +154,8 @@ export class Router {
       }
       else {
         await this.applyNotFound(initialUrl, event);
+        // a route for the url may have been added while the not-found page loaded
+        this.routeAdded();
       }
     }
     catch (error) {
@@ -202,6 +204,16 @@ export class Router {
       }
       return this.renderPage(page);
     });
+  }
+
+  // a route was added: a page standing as not-found for want of a route is matched again a
+  // microtask later, when every route added with it is in, so a package that arrives late claims
+  // its own urls. the reload it starts is pending at once, so routes added together reload once
+  routeAdded() {
+    const { page } = this;
+    if (page?.status === 'notFound' && !page.route) {
+      queueMicrotask(() => !this.pending && this.match(page.url) && this.reload());
+    }
   }
 
   stop() {
