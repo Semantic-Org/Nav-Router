@@ -1,7 +1,7 @@
 ---
 title: Docs Authoring — A Sibling Docs Site for a New Library
-description: How to build the docs site for a library spun out into its own repo so it reads as a sibling of the nav-router docs — the stack, the features that are deliberate requirements, the design conventions, i18n, the working agreements, and the mistakes to avoid.
-keywords: [docs, documentation site, astro, design system, framework switcher, playground, examples, versions, i18n, rtl, homepage, gotchas]
+description: How to build the docs site for a library spun out into its own repo so it reads as a sibling of the nav-router docs — the stack, the features that are deliberate requirements, the design conventions, the room to leave for languages, the working agreements, and the mistakes to avoid.
+keywords: [docs, documentation site, astro, design system, framework switcher, playground, examples, versions, i18n, translation, rtl, homepage, gotchas]
 audience: contributing
 skill: docs-authoring
 type: skill
@@ -106,24 +106,15 @@ CI builds and ships prebuilt to Vercel. A push to `main` deploys staging; a tag 
 
 ## Internationalization
 
-Launch in English, but build the structure in from day one, because retrofitting it touches everything.
+Launch in English, and leave room for languages from day one, because retrofitting it touches everything. Translating is a separate pass, usually by a different agent once the docs are final: the `docs-i18n` skill. What the site's builder owes it:
 
-- **Routing:** English at the root, other languages under a prefix (`/ja/…`). Not subdomains; those are taken by archived versions.
-- **Content:** English is the source of truth. Each translation lives in a parallel folder and records the hash of the English page it came from, so the build can flag a translation that has fallen behind.
-- **Missing pages:** show English with a notice that the page isn't translated yet. Never a 404.
-- **What's translated:** prose, headings and the interface's own words. Not code, API names or example files.
-- **Picker:** in the topbar beside the version menu. The sidebar already holds the framework picker.
-- **Per language:** search indexes, share cards, `.md` pages, the assistant prompt, the sitemap and `hreflang` links.
-- **Translation is its own process.** It is not done by the agent building the site. It gets a dedicated brief (a glossary, the voice, terms to keep in English) and a review pass. Translate only once a library's docs are final.
-- **Right-to-left is in scope.** Check the layout under `dir="rtl"` before launch.
-
-**Order, by community size and how much each community relies on translated docs** (late 2026):
-
-1. Simplified Chinese (`zh-CN`) and Japanese (`ja`). The highest need, and the translations every major framework did first and finished.
-2. Brazilian Portuguese (`pt-BR`) and Spanish (`es`, one Latin-America-leaning locale).
-3. Korean (`ko`), then Russian (`ru`) or French (`fr`).
-
-German and Hindi have large communities that read English well, so they come late. Arabic is the one right-to-left candidate, for a second wave. Traditional Chinese can start as a labelled machine conversion of Simplified Chinese.
+- **No visible words in code.** Labels, headings, sentences, `aria-label`, `title`, placeholders: all keys in one English strings file, read through `t()` at build, `{{t:key}}` in a raw template, `ui()` in a script. Code, API names, product names and file names stay as they are. Markdown pages need nothing; they translate as files.
+- **One key per whole passage.** A sentence is one string, with `{placeholders}` for values and its inline tags inside it, so a language can order it as it reads. Never join a sentence from pieces. Counts go through `plural()`.
+- **A key names one wording.** Change what the English says and it takes a new key, so no language keeps a translation of the old meaning. A typo fix keeps the key.
+- **Links take the reader's language** (`localePath()`), and one route serves every page under every language, English at the root.
+- **Logical CSS,** as in Design Conventions. A diagram that must stay left to right is pinned, and its sentences left free to follow the page.
+- **A place for the language choice:** in the topbar beside the version menu, and in the menu drawer on narrow screens. It shows itself once a second language is enabled.
+- **The list of languages** exists with English alone enabled.
 
 ---
 
@@ -142,7 +133,7 @@ Mistakes made once while building the nav-router docs, in general form.
 
 - **Judging layout in the abstract.** Values that are right on paper can look wrong on screen: off-center, unevenly spaced, too close to a neighbor. Judge on a rendered page, at the target width, in both themes. Fix what the eye sees, then find the rule that produces it. *For example:* the content was centered in its column but not on the window, and the rail drifted toward the edge between widths.
 - **Sizes that jump when content changes.** Work out the longest text each element can show, and reserve that size so nothing moves inline when it changes. *For example:* "Copy page" shrank when it read "Copied".
-- **Awkward in-between widths.** Layouts are liquid. Check the widths between breakpoints, not just at them, so no resolution lands awkwardly. *For example:* menu tabs overflowed at phone width, tables squeezed prose to two words, and a drawer stayed open over a same-page jump.
+- **Awkward in-between widths.** Layouts are liquid. Check the widths between breakpoints, not just at them, so no resolution lands awkwardly. Design for 360px and up; at 320px nothing may scroll sideways or stop working, since that is what a zoomed desktop window gets. *For example:* menu tabs overflowed at phone width, tables squeezed prose to two words, and a drawer stayed open over a same-page jump.
 - **Repeating forms on the homepage.** Each homepage experience should feel made for its argument. Don't fill it with repeated card grids or rearranged site components. To get fresh ideas, brief a subagent the way you'd brief a design contractor: the claim, the bar, what was rejected and why, and the facts it must stay true to.
 - **Explaining mechanisms instead of outcomes.** Lead with what a developer building an app gets, not with how the library works inside. Treat marketing copy as a draft; it will be revised until it reads strongly.
 - **Assuming instead of reading the source.** These are new libraries. Nothing you remember about them is reliable, so every claim about the API comes from reading their code. The same goes for house patterns (check how a sibling already does it before overriding) and for bugs (confirm the cause before reporting it).
