@@ -163,7 +163,7 @@ export class Navigator {
     if (this.canGoBack) {
       return this.catchNavigation(globalThis.navigation.back());
     }
-    return this.navigate(fallbackUrl ?? (this.router.base || '/'), { history: 'push' });
+    return this.navigate(fallbackUrl ?? (this.router.config.base || '/'), { history: 'push' });
   }
 
   forward() {
@@ -216,11 +216,11 @@ export class Navigator {
            Scroll Memory
   *******************************/
 
-  // the platform restores the viewport and nothing else. the containers router.restoreScroll
+  // the platform restores the viewport and nothing else. the containers router.config.restoreScroll
   // names ride the entry's state, saved on the way out and put back on a traverse
 
   saveScroll() {
-    const selectors = this.router.restoreScroll;
+    const selectors = this.router.config.restoreScroll;
     const nav = globalThis.navigation;
     if (!selectors || !globalThis.document || !nav?.currentEntry) {
       return;
