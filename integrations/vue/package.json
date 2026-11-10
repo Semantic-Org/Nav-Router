@@ -1,0 +1,19 @@
+{
+  "name": "@nav-router/vue",
+  "version": "0.1.0",
+  "description": "Nav Router for Vue: views are Vue components whose props are the router's live context, the reactive scaffold on Vue's reactivity",
+  "license": "ISC",
+  "type": "module",
+  "sideEffects": false,
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js"
+  },
+  "dependencies": {
+    "@nav-router/plugins": "0.1.0"
+  },
+  "peerDependencies": {
+    "nav-router": "^0.1.0",
+    "vue": ">=3.5"
+  }
+}
