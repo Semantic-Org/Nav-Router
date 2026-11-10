@@ -28,11 +28,24 @@ import { DomView } from './view.js';
 const NOT_FOUND = Symbol('notFound');
 
 export class Router {
+  /*******************************
+            Integration
+  *******************************/
+
+  // what an integration's router overrides: the view it renders with, and how a moment is held
+
   // the view a route's layout, slots and page are made with. the native one by default, functions
   // returning markup or nodes, so a plain app renders from one import; an integration's router
   // names its own. where there is no document, a server or a test, there is no page to render to
   // and so no view
   static View = globalThis.document ? DomView : null;
+
+  // writes that belong together, one moment to anything watching: the page's write, its settle
+  // and its render. nothing here, where nothing watches. a reactive router holds its notifications
+  // to the end, and a renderer with its own schedule commits the page once
+  batch(fn) {
+    return fn();
+  }
 
   // brand router
   get [IS_ROUTER]() {
@@ -1329,12 +1342,6 @@ export class Router {
     });
     await rendering;
     this.notify();
-  }
-
-  // writes that belong together, one moment to anything watching: nothing here, where nothing
-  // watches, and the reactive scaffold's provider holds its notifications to the end
-  batch(fn) {
-    return fn();
   }
 
   pageFor({ route, url, params, query }) {
