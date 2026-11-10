@@ -19,7 +19,7 @@ const defaults = {
 // the plugin's own namespace on the router, router({ announcer: { politeness, format } }), merged
 // over its defaults here since the router's merge is shallow
 Router.defaults.announcer ??= {};
-const settingsOf = (router) => ({ ...defaults, ...router.config.announcer });
+const getSettings = (router) => ({ ...defaults, ...router.config.announcer });
 
 const proto = Router.prototype;
 const { start, intercepted, renderPage, settled, failed, stop } = proto;
@@ -29,7 +29,7 @@ proto.ensureAnnouncer = function() {
   this.announcer ??= { element: null, queued: null, lastText: '', lastPage: null };
   if (!this.announcer.element && globalThis.document?.body) {
     const element = globalThis.document.createElement('div');
-    element.setAttribute('aria-live', settingsOf(this).politeness);
+    element.setAttribute('aria-live', getSettings(this).politeness);
     element.setAttribute('aria-atomic', 'true');
     element.setAttribute('data-router-announcer', '');
     element.style.cssText = LIVE_REGION_STYLE;
@@ -71,7 +71,7 @@ proto.renderPage = async function(page, event = null) {
   const moved = !lastPage || lastPage.route !== page.route || !isEqual(lastPage.params, page.params)
     || event?.navigationType === 'reload';
   announcer.lastPage = { route: page.route, params: page.params };
-  const text = String(settingsOf(this).format(page) ?? '');
+  const text = String(getSettings(this).format(page) ?? '');
   if (!lastPage || event?.initial || !text || (!moved && text === announcer.lastText)) {
     return;
   }

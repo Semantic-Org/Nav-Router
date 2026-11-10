@@ -55,16 +55,18 @@ const restoreEntry = (key, record) => {
   }
 };
 
-// the hook sees what the other hooks see, with the page's data and slices, so a reactive router
+// the hook sees what the other hooks see, with the page's data and active routes, so a reactive router
 // tracks what it reads. a sync answer waits for the render's write, an async one lands on its own
 proto.evaluateMeta = function(route) {
-  // the hook sees what the other hooks see: the slices of the route and the routes above it
-  const slices = (this.page.slices ?? []).filter((slice) => inArray(slice.route, route.ancestors));
+  // the hook sees what the other hooks see: the active routes of the route and the routes above it
+  const activeRoutes = (this.page.activeRoutes ?? []).filter((activeRoute) =>
+    inArray(activeRoute.route, route.ancestors)
+  );
   const data = {};
-  each(slices, (slice) => extend(data, slice.data));
-  const context = this.contextFor(route, this.page, { data, slices });
+  each(activeRoutes, (activeRoute) => extend(data, activeRoute.data));
+  const context = this.contextFor(route, this.page, { data, activeRoutes });
   const value = this.evaluateHook(route, route.meta, context, {
-    kind: 'slice',
+    kind: 'data',
     changed: (value) => this.metaChanged(route, value),
   });
   if (isPromise(value)) {
@@ -131,7 +133,7 @@ proto.writeHead = function(page) {
   }
 
   if (isFunction(this.config.formatTitle)) {
-    const baseTitle = isArray(page.titles) ? (page.titles.at(-1) ?? '') : (page.title ?? '');
+    const baseTitle = isArray(page.titles) ? (page.titles[0] ?? '') : (page.title ?? '');
     const formatted = this.config.formatTitle(baseTitle, page.titles ?? [], page);
     if (formatted != null) {
       page.title = String(formatted);
@@ -146,7 +148,7 @@ proto.writeHead = function(page) {
   }
 
   const merged = {};
-  each(page.routes ?? [], (route) => {
+  each(page.activeRoutes ?? [], ({ route }) => {
     const meta = this.headMeta?.get(route)?.value;
     if (meta) {
       extend(merged, meta);

@@ -39,14 +39,14 @@ const runChecks = (checks, context, index = 0) => {
 routerProto.hasLeaveBlockers = function() {
   return Boolean(
     this.leaveGuards?.size
-      || this.page?.routes?.some((route) => route.canLeave !== undefined),
+      || this.page?.activeRoutes?.some(({ route }) => route.canLeave !== undefined),
   );
 };
 
 routerProto.onBeforeUnload = function(event) {
   const context = { router: this, from: this.page, destination: null, navigationType: 'unload', event };
   const blocks = (result) => result === false || (isString(result) && result.length > 0);
-  const blocked = [...(this.page?.routes ?? [])].reverse().some((route) =>
+  const blocked = [...(this.page?.activeRoutes ?? [])].reverse().some(({ route }) =>
     route.canLeave !== undefined
     && blocks(isFunction(route.canLeave) ? route.canLeave({ ...context, route }) : route.canLeave)
   ) || [...(this.leaveGuards ?? [])].some((guard) => blocks(guard(context)));
@@ -123,7 +123,7 @@ navProto.onNavigate = function(event) {
     event,
   };
 
-  each([...(router.page?.routes ?? [])].reverse(), (route) => {
+  each([...(router.page?.activeRoutes ?? [])].reverse(), ({ route }) => {
     if (route.canLeave === undefined) {
       return;
     }
