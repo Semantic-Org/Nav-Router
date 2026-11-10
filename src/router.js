@@ -30,8 +30,9 @@ const NOT_FOUND = Symbol('notFound');
 export class Router {
   // the view a route's layout, slots and page are made with. the native one by default, functions
   // returning markup or nodes, so a plain app renders from one import; an integration's router
-  // names its own
-  static View = DomView;
+  // names its own. where there is no document, a server or a test, there is no page to render to
+  // and so no view
+  static View = globalThis.document ? DomView : null;
 
   // brand router
   get [IS_ROUTER]() {
