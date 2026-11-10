@@ -1,5 +1,5 @@
 import { getRouter, Router, View } from 'nav-router';
-import { createElement, memo, useSyncExternalStore } from 'react';
+import { Component, createElement, memo, useSyncExternalStore } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 
@@ -18,8 +18,24 @@ const Outlet = memo(({ view }) => {
   for (const name of Object.keys(view.fills)) {
     props[name] = view.slots[name] ??= createElement(Slot, { layout: view, name });
   }
-  return createElement(view.view, props);
+  return createElement(Boundary, { view }, createElement(view.view, props));
 });
+
+// a view that throws as it renders is the router's to show, as its route's error. the view that
+// failed renders nothing, and the layouts around it stand
+class Boundary extends Component {
+  state = { failed: null };
+
+  componentDidCatch(error) {
+    const { view } = this.props;
+    this.setState({ failed: view });
+    view.router.renderFailed(error);
+  }
+
+  render() {
+    return this.state.failed === this.props.view ? null : this.props.children;
+  }
+}
 
 // a react component. the top view has a root in the mount. a view inside a react layout has none:
 // its layout renders it, as children, or as the prop named for its slot, so a layout is plain react,
@@ -97,8 +113,31 @@ export class ReactView extends View {
 export class ReactRouter extends Router {
   static View = ReactView;
 
+  // a view that threw inside the moment fails the moment, as a native view's throw does
   batch(fn) {
-    return flushSync(fn);
+    this.rendering = true;
+    try {
+      const result = flushSync(fn);
+      if (this.thrown) {
+        throw this.thrown;
+      }
+      return result;
+    }
+    finally {
+      this.rendering = false;
+      this.thrown = null;
+    }
+  }
+
+  // inside a moment that is not already the error page the failure is the moment's, thrown as it
+  // ends. outside one, a view rendering from its own state, it is the standing page's
+  renderFailed(error) {
+    if (this.rendering && this.page?.status !== 'error') {
+      this.thrown ??= error;
+    }
+    else {
+      this.viewFailed(error);
+    }
   }
 }
 

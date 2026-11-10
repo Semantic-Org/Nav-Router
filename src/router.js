@@ -733,52 +733,74 @@ export class Router {
       this.notify();
       return;
     }
-    this.error = {
+    // a failure before commit left the standing page in place; only a committed one is shown as an error
+    if (!pending || pending.committed) {
+      await this.renderError(error, pending);
+    }
+    else {
+      this.error = this.createError(error, pending);
+      this.logError(error);
+    }
+    this.notify();
+  }
+
+  // a view failed to render on the standing page, with no navigation around it to fail: it is the
+  // page's error as a navigation's failure is. a view failing on the error page, or under a
+  // navigation about to replace the page, is logged and nothing more
+  async viewFailed(error) {
+    if (this.pending || this.page?.status === 'error') {
+      this.logError(error);
+      return;
+    }
+    await this.renderError(error);
+    this.notify();
+  }
+
+  createError(error, pending) {
+    return {
       error,
       // transition is still set inside navigateerror, and its from is the last page that settled
       from: globalThis.navigation?.transition?.from ?? null,
       url: pending?.url ?? this.navigator.entry?.url ?? null,
     };
-    // a failure before commit left the standing page in place; only a committed one is shown as an error
-    const committed = !pending || pending.committed;
-    if (committed && this.config.errorRoute) {
+  }
+
+  // the error shown: at the error route when one is named, as the error page otherwise
+  async renderError(error, pending = null) {
+    this.error = this.createError(error, pending);
+    if (this.config.errorRoute) {
       this.navigator.deferNavigate(this.href(this.config.errorRoute), { history: 'replace' });
+      return;
     }
-    else if (committed) {
-      const previous = this.page;
-      const view = await this.resolveView(this.config.statusViews?.error).catch(() => null);
-      if (!view) {
-        this.logError(error);
-      }
-      // the routes on screen stay active under the error page. a cold error, nothing yet shown, is
-      // framed by the root when it has no data of its own, since the data that failed may be the
-      // root's, and stands at the mount with no route active otherwise
-      const views = previous?.views ?? await this.resolveRouteViews([this.root]).catch(() => []);
-      // a newer navigation began or landed while the views loaded: the error page is not this one's
-      // to write. a navigation that failed is finished, so its signal says nothing of what came after
-      if (this.pending || this.page !== previous) {
-        return;
-      }
-      const activeRoutes = previous?.activeRoutes
-        ?? (this.root.data === undefined ? [this.createActiveRoute(this.root, {})] : []);
-      await this.batch(() => {
-        this.page = {
-          ...(pending ? this.pageFor(pending) : (previous ?? {})),
-          activeRoutes,
-          unresolvedRoutes: this.getUnresolvedRoutes(activeRoutes, pending?.routes ?? []),
-          views,
-          view,
-          status: 'error',
-          error,
-        };
-        this.settleRoutes(previous, this.page);
-        return this.renderPage(this.page);
-      }).catch(noop);
-    }
-    else {
+    const previous = this.page;
+    const view = await this.resolveView(this.config.statusViews?.error).catch(() => null);
+    if (!view) {
       this.logError(error);
     }
-    this.notify();
+    // the routes on screen stay active under the error page. a cold error, nothing yet shown, is
+    // framed by the root when it has no data of its own, since the data that failed may be the
+    // root's, and stands at the mount with no route active otherwise
+    const views = previous?.views ?? await this.resolveRouteViews([this.root]).catch(() => []);
+    // a newer navigation began or landed while the views loaded: the error page is not this one's
+    // to write. a navigation that failed is finished, so its signal says nothing of what came after
+    if (this.pending || this.page !== previous) {
+      return;
+    }
+    const activeRoutes = previous?.activeRoutes
+      ?? (this.root.data === undefined ? [this.createActiveRoute(this.root, {})] : []);
+    await this.batch(() => {
+      this.page = {
+        ...(pending ? this.pageFor(pending) : (previous ?? {})),
+        activeRoutes,
+        unresolvedRoutes: this.getUnresolvedRoutes(activeRoutes, pending?.routes ?? []),
+        views,
+        view,
+        status: 'error',
+        error,
+      };
+      this.settleRoutes(previous, this.page);
+      return this.renderPage(this.page);
+    }).catch(noop);
   }
 
   // the one place core logs. an integration that wants its own namespace replaces this, the way
@@ -1576,23 +1598,29 @@ export class Router {
     const data = {};
     each(activeRoutes, (activeRoute) => extend(data, activeRoute.data));
     const titles = this.getTitles(activeRoutes);
-    const rendering = this.batch(() => {
-      this.page = { ...previous, ...changes, activeRoutes, data, title: titles[0] ?? '', titles };
-      if (globalThis.document && this.page.title) {
-        globalThis.document.title = this.page.title;
-      }
-      if (changes) {
-        // the history entry's cached result held these routes as an ok page, which it no longer is
-        this.entryCache?.delete(previous.key);
-        this.page.unresolvedRoutes = this.getUnresolvedRoutes(activeRoutes, this.matchedRoutes(previous));
-        this.settleRoutes(previous, this.page, { inPlace: true });
-      }
-      else {
-        each(activeRoutes.slice(index), (moved) => moved.route.update(this.page));
-      }
-      return this.renderPage(this.page);
-    });
-    await rendering;
+    // nothing is navigating here, so a view that fails has no navigation to fail
+    try {
+      await this.batch(() => {
+        this.page = { ...previous, ...changes, activeRoutes, data, title: titles[0] ?? '', titles };
+        if (globalThis.document && this.page.title) {
+          globalThis.document.title = this.page.title;
+        }
+        if (changes) {
+          // the history entry's cached result held these routes as an ok page, which it no longer is
+          this.entryCache?.delete(previous.key);
+          this.page.unresolvedRoutes = this.getUnresolvedRoutes(activeRoutes, this.matchedRoutes(previous));
+          this.settleRoutes(previous, this.page, { inPlace: true });
+        }
+        else {
+          each(activeRoutes.slice(index), (moved) => moved.route.update(this.page));
+        }
+        return this.renderPage(this.page);
+      });
+    }
+    catch (error) {
+      await this.viewFailed(error);
+      return;
+    }
     this.notify();
   }
 
