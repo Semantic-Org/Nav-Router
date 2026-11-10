@@ -39,19 +39,17 @@ export class View {
     this.fill(view, context, target, anchor);
   }
 
-  // the native view cannot be told, so it renders again where it stands and answers with a new
-  // record of itself, which tells its route that what hung inside it has gone
+  // the native view cannot be told, so it is destroyed and a new one begins where it stood. the
+  // new view is the answer, which tells its route that what hung inside the old one has gone
   update(context) {
-    const previous = this.nodes;
-    const focused = previous.find((node) => node.contains(document.activeElement)) ? document.activeElement : null;
-    for (const node of previous) {
-      node.remove();
-    }
-    this.fill(this.view, context, this.target, this.end);
+    const { router, view, placement } = this;
+    const focused = this.nodes.some((node) => node.contains(document.activeElement)) && document.activeElement;
+    this.destroy();
+    const next = new this.constructor({ router, view, placement }).start(context);
     if (focused?.id) {
       document.getElementById(focused.id)?.focus();
     }
-    return Object.assign(Object.create(Object.getPrototypeOf(this)), this);
+    return next;
   }
 
   destroy() {
