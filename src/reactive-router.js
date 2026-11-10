@@ -332,7 +332,7 @@ export class ReactiveRouter extends Router {
       // attached. a later run that throws is a rejected promise, applied as one
       let value;
       try {
-        value = fn(createHookContext({ signal: run.attached ? this.signalOf(route) : signal }));
+        value = fn(createHookContext({ signal: run.attached ? this.getSignal(route) : signal }));
       }
       catch (error) {
         value = Promise.reject(error);
@@ -447,7 +447,7 @@ export class ReactiveRouter extends Router {
 
   // the signal a hook's later run is handed: its route's while it is active, and for an unresolved
   // route, which has no life of its own, one that lives as long as the page it waits on
-  signalOf(route) {
+  getSignal(route) {
     return route.active ? route.abortSignal : this.pageAbort?.signal;
   }
 

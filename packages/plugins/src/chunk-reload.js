@@ -18,7 +18,7 @@ const defaults = {
 // the plugin's own namespace on the router, router({ chunkReload: { storageKey, reload } }), merged
 // over its defaults here since the router's merge is shallow
 Router.defaults.chunkReload ??= {};
-const settingsOf = (router) => ({ ...defaults, ...router.config.chunkReload });
+const getSettings = (router) => ({ ...defaults, ...router.config.chunkReload });
 
 const proto = Router.prototype;
 const { intercepted, resolveView, settled, failed, stop } = proto;
@@ -44,7 +44,7 @@ proto.resolveView = async function(target) {
 proto.settled = function(event) {
   this.chunkError = null;
   try {
-    globalThis.sessionStorage?.removeItem(settingsOf(this).storageKey);
+    globalThis.sessionStorage?.removeItem(getSettings(this).storageKey);
   }
   catch {}
   return settled.call(this, event);
@@ -56,14 +56,14 @@ proto.failed = function(error, event) {
   const url = this.pending?.url ?? globalThis.location?.href ?? null;
   if (isChunkError && globalThis.navigator?.onLine !== false && url) {
     try {
-      if (globalThis.sessionStorage?.getItem(settingsOf(this).storageKey) !== url) {
-        globalThis.sessionStorage?.setItem(settingsOf(this).storageKey, url);
+      if (globalThis.sessionStorage?.getItem(getSettings(this).storageKey) !== url) {
+        globalThis.sessionStorage?.setItem(getSettings(this).storageKey, url);
         this.pending = null;
         this.navigator.detach();
-        settingsOf(this).reload(url);
+        getSettings(this).reload(url);
         return;
       }
-      globalThis.sessionStorage?.removeItem(settingsOf(this).storageKey);
+      globalThis.sessionStorage?.removeItem(getSettings(this).storageKey);
     }
     catch {}
   }

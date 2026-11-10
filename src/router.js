@@ -183,7 +183,7 @@ export class Router {
     if (event.signal.aborted) {
       return;
     }
-    const titles = this.titlesOf(activeRoutes);
+    const titles = this.getTitles(activeRoutes);
     const page = {
       view,
       views,
@@ -743,7 +743,7 @@ export class Router {
         this.page = {
           ...(pending ? this.pageFor(pending) : (previous ?? {})),
           activeRoutes,
-          unresolvedRoutes: this.unresolvedOf(activeRoutes, pending?.routes ?? []),
+          unresolvedRoutes: this.getUnresolvedRoutes(activeRoutes, pending?.routes ?? []),
           views,
           view,
           status: 'error',
@@ -1069,7 +1069,7 @@ export class Router {
             this.resolveView(this.config.statusViews?.forbidden),
             viewsReady,
           ]);
-          const titles = this.titlesOf(activeRoutes);
+          const titles = this.getTitles(activeRoutes);
           return this.buildCascadeResult(matched, {
             status: 'forbidden',
             view,
@@ -1113,7 +1113,7 @@ export class Router {
       return this.notFoundResult(matched, viewsReady, { data, activeRoutes });
     }
     const views = await viewsReady;
-    const titles = this.titlesOf(activeRoutes);
+    const titles = this.getTitles(activeRoutes);
     return this.buildCascadeResult(matched, {
       status: 'ok',
       view: views.at(-1)?.view ?? null,
@@ -1167,7 +1167,7 @@ export class Router {
         activeRoute.title = await this.resolveTitle(route, matched, {
           data: { ...data },
           activeRoutes: [...activeRoutes, activeRoute],
-          titles: this.titlesOf(activeRoutes),
+          titles: this.getTitles(activeRoutes),
           signal,
         });
       }
@@ -1179,7 +1179,7 @@ export class Router {
 
   async notFoundResult(matched, viewsReady, { data, activeRoutes }) {
     const [views, view] = await Promise.all([viewsReady, this.resolveView(this.config.statusViews?.notFound)]);
-    const titles = this.titlesOf(activeRoutes);
+    const titles = this.getTitles(activeRoutes);
     return this.buildCascadeResult(matched, {
       status: 'notFound',
       view,
@@ -1203,7 +1203,7 @@ export class Router {
   }
 
   // the titles a page carries, nearest first: the leaf's, its parent's, up to the root's
-  titlesOf(activeRoutes) {
+  getTitles(activeRoutes) {
     return activeRoutes.map((activeRoute) => activeRoute.title).filter((title) => title !== null).reverse();
   }
 
@@ -1305,7 +1305,7 @@ export class Router {
       this.page = {
         ...this.pageFor(matched),
         ...resolved,
-        unresolvedRoutes: this.unresolvedOf(resolved.activeRoutes, matched.routes),
+        unresolvedRoutes: this.getUnresolvedRoutes(resolved.activeRoutes, matched.routes),
         key,
         user: this.user,
       };
@@ -1348,7 +1348,7 @@ export class Router {
 
   // the matched routes that are not on the page, from the one that refused, was not found or failed
   // down to the leaf. they have no life on it, and are listed beside the active ones to say what happened
-  unresolvedOf(activeRoutes, matched) {
+  getUnresolvedRoutes(activeRoutes, matched) {
     return matched.filter((route) => !activeRoutes.some((activeRoute) => activeRoute.route === route)).map((route) => ({
       route,
     }));
@@ -1559,7 +1559,7 @@ export class Router {
     const activeRoutes = changes ? previous.activeRoutes.slice(0, index) : previous.activeRoutes;
     const data = {};
     each(activeRoutes, (activeRoute) => extend(data, activeRoute.data));
-    const titles = this.titlesOf(activeRoutes);
+    const titles = this.getTitles(activeRoutes);
     const rendering = this.batch(() => {
       this.page = { ...previous, ...changes, activeRoutes, data, title: titles[0] ?? '', titles };
       if (globalThis.document && this.page.title) {
@@ -1568,7 +1568,7 @@ export class Router {
       if (changes) {
         // the history entry's cached result held these routes as an ok page, which it no longer is
         this.entryCache?.delete(previous.key);
-        this.page.unresolvedRoutes = this.unresolvedOf(activeRoutes, this.matchedRoutes(previous));
+        this.page.unresolvedRoutes = this.getUnresolvedRoutes(activeRoutes, this.matchedRoutes(previous));
         this.settleRoutes(previous, this.page, { inPlace: true });
       }
       else {
