@@ -1,4 +1,4 @@
-import { Router } from 'nav-router';
+import { isFunction, isString } from '@semantic-ui/utils';
 
 // a view on the page, with a three-part life: it is created at its place, updated with its
 // context, and destroyed. this is the place and the life, the same for every kind of view, and it
@@ -86,7 +86,7 @@ export class View {
     const { parent, slot } = this.placement;
     if (!parent) {
       const { mount } = this.router.config;
-      return typeof mount === 'string' ? document.querySelector(mount) : mount;
+      return isString(mount) ? document.querySelector(mount) : mount;
     }
     const selector = slot ? `slot[name="${CSS.escape(slot)}"]` : 'slot:not([name])';
     for (let layout = parent; layout; layout = slot ? layout.parent : null) {
@@ -133,8 +133,8 @@ export class View {
 // cannot be told, so an update makes it again, with the focus put back where it was
 export class DomView extends View {
   create({ view, context, target, anchor }) {
-    let result = typeof view === 'function' ? view(context) : view;
-    if (typeof result === 'string') {
+    let result = isFunction(view) ? view(context) : view;
+    if (isString(result)) {
       const template = document.createElement('template');
       template.innerHTML = result.trim();
       result = template.content;
@@ -164,14 +164,3 @@ export class DomView extends View {
     return next;
   }
 }
-
-// where the app goes; a selector or an element
-Router.defaults.mount ??= 'body';
-
-export class DomRouter extends Router {
-  static View = DomView;
-}
-
-export * from 'nav-router';
-export const domRouter = (options) => new DomRouter(options);
-export { domRouter as router };

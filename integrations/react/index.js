@@ -1,5 +1,4 @@
-import { View } from '@nav-router/dom';
-import { Router } from 'nav-router';
+import { getRouter, Router, View } from 'nav-router';
 import { createElement, useSyncExternalStore } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
@@ -35,7 +34,6 @@ export const useRouter = (read) => {
   return useSyncExternalStore((listener) => router.subscribe(listener), () => read(router));
 };
 
-import { getRouter } from 'nav-router';
 export * from 'nav-router';
 export const reactRouter = (options) => new ReactRouter(options);
 export { reactRouter as router };

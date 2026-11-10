@@ -1,4 +1,4 @@
-import { View } from '@nav-router/dom';
+import { View } from 'nav-router';
 import { ReactiveRouter } from 'nav-router/reactive';
 import { batch, createComputed, createRoot, createSignal, untrack } from 'solid-js';
 import { createComponent, insert } from 'solid-js/web';

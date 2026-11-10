@@ -22,6 +22,7 @@ import { setRouter } from './helpers/router.js';
 import { IS_ROUTER } from './internal-helpers/identity.js';
 import { Navigator } from './navigator.js';
 import { Route } from './route.js';
+import { DomView } from './view.js';
 
 // what a data() returns through notFound(), at navigation or on the standing page
 const NOT_FOUND = Symbol('notFound');
@@ -37,6 +38,8 @@ export class Router {
 
   static defaults = {
     base: '',
+    // where the app goes on the page, a selector or an element
+    mount: 'body',
     // the view for each status a page can stand in: loading, notFound, forbidden, error
     statusViews: {},
     signInRoute: null,
@@ -1654,5 +1657,12 @@ export class Router {
   }
 }
 
-export const router = (options) => new Router(options);
+// the router that renders the dom with no framework: its views are functions returning markup or
+// nodes. router() makes this one, so a plain app renders from one import. an integration's router
+// extends Router or ReactiveRouter and names its own view, and nothing of this one comes with it
+export class DomRouter extends Router {
+  static View = DomView;
+}
+
+export const router = (options) => new DomRouter(options);
 export const site = router; // alias

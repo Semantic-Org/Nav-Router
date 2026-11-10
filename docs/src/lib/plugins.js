@@ -52,32 +52,21 @@ export const PLUGINS = [
     category: 'Tooling',
     description: 'Lists every route as a page a crawler or a generator can read, and adds `router.sitemap()`.',
   },
-  {
-    name: 'dom',
-    short: 'String and element views, no framework',
-    category: 'Rendering',
-    description: 'Renders views as markup or elements into the page’s `<slot>`s, with no framework.',
-  },
 ];
 
 // the binding a plugin imports under: view-transitions → viewTransitions
 export const bindingFor = (name) => name.replace(/-(\w)/g, (_, c) => c.toUpperCase());
 
-// options a plugin needs to do anything, shown in the setup as the router's own: dom renders into a mount
-const REQUIRED_OPTIONS = { dom: "mount: '#app'" };
-
 // the setup for a set of plugins, as nav-router's own examples write it: one import per plugin, for
-// its effect, dom first, the renderer the others build on, and the plugins' options on the router
+// its effect, beside the router, which renders the dom without one
 export function sampleFor(names) {
-  const picked = PLUGINS.map((p) => p.name).filter((n) => names.includes(n))
-    .sort((a, b) => (b === 'dom') - (a === 'dom'));
+  const picked = PLUGINS.map((p) => p.name).filter((n) => names.includes(n));
   const lines = [];
   picked.forEach((n) => lines.push(`import '@nav-router/plugins/${n}';`));
   if (!picked.length) { lines.push('// select plugins below to add them here'); }
   lines.push("import { router } from 'nav-router';", '');
-  const options = picked.map((n) => REQUIRED_OPTIONS[n]).filter(Boolean);
   lines.push('const app = router({');
-  options.forEach((option) => lines.push(`  ${option},`));
+  lines.push("  mount: '#app',");
   lines.push('  // the routes', '});');
   return lines.join('\n');
 }

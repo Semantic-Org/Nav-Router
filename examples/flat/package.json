@@ -6,7 +6,6 @@
     "dev": "vite"
   },
   "dependencies": {
-    "@nav-router/dom": "0.1.0",
     "@nav-router/plugins": "0.1.0",
     "nav-router": "0.1.0"
   },

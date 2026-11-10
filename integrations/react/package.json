@@ -5,7 +5,12 @@
   "license": "ISC",
   "type": "module",
   "sideEffects": false,
-  "exports": { ".": "./index.js" },
-  "dependencies": { "@nav-router/dom": "0.1.0" },
-  "peerDependencies": { "nav-router": "^0.1.0", "react": ">=19", "react-dom": ">=19" }
+  "exports": {
+    ".": "./index.js"
+  },
+  "peerDependencies": {
+    "nav-router": "^0.1.0",
+    "react": ">=19",
+    "react-dom": ">=19"
+  }
 }
