@@ -1,7 +1,18 @@
 import { getRouter, Router, View } from 'nav-router';
-import { createElement, useSyncExternalStore } from 'react';
+import { createElement, memo, useSyncExternalStore } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
+
+// one view as a react component. it renders when its own view is told, or when what fills its slots
+// changes, and not because the layout above it rendered: a view that was not told does not render
+const Outlet = memo(({ view }) => {
+  useSyncExternalStore(view.subscribe, view.getVersion);
+  const props = { ...view.context };
+  for (const [name, fill] of Object.entries(view.fills)) {
+    props[name] = createElement(Outlet, { view: fill });
+  }
+  return createElement(view.view, props);
+});
 
 // a react component. the top view has a root in the mount. a view inside a react layout has none:
 // its layout renders it, as children, or as the prop named for its slot, so a layout is plain react,
@@ -11,6 +22,22 @@ export class ReactView extends View {
 
   // what each slot of this layout holds, by name
   fills = {};
+
+  // told once per change, which is what wakes this view's component and no other
+  version = 0;
+  listeners = new Set();
+  subscribe = (listener) => {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  };
+  getVersion = () => this.version;
+
+  changed() {
+    this.version++;
+    for (const listener of this.listeners) {
+      listener();
+    }
+  }
 
   // a slot in react is a prop of the layout that takes the view: the nearest layout above whose
   // route declares the name, or the layout the view hangs in. the top view goes in the mount
@@ -31,52 +58,40 @@ export class ReactView extends View {
     this.context = context;
     if (this.layout) {
       this.layout.fills[this.slot ?? 'children'] = this;
+      this.layout.changed();
     }
     else {
       this.root = createRoot(this.target);
+      this.root.render(createElement(Outlet, { view: this }));
     }
-    this.render();
   }
 
   update(context) {
     this.context = context;
-    this.render();
+    this.changed();
   }
 
   destroy() {
-    if (this.layout) {
-      delete this.layout.fills[this.slot ?? 'children'];
-      this.layout.render();
-    }
-    else {
+    const { layout } = this;
+    const name = this.slot ?? 'children';
+    if (!layout) {
       this.root?.unmount();
       super.destroy();
     }
-  }
-
-  // this view as an element, with what fills its slots as its props
-  element() {
-    const props = { ...this.context };
-    for (const [name, fill] of Object.entries(this.fills)) {
-      props[name] = fill.element();
-    }
-    return createElement(this.view, props);
-  }
-
-  // a view inside a layout is rendered by rendering the layout. the root's render is flushed, so
-  // the page is whole when the router's moment ends
-  render() {
-    if (this.layout) {
-      this.layout.render();
-    }
-    else {
-      flushSync(() => this.root.render(this.element()));
+    else if (layout.fills[name] === this) {
+      delete layout.fills[name];
+      layout.changed();
     }
   }
 }
 
+// the page is committed once, as the router's moment ends, whatever number of views it told
 export class ReactRouter extends Router {
   static View = ReactView;
+
+  batch(fn) {
+    return flushSync(fn);
+  }
 }
 
 // the router's state, read in a component and kept current: useRouter((router) => router.pending)
