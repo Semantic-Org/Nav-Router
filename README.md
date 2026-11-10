@@ -49,6 +49,7 @@ app.start();
 | --- | --- |
 | [nav-router](src) | The router and the reactive scaffold integrations build on |
 | [@nav-router/plugins](packages/plugins) | The plugins, each installed by importing it |
+| [@nav-router/react](integrations/react) | Nav Router for React |
 | [@nav-router/solid](integrations/solid) | Nav Router for Solid |
 | [@nav-router/core](packages/core) | The router under its scoped name, a thin re-export |
 
@@ -60,6 +61,7 @@ Each example is a small Vite app. Install once at the root, then run one by name
 npm install
 npm run flat     # a flat route table
 npm run nested   # nested layouts and slots
+npm run react    # the same app as React components
 npm run solid    # the same app as Solid components
 ```
 

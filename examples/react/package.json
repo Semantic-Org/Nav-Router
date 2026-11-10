@@ -1,0 +1,19 @@
+{
+  "name": "nav-router-react",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite"
+  },
+  "dependencies": {
+    "@nav-router/plugins": "0.1.0",
+    "@nav-router/react": "0.1.0",
+    "nav-router": "0.1.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5",
+    "vite": "^7"
+  }
+}
