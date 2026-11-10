@@ -1,208 +1,116 @@
-import { each, isArray, isFunction, isString } from '@semantic-ui/utils';
+import { each, isFunction, isString } from '@semantic-ui/utils';
 import { Router } from 'nav-router';
 
-// the native how for what appears. every view lives in a region, the house's DynamicRegion: two
-// empty text nodes, which serialize to nothing and have no box, a start at the place the plugin
-// reads and an end after it, with whatever the view rendered between them, one node or many. a
-// view is a function of its context returning markup or nodes, inserted before the region's end;
-// a view a framework mounts comes with mount(target, anchor) in the createView bag, the one thing
-// the plugin cannot know, and is mounted with the region's end as its insertion reference. a
-// layout writes <slot> for the content below it and <slot name="x"> for content by name, the
-// platform's element, found among the layout's own nodes or inside them, so a fragment layout
-// works as a rooted one does: in light dom the content goes inside the slot and the slot's own
-// fallback children wait aside until it empties; under a shadow host the content is light
-// children carrying the slot attribute, stamped at mount and when told, and the host projects it.
-// an update renders the view again and swaps what stands between the anchors, keeping its id and
-// the focus inside it, or tells a mounted view and an element with an update() of its own. the
-// root's region leads the mount, the router's own setting, body by default, so two routers on a
-// page take two containers. placement, removal and the slot's fallback are the
-// plugin's for every view
+// the native how for what appears. the router creates, updates and destroys a route's views, and
+// this turns each into dom: create finds where the view goes and renders it there, update tells
+// it or makes it again, destroy takes it away. what create returned is all that is kept
 Router.defaults.mount ??= 'body';
 
-const proto = Router.prototype;
-const mountElement = (router) => {
-  const target = router.config.mount;
-  return isString(target) ? document.querySelector(target) : target;
-};
+// how a view is handed its place: 'anchor', a target and the node to insert before, with nothing
+// of the plugin's around the view, or 'element', an element that is the view's alone
+Router.viewPlace = 'anchor';
 
-// the nodes a view's result is: markup parses, a node is itself, a fragment its children, an array its own
+const proto = Router.prototype;
+
+// markup parses, a node is itself, a fragment its children, an array its own
 const toNodes = (result) => {
   if (isString(result)) {
     const template = document.createElement('template');
     template.innerHTML = result.trim();
     return [...template.content.childNodes];
   }
-  if (result instanceof Node) {
-    return result.nodeType === Node.DOCUMENT_FRAGMENT_NODE ? [...result.childNodes] : [result];
-  }
-  if (isArray(result)) {
-    return result;
-  }
-  throw new Error(`dom: a view returned ${typeof result}, not markup or nodes`);
+  return result instanceof DocumentFragment ? [...result.childNodes] : [result].flat();
 };
 
-const renderView = (view, context) => toNodes(isFunction(view) ? view(context) : view);
-
-// what stands between a region's anchors, the view's own
-const contents = ({ start, end }) => {
-  const nodes = [];
-  for (let node = start.nextSibling; node && node !== end; node = node.nextSibling) {
-    nodes.push(node);
-  }
-  return nodes;
-};
-
-const elements = (region) => contents(region).filter((node) => node.nodeType === Node.ELEMENT_NODE);
-
-// the slot element a region's layout wrote for the selector: the host when an element of it
-// projects one, otherwise the match among the layout's own nodes or inside one
-const findSlot = (region, selector) => {
-  const roots = elements(region);
-  const host = roots.find((element) => element.shadowRoot);
-  if (host) {
-    return host.shadowRoot.querySelector(selector) ? host : null;
-  }
-  for (const root of roots) {
-    const found = root.matches(selector) ? root : root.querySelector(selector);
-    if (found) {
-      return found;
+// where a view lives: an element, and for an anchored view two empty text nodes inside it that
+// bound what the view rendered. a slot's own children, its fallback, wait here while the view
+// fills it and go back when it leaves
+class Region {
+  constructor(target, { parent, anchored }) {
+    this.target = target;
+    this.parent = parent;
+    if (target.localName === 'slot') {
+      this.fallback = [...target.childNodes];
+      target.replaceChildren();
+    }
+    if (anchored) {
+      this.start = target.insertBefore(document.createTextNode(''), parent ? null : target.firstChild);
+      this.end = document.createTextNode('');
+      this.start.after(this.end);
     }
   }
-  return null;
-};
 
-// where the placement lands: the mount for the root, otherwise the slot the parent's layout
-// wrote. a named slot is the nearest layout's above that wrote it, across layouts that did not,
-// so a leaf's override of a slot the root declares lands in the root's; content for a slot no
-// layout wrote goes in the parent's first element
-const findTarget = ({ parent, slot }, router) => {
+  // what the view rendered
+  get nodes() {
+    if (!this.start) {
+      return [...this.target.childNodes];
+    }
+    const nodes = [];
+    for (let node = this.start.nextSibling; node && node !== this.end; node = node.nextSibling) {
+      nodes.push(node);
+    }
+    return nodes;
+  }
+
+  remove() {
+    each([...this.nodes, this.start, this.end], (node) => node?.remove());
+    if (this.fallback) {
+      this.target.append(...this.fallback);
+    }
+  }
+}
+
+// the element a view goes in: the mount at the top, otherwise the slot the layout above wrote. a
+// named slot is the nearest layout's above that wrote it
+const findTarget = (router, { parent, slot }) => {
   if (!parent) {
-    return mountElement(router);
+    const { mount } = router.config;
+    return isString(mount) ? document.querySelector(mount) : mount;
   }
-  const selector = slot ? `slot[name="${slot}"]` : 'slot:not([name])';
-  for (let region = parent; region; region = slot ? region.parent : null) {
-    const found = findSlot(region, selector);
-    if (found) {
-      return found;
+  const selector = slot ? `slot[name="${CSS.escape(slot)}"]` : 'slot:not([name])';
+  for (let layout = parent; layout; layout = slot ? layout.parent : null) {
+    for (const node of layout.nodes) {
+      const found = node.matches?.(selector) ? node : node.querySelector?.(selector);
+      if (found) {
+        return found;
+      }
     }
   }
-  return elements(parent)[0] ?? parent.target;
+  throw new Error(`dom: no layout above wrote <slot${slot ? ` name="${slot}"` : ''}>`);
 };
 
-// a region opened at the target the placement names, before the mount's first child for the root,
-// so the app leads whatever else the mount holds, and at the end otherwise, since a slot holds one
-// occupant. a light-dom slot keeps its own fallback children aside while something fills it
-const openRegion = (placement, router) => {
-  const target = findTarget(placement, router);
-  if (target.tagName === 'SLOT' && !target.fallback) {
-    target.fallback = [...target.childNodes];
-    target.replaceChildren();
-  }
-  const start = document.createTextNode('');
-  const end = document.createTextNode('');
-  target.insertBefore(start, placement.parent ? null : target.firstChild);
-  start.after(end);
-  return { target, start, end, parent: placement.parent };
-};
-
-// the slot's fallback comes back once what filled it has left
-const closeSlot = (target) => {
-  if (target?.fallback && !target.childNodes.length) {
-    target.append(...target.fallback);
-    delete target.fallback;
-  }
-};
-
-const fill = (region, nodes) => each(nodes, (node) => region.end.before(node));
-
-const empty = (region) => each(contents(region), (node) => node.remove());
-
-// the region leaves whole, and the slot's fallback comes back once it is empty
-const remove = (region) => {
-  empty(region);
-  region.start.remove();
-  region.end.remove();
-  closeSlot(region.target);
-};
-
-// a shadow host projects by the slot attribute, carried by the region's elements
-const setSlotAttribute = (region, slot) => {
-  if (region.target.shadowRoot) {
-    each(
-      elements(region),
-      (element) => (slot ? element.setAttribute('slot', slot) : element.removeAttribute('slot')),
-    );
-  }
-};
-
-// the region is the rendered value, carrying the dispose a mount returned and its update when it
-// has one. a view that throws leaves nothing behind: the region goes and the slot shows its fallback
-proto.createView = function({ view, placement, context, mount }) {
-  const region = openRegion(placement, this);
+proto.createView = function({ view, placement, context }) {
+  const anchored = this.constructor.viewPlace === 'anchor';
+  const region = new Region(findTarget(this, placement), { parent: placement.parent, anchored });
+  const { target, end } = region;
   try {
-    if (mount) {
-      const mounted = mount(region.target, region.end);
-      Object.assign(region, isFunction(mounted) ? { dispose: mounted } : mounted);
-    }
-    else {
-      fill(region, renderView(view, context));
-    }
+    region.view = this.renderView({ view, context, ...(anchored ? { target, anchor: end } : { element: target }) });
   }
   catch (error) {
-    remove(region);
+    region.remove();
     throw error;
   }
-  setSlotAttribute(region, placement.slot);
   return region;
 };
 
+// a view that can be told is told. one that cannot is destroyed and created again where it stood
 proto.updateView = function({ rendered, view, placement, context }) {
-  const previous = contents(rendered);
-  const update = rendered.dispose ? rendered.update : previous.length === 1 ? previous[0].update : null;
-  // a mounted view is told through its update, or left as it stands; so is an element with one of its own
-  if (rendered.dispose || isFunction(update)) {
-    update?.(context);
-    setSlotAttribute(rendered, placement.slot);
+  if (rendered.view.update) {
+    rendered.view.update(context);
     return rendered;
   }
-  const nodes = renderView(view, context);
-  if (nodes.length === 1 && previous.length === 1 && nodes[0] === previous[0]) {
-    return rendered;
-  }
-  // one element in for one out keeps its id, so a control the page addresses by id stays addressed
-  if (
-    previous.length === 1 && nodes.length === 1 && previous[0].id && nodes[0].nodeType === Node.ELEMENT_NODE
-    && !nodes[0].id
-  ) {
-    nodes[0].id = previous[0].id;
-  }
-  const focused = previous.some((node) => node.contains(document.activeElement)) ? document.activeElement : null;
-  empty(rendered);
-  fill(rendered, nodes);
-  setSlotAttribute(rendered, placement.slot);
-  // the same control by id takes the focus back, with its selection where it was
-  const focusTarget = focused?.id && elements(rendered)
-    .map((
-      element,
-    ) => (element.matches(`#${CSS.escape(focused.id)}`)
-      ? element
-      : element.querySelector(`#${CSS.escape(focused.id)}`))
-    )
-    .find(Boolean);
-  if (focusTarget) {
-    focusTarget.focus();
-    if (isFunction(focusTarget.setSelectionRange) && focused.selectionStart !== null) {
-      try {
-        focusTarget.setSelectionRange(focused.selectionStart, focused.selectionEnd);
-      }
-      catch {}
-    }
-  }
-  // a layout that came back new remounts what hung inside it: a new record for the same region
-  return { ...rendered };
+  this.destroyView({ rendered });
+  return this.createView({ view, placement, context });
 };
 
 proto.destroyView = function({ rendered }) {
-  rendered.dispose?.();
-  remove(rendered);
+  rendered.view.destroy?.();
+  rendered.remove();
+};
+
+// what an integration replaces: render the view at its place and return { update, destroy }. the
+// native view is a function of its context returning markup or nodes, with neither
+proto.renderView = function({ view, context, target, anchor = null }) {
+  each(toNodes(isFunction(view) ? view(context) : view), (node) => target.insertBefore(node, anchor));
+  return {};
 };

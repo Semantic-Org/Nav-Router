@@ -48,28 +48,22 @@ export class SolidRouter extends ReactiveRouter {
     return batch(fn);
   }
 
-  // the view is mounted in the region the plugin opens, under a root of its own and with nothing
-  // of the integration's around it, so a layout's flex or grid reaches the view's root; placement,
-  // removal and the slot's fallback are the plugin's. the component is created as compiled jsx
-  // creates one, its body untracked, and what it returns is inserted before the region's end, so
-  // a root that changes with a condition is solid's to swap
-  createView({ view, placement, context }) {
+  // the view is mounted where the plugin places it, under a root of its own, the component created
+  // as compiled jsx creates one. what it returns is told through the live context's update and
+  // ended by its root
+  renderView({ view, context, target, anchor }) {
     const { context: props, update } = this.liveContext(context);
-    const mount = (target, anchor) => ({
-      update,
-      dispose: createRoot((end) => {
-        try {
-          insert(target, createComponent(view, props), anchor);
-        }
-        catch (error) {
-          // a view that threw leaves the root by the throw, its cleanups unrun until it is ended
-          end();
-          throw error;
-        }
-        return end;
-      }),
+    const destroy = createRoot((end) => {
+      try {
+        insert(target, createComponent(view, props), anchor);
+      }
+      catch (error) {
+        end();
+        throw error;
+      }
+      return end;
     });
-    return super.createView({ view, placement, context, mount });
+    return { update, destroy };
   }
 }
 
