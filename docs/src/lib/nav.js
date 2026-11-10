@@ -26,6 +26,11 @@ const FRAMEWORK_GUIDES = {
 // an integration's own exports, listed only where the package exists
 const FRAMEWORK_API = {
   solid: [['SolidRouter', 'solid-router', true], ['solidRouter()', 'solid-router-fn', true]],
+  svelte: [['SvelteRouter', 'svelte-router', true], ['svelteRouter()', 'svelte-router-fn', true], [
+    'Slot',
+    'slot',
+    true,
+  ]],
 };
 
 const frameworkGroups = (section) =>
