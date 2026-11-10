@@ -1,0 +1,16 @@
+{
+  "name": "@nav-router/react",
+  "version": "0.1.0",
+  "description": "Nav Router for React",
+  "license": "ISC",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./index.js"
+  },
+  "peerDependencies": {
+    "nav-router": "^0.1.0",
+    "react": ">=19",
+    "react-dom": ">=19"
+  }
+}

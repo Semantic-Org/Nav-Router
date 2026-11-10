@@ -22,11 +22,18 @@ import { setRouter } from './helpers/router.js';
 import { IS_ROUTER } from './internal-helpers/identity.js';
 import { Navigator } from './navigator.js';
 import { Route } from './route.js';
+import { DomView } from './view.js';
 
 // what a data() returns through notFound(), at navigation or on the standing page
 const NOT_FOUND = Symbol('notFound');
 
 export class Router {
+  // the view a route's layout, slots and page are made with. the native one by default, functions
+  // returning markup or nodes, so a plain app renders from one import; an integration's router
+  // names its own. where there is no document, a server or a test, there is no page to render to
+  // and so no view
+  static View = globalThis.document ? DomView : null;
+
   // brand router
   get [IS_ROUTER]() {
     return true;
@@ -37,6 +44,8 @@ export class Router {
 
   static defaults = {
     base: '',
+    // where the app goes on the page, a selector or an element
+    mount: 'body',
     // the view for each status a page can stand in: loading, notFound, forbidden, error
     statusViews: {},
     signInRoute: null,
@@ -1627,13 +1636,19 @@ export class Router {
   // name, absent for the default slot, the context the view is rendered with, and the rendered
   // view createView returned, an element or a component, which update hands back or replaces and
   // destroy ends. a view's life ends at destroyView, never at its route's signal
-  createView({ view, placement, context }) {}
-
-  updateView({ rendered, view, placement, context }) {
-    return rendered;
+  createView({ view, placement, context }) {
+    const { View } = this.constructor;
+    return View ? new View({ router: this, view, placement }).start(context) : undefined;
   }
 
-  destroyView({ rendered }) {}
+  // a view that was updated is the same view, unless it answers with the one that took its place
+  updateView({ rendered, context }) {
+    return rendered.update(context) ?? rendered;
+  }
+
+  destroyView({ rendered }) {
+    rendered.destroy();
+  }
 
   subscribe(listener) {
     if (isFunction(listener)) {
