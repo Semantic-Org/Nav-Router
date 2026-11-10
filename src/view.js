@@ -1,9 +1,11 @@
 import { isFunction, isString } from '@semantic-ui/utils';
 
-// a view on the page, with a three-part life: it is created at its place, updated with its
-// context, and destroyed. this is the place and the life, the same for every kind of view, and it
-// renders nothing: a kind extends it and writes create, update and destroy. where a view goes, a
-// slot's fallback, a shadow host's projection and taking the view away are all here, once
+// a view on the page, with a three-part life: it is created in its slot, updated with its context,
+// and destroyed. it renders nothing: a kind extends it and writes create, update and destroy.
+// findSlot says what the view goes in, and the views above it are in reach for that. as written
+// here it is the dom's answer, the <slot> element a layout above wrote, with the place, the slot's
+// fallback and the taking away that go with an element. a kind whose framework has slots of its
+// own says what a slot is by writing its own findSlot
 export class View {
   // how a view is handed its place: 'anchor', a target and the node to insert before, with
   // nothing of ours around the view, or 'element', an element that is the view's alone
@@ -14,11 +16,23 @@ export class View {
     this.view = view;
     this.placement = placement;
     this.parent = placement.parent;
+    this.slot = placement.slot;
   }
 
-  // the view's life begins: its place is opened and it is created there. apart from the
-  // constructor, so a view that extends this has its own fields in place before create runs
+  // the views this one hangs inside, nearest first, each a layout with its route
+  get ancestors() {
+    const views = [];
+    for (let view = this.parent; view; view = view.parent) {
+      views.push(view);
+    }
+    return views;
+  }
+
+  // the view's life begins: its slot is found, its place opened there, and it is created. apart
+  // from the constructor, so a view that extends this has its own fields in place before create runs
   start(context) {
+    this.route = context.route;
+    this.target = this.findSlot();
     this.open();
     try {
       this.create({ view: this.view, context, target: this.target, anchor: this.endAnchor, element: this.target });
@@ -61,13 +75,16 @@ export class View {
   // shadow host is shared, its children the views of all its slots, so there an element view is
   // given an element of its own, with no box
   open() {
-    let target = this.findTarget();
+    let { target } = this;
+    // a slot that is not an element is its kind's own, and has no place in the dom to open
+    if (!(target instanceof Node)) {
+      return;
+    }
     const anchored = this.constructor.place === 'anchor';
     if (this.host && !anchored) {
-      this.wrapper = target = target.appendChild(document.createElement('div'));
+      this.wrapper = this.target = target = target.appendChild(document.createElement('div'));
       target.style.display = 'contents';
     }
-    this.target = target;
     if (target.localName === 'slot') {
       this.fallback = [...target.childNodes];
       target.replaceChildren();
@@ -79,17 +96,17 @@ export class View {
     }
   }
 
-  // the mount at the top, otherwise the slot the layout above wrote: in its own nodes, or in the
-  // shadow root of one of them, which projects the host's children by their slot attribute. a
-  // named slot is the nearest layout's above that wrote it
-  findTarget() {
-    const { parent, slot } = this.placement;
-    if (!parent) {
+  // what this view goes in. the mount at the top, otherwise the slot a layout above wrote: among
+  // its own nodes, or in the shadow root of one of them, which projects the host's children by
+  // their slot attribute. a named slot is the nearest layout's above that wrote it
+  findSlot() {
+    const { ancestors, slot } = this;
+    if (!ancestors.length) {
       const { mount } = this.router.config;
       return isString(mount) ? document.querySelector(mount) : mount;
     }
     const selector = slot ? `slot[name="${CSS.escape(slot)}"]` : 'slot:not([name])';
-    for (let layout = parent; layout; layout = slot ? layout.parent : null) {
+    for (const layout of slot ? ancestors : ancestors.slice(0, 1)) {
       for (const node of layout.nodes) {
         if (node.shadowRoot?.querySelector(selector)) {
           this.host = node;
@@ -107,7 +124,7 @@ export class View {
   // a shadow host projects its children by their slot attribute, so the view's elements carry it
   project() {
     if (this.host) {
-      const { slot } = this.placement;
+      const { slot } = this;
       for (const node of this.wrapper ? [this.wrapper] : this.nodes) {
         if (node.nodeType === Node.ELEMENT_NODE) {
           slot ? node.setAttribute('slot', slot) : node.removeAttribute('slot');
@@ -119,7 +136,7 @@ export class View {
   // what this view rendered
   get nodes() {
     if (!this.startAnchor) {
-      return this.target ? [...this.target.childNodes] : [];
+      return this.target instanceof Node ? [...this.target.childNodes] : [];
     }
     const nodes = [];
     for (let node = this.startAnchor.nextSibling; node && node !== this.endAnchor; node = node.nextSibling) {
