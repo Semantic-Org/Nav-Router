@@ -1,5 +1,4 @@
-import { router as defineRouter } from 'nav-router';
-import '@nav-router/plugins/dom';
+import { router as defineRouter } from '@nav-router/dom';
 
 import { ErrorPage } from './views/error-page.js';
 import { ForbiddenPage } from './views/forbidden-page.js';
