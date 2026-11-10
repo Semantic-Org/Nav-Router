@@ -21,19 +21,26 @@ const Outlet = memo(({ view }) => {
   return createElement(Boundary, { view }, createElement(view.view, props));
 });
 
-// a view that throws as it renders is the router's to show, as its route's error. the view that
-// failed renders nothing, and the layouts around it stand
+// a view that throws as it renders is logged and renders nothing, and the layouts around it
+// stand, where react alone would empty the whole mount. it is tried again on the next page: the
+// router does not update a layout kept through a navigation, so the boundary listens for one
 class Boundary extends Component {
-  state = { failed: null };
+  state = {};
 
   componentDidCatch(error) {
-    const { view } = this.props;
-    this.setState({ failed: view });
-    view.router.renderFailed(error);
+    const { router } = this.props.view;
+    this.setState({ failed: router.page });
+    this.stop ??= router.subscribe(() => this.forceUpdate());
+    router.logError(error);
+  }
+
+  componentWillUnmount() {
+    this.stop?.();
   }
 
   render() {
-    return this.state.failed === this.props.view ? null : this.props.children;
+    const { view, children } = this.props;
+    return this.state.failed === view.router.page ? null : children;
   }
 }
 
@@ -113,31 +120,8 @@ export class ReactView extends View {
 export class ReactRouter extends Router {
   static View = ReactView;
 
-  // a view that threw inside the moment fails the moment, as a native view's throw does
   batch(fn) {
-    this.rendering = true;
-    try {
-      const result = flushSync(fn);
-      if (this.thrown) {
-        throw this.thrown;
-      }
-      return result;
-    }
-    finally {
-      this.rendering = false;
-      this.thrown = null;
-    }
-  }
-
-  // inside a moment that is not already the error page the failure is the moment's, thrown as it
-  // ends. outside one, a view rendering from its own state, it is the standing page's
-  renderFailed(error) {
-    if (this.rendering && this.page?.status !== 'error') {
-      this.thrown ??= error;
-    }
-    else {
-      this.viewFailed(error);
-    }
+    return flushSync(fn);
   }
 }
 
