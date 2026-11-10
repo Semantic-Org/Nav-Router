@@ -1,0 +1,22 @@
+{
+  "name": "@nav-router/svelte",
+  "version": "0.1.0",
+  "description": "Nav Router for Svelte: views are Svelte components whose props are the router's live context, the reactive scaffold on Svelte's runes",
+  "license": "ISC",
+  "type": "module",
+  "sideEffects": false,
+  "main": "index.svelte.js",
+  "exports": {
+    ".": {
+      "svelte": "./index.svelte.js",
+      "default": "./index.svelte.js"
+    }
+  },
+  "dependencies": {
+    "@nav-router/plugins": "0.1.0"
+  },
+  "peerDependencies": {
+    "nav-router": "^0.1.0",
+    "svelte": ">=5"
+  }
+}
