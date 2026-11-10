@@ -3,13 +3,20 @@ import { createElement, memo, useSyncExternalStore } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 
-// one view as a react component. it renders when its own view is told, or when what fills its slots
-// changes, and not because the layout above it rendered: a view that was not told does not render
+// a slot of a layout. it renders whatever view fills the slot now, so one view taking another's place
+// in a slot renders the slot and not the layout around it
+const Slot = ({ layout, name }) => {
+  const fill = useSyncExternalStore(layout.subscribe, () => layout.fills[name]);
+  return fill ? createElement(Outlet, { view: fill }) : null;
+};
+
+// one view as a react component. it renders when its own view is told, or when a slot of its own
+// starts or stops being filled, and not because the layout above it rendered
 const Outlet = memo(({ view }) => {
-  useSyncExternalStore(view.subscribe, view.getVersion);
+  useSyncExternalStore(view.subscribe, view.getSnapshot);
   const props = { ...view.context };
-  for (const [name, fill] of Object.entries(view.fills)) {
-    props[name] = createElement(Outlet, { view: fill });
+  for (const name of Object.keys(view.fills)) {
+    props[name] = view.slots[name] ??= createElement(Slot, { layout: view, name });
   }
   return createElement(view.view, props);
 });
@@ -20,20 +27,20 @@ const Outlet = memo(({ view }) => {
 export class ReactView extends View {
   static place = 'element';
 
-  // what each slot of this layout holds, by name
+  // what each slot of this layout holds, by name, and the element handed to the layout for each
   fills = {};
+  slots = {};
 
-  // told once per change, which is what wakes this view's component and no other
+  // what this view's component renders from: how many times it was told, and which slots are filled
   version = 0;
   listeners = new Set();
   subscribe = (listener) => {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   };
-  getVersion = () => this.version;
+  getSnapshot = () => `${this.version} ${Object.keys(this.fills).sort()}`;
 
   changed() {
-    this.version++;
     for (const listener of this.listeners) {
       listener();
     }
@@ -68,6 +75,7 @@ export class ReactView extends View {
 
   update(context) {
     this.context = context;
+    this.version++;
     this.changed();
   }
 
