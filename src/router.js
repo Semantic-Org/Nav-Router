@@ -27,7 +27,12 @@ import { DomView } from './view.js';
 // what a data() returns through notFound(), at navigation or on the standing page
 const NOT_FOUND = Symbol('notFound');
 
-export class BaseRouter {
+export class Router {
+  // the view a route's layout, slots and page are made with. the native one by default, functions
+  // returning markup or nodes, so a plain app renders from one import; an integration's router
+  // names its own
+  static View = DomView;
+
   // brand router
   get [IS_ROUTER]() {
     return true;
@@ -1655,14 +1660,6 @@ export class BaseRouter {
     this.onChange?.(this);
     each(this.listeners, (listener) => listener(this));
   }
-}
-
-// the router an app gets: it renders the dom with no framework, its views functions returning
-// markup or nodes, so a plain app renders from one import. BaseRouter above names no view, and is
-// what an integration's router extends to name its own, and what a plugin patches so it reaches
-// every router
-export class Router extends BaseRouter {
-  static View = DomView;
 }
 
 export const router = (options) => new Router(options);

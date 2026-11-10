@@ -1,7 +1,7 @@
 // classes
 export { createNavigator, Navigator } from './navigator.js';
 export { Route, route } from './route.js';
-export { BaseRouter, Router, router, site } from './router.js';
+export { Router, router, site } from './router.js';
 export { DomView, View } from './view.js';
 
 // helpers

@@ -1,5 +1,5 @@
 import { each, extend, inArray, isArray, isFunction, isPlainObject, isPromise } from '@semantic-ui/utils';
-import { BaseRouter } from 'nav-router';
+import { Router } from 'nav-router';
 
 const PROPERTY_PREFIX = /^(og|article|profile|book|fb):/;
 
@@ -8,9 +8,9 @@ const PROPERTY_PREFIX = /^(og|article|profile|book|fb):/;
 // reactive router again when what it read moves, so the tags follow live data. the merge and the
 // writes are synchronous at render, off the swap path, and an async answer lands when it resolves.
 // existing static tags are updated in place and restored when a later route clears them
-BaseRouter.defaults.formatTitle ??= null;
+Router.defaults.formatTitle ??= null;
 
-const proto = BaseRouter.prototype;
+const proto = Router.prototype;
 const { renderPage, onRouteCreated, onRouteUpdated, onRouteDestroyed, stop } = proto;
 
 const findExistingTag = (head, key) => {

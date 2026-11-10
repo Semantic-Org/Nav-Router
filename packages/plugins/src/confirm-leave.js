@@ -1,11 +1,11 @@
 import { each, inArray, isEqual, isFunction, isPromise, isString } from '@semantic-ui/utils';
-import { BaseRouter, Navigator } from 'nav-router';
+import { Navigator, Router } from 'nav-router';
 
 // holds dirty forms and in-flight edits on the page across link clicks, traverses and tab close.
 // sync guards refuse inside navigate before intercept runs, async modals hold precommit or roll back
-BaseRouter.defaults.confirm ??= (message) => (globalThis.confirm ? globalThis.confirm(message) : false);
+Router.defaults.confirm ??= (message) => (globalThis.confirm ? globalThis.confirm(message) : false);
 
-const routerProto = BaseRouter.prototype;
+const routerProto = Router.prototype;
 const navProto = Navigator.prototype;
 const { runGuards, beforeCommit, afterCommit, applyCascade, stop } = routerProto;
 const { onNavigate } = navProto;
