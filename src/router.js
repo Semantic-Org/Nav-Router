@@ -1643,33 +1643,17 @@ export class Router {
   // name, absent for the default slot, the context the view is rendered with, and the rendered
   // view createView returned, an element or a component, which update hands back or replaces and
   // destroy ends. a view's life ends at destroyView, never at its route's signal
-  // a view that fails to render is logged and stands empty, and the page stands with it. what
-  // hangs inside a layout that failed has no slot to go in, and the next update makes it again
   createView({ view, placement, context }) {
     const { View } = this.constructor;
-    if (!View) {
-      return undefined;
-    }
-    const rendered = new View({ router: this, view, placement });
-    try {
-      rendered.start(context);
-    }
-    catch (error) {
-      this.logError(error);
-    }
-    return rendered;
+    return View ? new View({ router: this, view, placement }).start(context) : undefined;
   }
 
-  // a view that was updated is the same view, unless it answers with the one that took its place
-  updateView({ rendered, context }) {
-    try {
-      return rendered.update(context) ?? rendered;
-    }
-    catch (error) {
-      this.logError(error);
-      rendered.destroy();
-      return rendered;
-    }
+  // a view that was updated is the same view, unless it answers with the one that took its place.
+  // one that failed to render is made again
+  updateView({ rendered, view, placement, context }) {
+    return rendered.failed
+      ? this.createView({ view, placement, context })
+      : rendered.update(context) ?? rendered;
   }
 
   destroyView({ rendered }) {
