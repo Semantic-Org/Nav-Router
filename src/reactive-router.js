@@ -408,14 +408,12 @@ export class ReactiveRouter extends Router {
 
   // after settle nothing is left pending: a run no route attached belonged to a branch this navigation
   // abandoned, a precommit redirect's first routes among them
-  settleRoutes(previous, page) {
+  settleRoutes(previous, page, inPlace) {
     this.writeLive(this.params, this.paramCells, page.params ?? {});
     this.writeLive(this.query, this.queryCells, page.query ?? {});
-    // the standing page settled again, a refusal or a not-found landing on it in place, which keeps
-    // the page's params where a navigation brings its own: the route it landed on is no longer
-    // active, and keeps its runs across the end of its life so the one that watches for the refusal
-    // lifting still does
-    const inPlace = page.params === previous?.params;
+    // in place, the standing page settled again with a refusal or a not-found landing on it: the
+    // route it landed on is no longer active, and keeps its runs across the end of its life so the
+    // one that watches for the refusal lifting still does
     const refused = page.unresolvedRoutes?.[0]?.route;
     const kept = inPlace && refused?.runs;
     if (kept) {

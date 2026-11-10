@@ -1224,7 +1224,6 @@ export class Router {
 
   buildCascadeResult({ route, params, query }, resolved) {
     return {
-      redirect: null,
       route,
       params,
       query,
@@ -1554,6 +1553,9 @@ export class Router {
   async updatePage(route, changes) {
     const previous = this.page;
     const index = previous.activeRoutes.findIndex((activeRoute) => activeRoute.route === route);
+    if (index < 0) {
+      return;
+    }
     const activeRoutes = changes ? previous.activeRoutes.slice(0, index) : previous.activeRoutes;
     const data = {};
     each(activeRoutes, (activeRoute) => extend(data, activeRoute.data));
@@ -1567,7 +1569,7 @@ export class Router {
         // the history entry's cached result held these routes as an ok page, which it no longer is
         this.entryCache?.delete(previous.key);
         this.page.unresolvedRoutes = this.unresolvedOf(activeRoutes, this.matchedRoutes(previous));
-        this.settleRoutes(previous, this.page);
+        this.settleRoutes(previous, this.page, true);
       }
       else {
         each(activeRoutes.slice(index), (moved) => moved.route.update(this.page));
