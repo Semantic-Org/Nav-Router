@@ -55,15 +55,16 @@ export class View {
   *******************************/
 
   // the element this view goes in, and for an anchored view the two empty text nodes that bound
-  // what it rendered. a slot's own children, its fallback, wait aside while the view fills it. a
-  // slot is the view's alone; the mount and a shadow host are shared with whatever else they
-  // hold, so an element view is given an element of its own there, with no box
+  // what it rendered. a slot's own children, its fallback, wait aside while the view fills it.
+  // an element view is handed its target as it is: a slot is the view's alone, and the mount is
+  // the router's, where the app said it goes, so a framework mounts in it its own way. only a
+  // shadow host is shared, its children the views of all its slots, so there an element view is
+  // given an element of its own, with no box
   open() {
     let target = this.findTarget();
     const anchored = this.constructor.place === 'anchor';
-    const first = this.parent ? null : target.firstChild;
-    if (!anchored && (this.host || !this.parent)) {
-      this.wrapper = target = target.insertBefore(document.createElement('div'), first);
+    if (this.host && !anchored) {
+      this.wrapper = target = target.appendChild(document.createElement('div'));
       target.style.display = 'contents';
     }
     this.target = target;
@@ -72,7 +73,7 @@ export class View {
       target.replaceChildren();
     }
     if (anchored) {
-      this.startAnchor = target.insertBefore(document.createTextNode(''), first);
+      this.startAnchor = target.insertBefore(document.createTextNode(''), this.parent ? null : target.firstChild);
       this.endAnchor = document.createTextNode('');
       this.startAnchor.after(this.endAnchor);
     }
