@@ -27,7 +27,7 @@ The reference implementation is **the nav-router docs**, which carry the whole m
 - **English is the source.** It sits at the root. Every other language is served under a lower-case prefix (`/ja/…`, `/zh-cn/…`) while the page declares the proper tag (`lang="zh-CN"`). Not subdomains; those are taken by archived versions.
 - **A language is one folder.** `content/translations/<language>/` mirrors `content/`: a `strings.json` for the interface's words, and a twin file for each Markdown page it has translated. Adding or fixing a translation never touches code, so a translator's whole job is "fill this folder".
 - **A twin carries only its words.** Title, lede, body, and `source`: the hash of the English it was made from. Dates, kinds and sizes stay the English page's. When the English moves on, the hashes differ and the page says it may be behind. The build lists every translation that is behind, with the hash to set once it is brought up to date, so whoever changes an English page sees it.
-- **Every page exists in every language.** One route serves all of them. A link in a language always takes its prefix, and the language menu never leads to a 404.
+- **Every page exists in every language.** Each kind of page keeps its own route, and that route covers every language (a leading `[...locale]` that is empty for English). A link in a language always takes its prefix, and the language menu never leads to a 404.
 - **The languages are a list in one module,** given to Astro's own `i18n` config, so a page reads its language from `Astro.currentLocale` rather than being handed it.
 
 ---
@@ -62,6 +62,7 @@ Translation is its own job, not the site builder's.
 - **The same agent takes later rounds,** so the glossary holds.
 - **A change to code alone needs no translator.** A twin carries its own copy of the page's code blocks. When only those change in English (an import path, a renamed option), carry the same edit into each twin and update its `source`.
 - **Translate only once a library's docs are final.** Until then, a few sample pages in a few languages (one right-to-left) are enough to prove the shape.
+- **The reader is offered their language, never moved to it.** A page offers itself in the first language the browser asks for that it is written in, in that language's own words. After a reader switches, it asks once whether to always open the docs in that language; only a yes sends later visits there, and picking another language takes it back.
 - **A language names itself.** Don't drop a language's menu name into a sentence template; cases and articles break. Each language writes its own name in its own sentence.
 - **Plural forms are the language's own.** English has two, Japanese one, Arabic six; a translator writes the ones its language tells apart.
 - **The assistant prompt asks for answers in the reader's language.**
@@ -84,5 +85,6 @@ German and Hindi have large communities that read English well, so they come lat
 
 - **Translating at the wrong level.** A page that is mostly words translates as a file; a page that is mostly markup translates as keys. Copying a hand-tuned template per language, or matching translations to the English text itself, breaks on the first edit. *For example:* a homepage dictionary keyed by its English sentences, when its copy is always a draft.
 - **Sentences joined from pieces.** A verb in one element and its object in the next fixes an order only English reads in. *For example:* a caption of "User navigates to" and a page name, which Japanese could only turn into a label.
+- **Merging routes to cover languages.** A route file is what Astro bundles by: one catch-all for every page ships the homepage's styles on every docs page and the reverse, and changes which stylesheet loads last. Give each kind of page its route and let the language be a param of it. After any change to routes or shared imports, compare what a page of each kind loads, on the built site, not the dev server. *For example:* one route for all pages took a page's CSS from 70 KB to 105 KB, and a menu button meant only for phones showed everywhere.
 - **Judging right-to-left from the code.** Half the problems only show rendered, with a real translation: a period on the wrong side of a caption, a number parted from its unit, a wire crossing a mirrored mock app.
 - **Mirroring a diagram wholesale.** A diagram with its own geometry (wires, a time axis) keeps it. Mirror what is inside a region, not where the regions are.
