@@ -9,20 +9,26 @@ export class View {
   // nothing of ours around the view, or 'element', an element that is the view's alone
   static place = 'anchor';
 
-  constructor({ router, view, placement, context }) {
+  constructor({ router, view, placement }) {
     this.router = router;
     this.view = view;
     this.placement = placement;
     this.parent = placement.parent;
+  }
+
+  // the view's life begins: its place is opened and it is created there. apart from the
+  // constructor, so a view that extends this has its own fields in place before create runs
+  start(context) {
     this.open();
     try {
-      this.create({ view, context, target: this.target, anchor: this.end, element: this.target });
+      this.create({ view: this.view, context, target: this.target, anchor: this.end, element: this.target });
     }
     catch (error) {
       // a view that failed leaves nothing behind
       this.destroy();
       throw error;
     }
+    return this;
   }
 
   /*******************************

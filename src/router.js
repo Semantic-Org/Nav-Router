@@ -1629,7 +1629,7 @@ export class Router {
   // destroy ends. a view's life ends at destroyView, never at its route's signal
   createView({ view, placement, context }) {
     const { View } = this.constructor;
-    return View ? new View({ router: this, view, placement, context }) : undefined;
+    return View ? new View({ router: this, view, placement }).start(context) : undefined;
   }
 
   // a view that was updated is the same view, unless it answers with the one that took its place
