@@ -1,0 +1,10 @@
+{
+  "name": "@nav-router/dom",
+  "version": "0.1.0",
+  "description": "Nav Router for the DOM: the View every integration extends, and a router whose views are markup or nodes",
+  "license": "ISC",
+  "type": "module",
+  "sideEffects": false,
+  "exports": { ".": "./index.js" },
+  "peerDependencies": { "nav-router": "^0.1.0" }
+}

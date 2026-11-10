@@ -1627,13 +1627,19 @@ export class Router {
   // name, absent for the default slot, the context the view is rendered with, and the rendered
   // view createView returned, an element or a component, which update hands back or replaces and
   // destroy ends. a view's life ends at destroyView, never at its route's signal
-  createView({ view, placement, context }) {}
-
-  updateView({ rendered, view, placement, context }) {
-    return rendered;
+  createView({ view, placement, context }) {
+    const { View } = this.constructor;
+    return View ? new View({ router: this, view, placement, context }) : undefined;
   }
 
-  destroyView({ rendered }) {}
+  // a view that was updated is the same view, unless it answers with the one that took its place
+  updateView({ rendered, context }) {
+    return rendered.update(context) ?? rendered;
+  }
+
+  destroyView({ rendered }) {
+    rendered.destroy();
+  }
 
   subscribe(listener) {
     if (isFunction(listener)) {
