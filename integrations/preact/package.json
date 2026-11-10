@@ -1,0 +1,22 @@
+{
+  "name": "@nav-router/preact",
+  "version": "0.1.0",
+  "description": "Nav Router for Preact: views are Preact components of the route's context, with the reactive scaffold on Preact's signals at @nav-router/preact/signals",
+  "license": "ISC",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./index.js",
+    "./signals": "./signals.js"
+  },
+  "peerDependencies": {
+    "@preact/signals": ">=2",
+    "nav-router": "^0.1.0",
+    "preact": ">=10.25"
+  },
+  "peerDependenciesMeta": {
+    "@preact/signals": {
+      "optional": true
+    }
+  }
+}
