@@ -150,7 +150,7 @@ proto.renderPage = async function(page, event = null) {
 };
 
 proto.updateData = async function(route, value) {
-  const label = route?.name || route?.path || 'slice';
+  const label = route?.name || route?.path || 'activeRoute';
   const close = measureTimeline('router:recompute');
   try {
     return await updateData.call(this, route, value);

@@ -6,7 +6,7 @@ import { Router } from './router.js';
 // provider's reaction, learning its dependencies on the cascade's first pass without computing
 // twice. when something it read moves, a later run lands the way that hook lands at navigation:
 // a redirect moves the page, a refused permission redirects or shows forbidden, data updates its
-// slice, and a title updates its title. a slice is a store with a cell per key, and merged data
+// entry, and a title updates its title. an active route's data is a store with a cell per key, and merged data
 // reads each key through its cell, so a key that moved wakes only the functions that read it, the
 // cell's own equality deciding what moved. a route holds its runs, and a run made while its
 // navigation is in flight belongs to that navigation until it is attached to the route at settle: it ends
@@ -16,13 +16,13 @@ import { Router } from './router.js';
 export class ReactiveRouter extends Router {
   // the comparator for each kind of cell the scaffold makes, on the class as Signal.equality is so
   // a provider or an app overrides it once: a data key, a param, a query key or the user compares
-  // deep, the slices by their members since the router builds that array fresh at every update,
+  // deep, the active routes by their members since the router builds that array fresh at every update,
   // and the page by identity since it carries the route and the router, which a walk would enter
   static equality = {
     // a snapshot carries routes and the router, which a walk would enter: current, page, pending, error
     snapshot: Object.is,
-    // the router builds a view's slices array fresh at every update; the same slices in it are the same
-    slices: (a, b) => a.length === b.length && a.every((slice, index) => slice === b[index]),
+    // the router builds a view's active routes array fresh at every update; the same ones in it are the same
+    activeRoutes: (a, b) => a.length === b.length && a.every((activeRoute, index) => activeRoute === b[index]),
   };
 
   constructor(options) {
@@ -123,7 +123,7 @@ export class ReactiveRouter extends Router {
     this.abortController?.abort();
     // an unresolved route has no signal to end its runs, so the page's watch ends here
     this.pageAbort?.abort();
-    each(this.page?.unresolvedRoutes ?? [], (route) => this.stopRuns(route));
+    each(this.page?.unresolvedRoutes ?? [], ({ route }) => this.stopRuns(route));
     return super.stop();
   }
 
@@ -205,7 +205,7 @@ export class ReactiveRouter extends Router {
 
   // the view's context made live, for an integration to render with. params, query, user and page
   // are the router's own cells, so a kept layout's reads stay current without the route being told;
-  // data reads through the slices' own cells, so one key moving wakes its reader alone; the slices are
+  // data reads through the active routes' own cells, so one key moving wakes its reader alone; the active routes are
   // the one cell per view, and update is its write, for an integration to hang where its rendered
   // view is told. what it hands the view, props or anything else, is its own word
   liveContext(context) {
@@ -223,9 +223,9 @@ export class ReactiveRouter extends Router {
         update: noop,
       };
     }
-    const slices = this.createSignal(context.slices, { equals: this.constructor.equality.slices });
-    // the merged data is built once per slices array, the cells inside it doing the tracking
-    let cachedSlices = null;
+    const activeRoutes = this.createSignal(context.activeRoutes, { equals: this.constructor.equality.activeRoutes });
+    // the merged data is built once per active routes array, the cells inside it doing the tracking
+    let cachedRoutes = null;
     let cachedData = null;
     const live = {
       route: context.route,
@@ -239,30 +239,30 @@ export class ReactiveRouter extends Router {
       get page() {
         return router.page;
       },
-      get slices() {
-        return slices.get();
+      get activeRoutes() {
+        return activeRoutes.get();
       },
       get data() {
-        const current = slices.get();
-        if (current !== cachedSlices) {
-          cachedSlices = current;
+        const current = activeRoutes.get();
+        if (current !== cachedRoutes) {
+          cachedRoutes = current;
           cachedData = router.dataFor(current);
         }
         return cachedData;
       },
     };
-    return { context: live, update: (next) => slices.set(next.slices) };
+    return { context: live, update: (next) => activeRoutes.set(next.activeRoutes) };
   }
 
-  // merges ancestor slices behind per-key getters, so reading data.team tracks team's cell alone.
-  // a getter exists for the keys a slice holds, so a key a run returns only sometimes is read plain
+  // merges ancestor active routes behind per-key getters, so reading data.team tracks team's cell alone.
+  // a getter exists for the keys an active route holds, so a key a run returns only sometimes is read plain
   // on the runs it is absent: a data() returns every key every run, undefined when it has none
-  dataFor(slices) {
+  dataFor(activeRoutes) {
     const data = {};
-    each(slices, (slice) => {
-      each(slice.data, (_, key) => {
+    each(activeRoutes, (activeRoute) => {
+      each(activeRoute.data, (_, key) => {
         Object.defineProperty(data, key, {
-          get: () => (slice.store ? slice.store.get(key) : slice.data[key]),
+          get: () => (activeRoute.store ? activeRoute.store.get(key) : activeRoute.data[key]),
           enumerable: true,
           configurable: true,
         });
@@ -272,27 +272,27 @@ export class ReactiveRouter extends Router {
   }
 
   /*******************************
-              Slices
+           Active Routes
   *******************************/
 
-  createSlice(route, data) {
-    const slice = super.createSlice(route, data);
-    slice.store = this.createStore(data);
-    return slice;
+  createActiveRoute(route, data) {
+    const activeRoute = super.createActiveRoute(route, data);
+    activeRoute.store = this.createStore(data);
+    return activeRoute;
   }
 
   // every key is written through its cell, whose own equality is the one compare, and what the cell
   // holds afterwards says whether it moved. the plain mirror is written first so a synchronous
   // reaction reads the new value through either door
-  setSlice(slice, data) {
-    const previous = slice.data;
+  setRouteData(activeRoute, data) {
+    const previous = activeRoute.data;
     let moved = false;
-    slice.data = data;
+    activeRoute.data = data;
     this.batch(() => {
       each({ ...previous, ...data }, (_, key) => {
-        const before = slice.store.peek(key);
-        slice.store.set(key, data[key]);
-        moved ||= !Object.is(slice.store.peek(key), before);
+        const before = activeRoute.store.peek(key);
+        activeRoute.store.set(key, data[key]);
+        moved ||= !Object.is(activeRoute.store.peek(key), before);
       });
     });
     return moved;
@@ -304,18 +304,18 @@ export class ReactiveRouter extends Router {
 
   // runs fn inside the provider's reaction and hands each later run's value to changed. the signal
   // the hook was given is the life its run belongs to: the navigation's while one is in flight, the
-  // route's own when the standing page runs it. what the function reads of the slices above it is
+  // route's own when the standing page runs it. what the function reads of the active routes above it is
   // its own dependency, through the data the provider makes readable
   evaluateHook(route, fn, context, { kind, changed }) {
     if (!isFunction(fn)) {
       return fn;
     }
-    const { signal, slices } = context;
+    const { signal, activeRoutes } = context;
     let first;
     // what the hook sees of the user is live, a getter on its own context, so a guard that read it
     // runs again when the user moves and a hook that did not read it is left alone
     const createHookContext = (extra) =>
-      Object.defineProperty({ ...context, data: this.dataFor(slices), ...extra }, 'user', {
+      Object.defineProperty({ ...context, data: this.dataFor(activeRoutes), ...extra }, 'user', {
         get: () => this.user,
         enumerable: true,
       });
@@ -374,7 +374,7 @@ export class ReactiveRouter extends Router {
   }
 
   // the runs the settled navigation made for the route replace the ones it had, by kind: a kept
-  // route keeps its slice runs and attaches only its new guard runs, which ran this navigation
+  // route keeps its data runs and attaches only its new guard runs, which ran this navigation
   attachRuns(route, kind = null) {
     const routeRuns = this.pendingRuns.filter((run) => run.route === route && (kind === null || run.kind === kind));
     this.pendingRuns = this.pendingRuns.filter((run) => !inArray(run, routeRuns));
@@ -391,7 +391,7 @@ export class ReactiveRouter extends Router {
   // a later value applied to the standing page through its consequence, untracked since a
   // consequence reads the page before its first await and the page is a cell. a run aborted at its
   // route's teardown and a route since gone say nothing; a failure is logged with the page kept,
-  // since the slice the route had still stands
+  // since the entry the route had still stands
   applyHookResult(route, changed, value) {
     const onError = (error) => {
       if (error?.name !== 'AbortError' && this.onPage(route)) {
@@ -411,11 +411,12 @@ export class ReactiveRouter extends Router {
   settleRoutes(previous, page) {
     this.writeLive(this.params, this.paramCells, page.params ?? {});
     this.writeLive(this.query, this.queryCells, page.query ?? {});
-    // the standing page settled again, a refusal or a not-found landing on it in place: the route it
-    // landed on is no longer active, and keeps its runs across the end of its life so the one that
-    // watches for the refusal lifting still does
-    const inPlace = page.slices === previous?.slices;
-    const [refused] = page.unresolvedRoutes ?? [];
+    // the standing page settled again, a refusal or a not-found landing on it in place, which keeps
+    // the page's params where a navigation brings its own: the route it landed on is no longer
+    // active, and keeps its runs across the end of its life so the one that watches for the refusal
+    // lifting still does
+    const inPlace = page.params === previous?.params;
+    const refused = page.unresolvedRoutes?.[0]?.route;
     const kept = inPlace && refused?.runs;
     if (kept) {
       refused.runs = null;
@@ -428,17 +429,17 @@ export class ReactiveRouter extends Router {
     if (!inPlace) {
       this.pageAbort?.abort();
       this.pageAbort = new AbortController();
-      each(page.activeRoutes ?? [], (route) => {
+      each(page.activeRoutes ?? [], ({ route }) => {
         if (!this.changedRoutes.has(route)) {
           this.attachRuns(route, 'guard');
         }
       });
       // an unresolved route's runs are the page's: they watch for it to resolve, and end with the page
-      each(page.unresolvedRoutes ?? [], (route) => this.attachRuns(route));
+      each(page.unresolvedRoutes ?? [], ({ route }) => this.attachRuns(route));
       each(this.pendingRuns, (run) => run.stop());
       this.pendingRuns = [];
     }
-    each(previous?.unresolvedRoutes ?? [], (route) => {
+    each(previous?.unresolvedRoutes ?? [], ({ route }) => {
       if (!inArray(route, this.matchedRoutes(page))) {
         this.stopRuns(route);
       }
@@ -456,7 +457,8 @@ export class ReactiveRouter extends Router {
   // unresolved. untracked: the page is a cell, and a hook that depended on it would run again at
   // every page its own consequence wrote
   onPage(route) {
-    return route.active || this.untrack(() => inArray(route, this.page?.unresolvedRoutes ?? []));
+    return route.active
+      || this.untrack(() => this.page?.unresolvedRoutes?.some((unresolved) => unresolved.route === route));
   }
 
   onRouteCreated(route, context) {

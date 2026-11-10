@@ -206,7 +206,7 @@ export class Route {
     });
     if (layoutBefore !== undefined && rendered.layout !== layoutBefore) {
       // the routes below that stand; one not yet active renders when it activates
-      const routes = page.activeRoutes;
+      const routes = page.activeRoutes.map((activeRoute) => activeRoute.route);
       const routesBelow = routes.slice(routes.indexOf(this) + 1).filter((route) => route.active);
       each([...routesBelow].reverse(), (route) => route.destroyViews());
       this.destroyViews({ keepLayout: true });
@@ -221,7 +221,7 @@ export class Route {
   // stopped being it, is told this alone, its layout and slots left as they stand
   renderView(page) {
     const { rendered } = this;
-    if (page.activeRoutes.at(-1) === this) {
+    if (page.activeRoutes.at(-1)?.route === this) {
       if (rendered.view && rendered.page?.view !== page.view) {
         this.router.destroyView({ rendered: rendered.view });
         rendered.view = undefined;
@@ -260,7 +260,7 @@ export class Route {
 
   // whether an active route below this one on the page declares the slot, an explicit empty included
   hasSlotBelow(page, slot) {
-    const routes = page?.activeRoutes ?? [];
+    const routes = (page?.activeRoutes ?? []).map((activeRoute) => activeRoute.route);
     return routes.slice(routes.indexOf(this) + 1).some((other) => slot in other.slots);
   }
 
@@ -303,10 +303,10 @@ export class Route {
 
   // what a view sees: the page's params and query, and the data of this route and the routes above it
   viewContext(page) {
-    const slices = (page.slices ?? []).filter((slice) => inArray(slice.route, this.ancestors));
+    const activeRoutes = (page.activeRoutes ?? []).filter((activeRoute) => inArray(activeRoute.route, this.ancestors));
     const data = {};
-    each(slices, (slice) => extend(data, slice.data));
-    return { ...this.router.contextFor(this, page, { data, slices }), page };
+    each(activeRoutes, (activeRoute) => extend(data, activeRoute.data));
+    return { ...this.router.contextFor(this, page, { data, activeRoutes }), page };
   }
 
   timeout(fn, ms) {
