@@ -4,5 +4,5 @@ defineProps(['page']);
 </script>
 
 <template>
-  <nav class="crumbs" aria-label="Breadcrumb">{{ (page.titles ?? []).join(' / ') }}</nav>
+  <nav class="crumbs" aria-label="Breadcrumb">{{ (page.titles ?? []).toReversed().join(' / ') }}</nav>
 </template>
