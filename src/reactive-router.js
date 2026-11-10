@@ -466,9 +466,13 @@ export class ReactiveRouter extends Router {
     return super.onRouteCreated(route, context);
   }
 
+  // a navigation's settle hands the route the runs born for it. an update on the standing page
+  // came from a run it already holds, so nothing is attached
   onRouteUpdated(route, context) {
-    this.changedRoutes?.add(route);
-    this.attachRuns(route);
+    if (this.changedRoutes) {
+      this.changedRoutes.add(route);
+      this.attachRuns(route);
+    }
     return super.onRouteUpdated(route, context);
   }
 }

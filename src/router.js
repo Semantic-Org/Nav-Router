@@ -1379,8 +1379,7 @@ export class Router {
         this.onRouteCreated(route, this.lifecycleContext(route, page, previous));
       }
       else if (findActiveRoute(page, route) !== findActiveRoute(previous, route)) {
-        route.update(page);
-        this.onRouteUpdated(route, this.lifecycleContext(route, page, previous));
+        this.updateRoute(route, page, previous);
       }
       else {
         // a kept route renders a slot again when a route below it took that slot or gave it back
@@ -1396,6 +1395,13 @@ export class Router {
         }
       }
     });
+  }
+
+  // the one place a route is told its data moved, at a navigation's settle and on the standing
+  // page alike: its views are told, then its updated hook
+  updateRoute(route, page, previous) {
+    route.update(page);
+    this.onRouteUpdated(route, this.lifecycleContext(route, page, previous));
   }
 
   destroyRoute(route, context) {
@@ -1572,7 +1578,7 @@ export class Router {
         this.settleRoutes(previous, this.page, { inPlace: true });
       }
       else {
-        each(activeRoutes.slice(index), (moved) => moved.route.update(this.page));
+        each(activeRoutes.slice(index), (moved) => this.updateRoute(moved.route, this.page, previous));
       }
       return this.renderPage(this.page);
     });
