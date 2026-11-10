@@ -408,7 +408,7 @@ export class ReactiveRouter extends Router {
 
   // after settle nothing is left pending: a run no route attached belonged to a branch this navigation
   // abandoned, a precommit redirect's first routes among them
-  settleRoutes(previous, page, { inPlace } = {}) {
+  settleRoutes(previous, page, { inPlace = false } = {}) {
     this.writeLive(this.params, this.paramCells, page.params ?? {});
     this.writeLive(this.query, this.queryCells, page.query ?? {});
     // in place, the standing page settled again with a refusal or a not-found landing on it: the
