@@ -1569,7 +1569,7 @@ export class Router {
         // the history entry's cached result held these routes as an ok page, which it no longer is
         this.entryCache?.delete(previous.key);
         this.page.unresolvedRoutes = this.unresolvedOf(activeRoutes, this.matchedRoutes(previous));
-        this.settleRoutes(previous, this.page, true);
+        this.settleRoutes(previous, this.page, { inPlace: true });
       }
       else {
         each(activeRoutes.slice(index), (moved) => moved.route.update(this.page));
