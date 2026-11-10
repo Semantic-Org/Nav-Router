@@ -1,9 +1,9 @@
 import { each, isString } from '@semantic-ui/utils';
-import { Router } from 'nav-router';
+import { BaseRouter } from 'nav-router';
 
 // every route in the tree as a page a crawler or a generator can read. paths keep their patterns,
 // so a generator expands the params it knows. adds router.sitemap()
-Router.prototype.sitemap = function() {
+BaseRouter.prototype.sitemap = function() {
   const pages = [];
   const walk = (route) => {
     pages.push({

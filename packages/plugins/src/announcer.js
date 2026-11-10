@@ -1,5 +1,5 @@
 import { isEqual } from '@semantic-ui/utils';
-import { Router } from 'nav-router';
+import { BaseRouter } from 'nav-router';
 
 const LIVE_REGION_STYLE =
   'position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0';
@@ -18,10 +18,10 @@ const defaults = {
 
 // the plugin's own namespace on the router, router({ announcer: { politeness, format } }), merged
 // over its defaults here since the router's merge is shallow
-Router.defaults.announcer ??= {};
+BaseRouter.defaults.announcer ??= {};
 const getSettings = (router) => ({ ...defaults, ...router.config.announcer });
 
-const proto = Router.prototype;
+const proto = BaseRouter.prototype;
 const { start, intercepted, renderPage, settled, failed, stop } = proto;
 
 // mounted empty ahead of time so screen readers register the live region before its text mutates

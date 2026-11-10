@@ -1,10 +1,10 @@
 import { isDevelopment, markTimeline, measureTimeline } from '@semantic-ui/utils';
-import { Router } from 'nav-router';
+import { BaseRouter } from 'nav-router';
 
 // draws navigation and cascade spans on the devtools performance panel through @semantic-ui/utils.
 // every entry point is throw-safe, and tooltip prose folds at the callsite in production builds
-Router.defaults.timelineGroup ??= 'router';
-const proto = Router.prototype;
+BaseRouter.defaults.timelineGroup ??= 'router';
+const proto = BaseRouter.prototype;
 const { start, intercepted, settled, failed, runGuards, runData, renderPage, updateData, stop } = proto;
 
 const routeLabel = (target) => target?.route?.name || target?.pathname || target?.url || 'unknown';

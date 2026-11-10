@@ -27,7 +27,7 @@ import { DomView } from './view.js';
 // what a data() returns through notFound(), at navigation or on the standing page
 const NOT_FOUND = Symbol('notFound');
 
-export class Router {
+export class BaseRouter {
   // brand router
   get [IS_ROUTER]() {
     return true;
@@ -1657,12 +1657,13 @@ export class Router {
   }
 }
 
-// the router that renders the dom with no framework: its views are functions returning markup or
-// nodes. router() makes this one, so a plain app renders from one import. an integration's router
-// extends Router or ReactiveRouter and names its own view, and nothing of this one comes with it
-export class DomRouter extends Router {
+// the router an app gets: it renders the dom with no framework, its views functions returning
+// markup or nodes, so a plain app renders from one import. BaseRouter above names no view, and is
+// what an integration's router extends to name its own, and what a plugin patches so it reaches
+// every router
+export class Router extends BaseRouter {
   static View = DomView;
 }
 
-export const router = (options) => new DomRouter(options);
+export const router = (options) => new Router(options);
 export const site = router; // alias

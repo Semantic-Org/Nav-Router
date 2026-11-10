@@ -1,6 +1,6 @@
 import { each, inArray, isFunction, isPromise, isString, noop } from '@semantic-ui/utils';
 
-import { Router } from './router.js';
+import { BaseRouter } from './router.js';
 
 // the scaffolding every reactive provider would otherwise repeat. each hook runs inside the
 // provider's reaction, learning its dependencies on the cascade's first pass without computing
@@ -13,7 +13,7 @@ import { Router } from './router.js';
 // with the navigation's signal before, and with the route's after. a provider supplies the four
 // primitives below; the fifth, the per-key store, is built from signals unless the provider has a
 // native one ($state, a store, reactive())
-export class ReactiveRouter extends Router {
+export class ReactiveRouter extends BaseRouter {
   // the comparator for each kind of cell the scaffold makes, on the class as Signal.equality is so
   // a provider or an app overrides it once: a data key, a param, a query key or the user compares
   // deep, the active routes by their members since the router builds that array fresh at every update,

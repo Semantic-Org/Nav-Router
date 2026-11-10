@@ -1,7 +1,7 @@
 import { isObject, isPromise } from '@semantic-ui/utils';
 
 import { isLazy } from 'nav-router';
-import { Router } from 'nav-router';
+import { BaseRouter } from 'nav-router';
 
 // recovers once per url when a fresh deploy invalidates an old lazy view chunk.
 // hover preloads swallow rejections, so only an actual failed navigation triggers a document load.
@@ -17,10 +17,10 @@ const defaults = {
 
 // the plugin's own namespace on the router, router({ chunkReload: { storageKey, reload } }), merged
 // over its defaults here since the router's merge is shallow
-Router.defaults.chunkReload ??= {};
+BaseRouter.defaults.chunkReload ??= {};
 const getSettings = (router) => ({ ...defaults, ...router.config.chunkReload });
 
-const proto = Router.prototype;
+const proto = BaseRouter.prototype;
 const { intercepted, resolveView, settled, failed, stop } = proto;
 
 proto.intercepted = function(matched, event) {

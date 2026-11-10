@@ -1,12 +1,12 @@
-import { Router } from 'nav-router';
+import { BaseRouter } from 'nav-router';
 
 // crosses to the page inside a view transition: settle and render are the one moment it snapshots
 // around, so what leaves animates out and what appears animates in. the handler settles on the
 // promise waitFor names: 'finished', the default, holds the platform's focus reset and scroll
 // through the animation, 'updateCallbackDone' runs them as soon as the new dom is in. its own
 // namespace on the router, router({ viewTransitions: { waitFor } })
-Router.defaults.viewTransitions ??= {};
-const proto = Router.prototype;
+BaseRouter.defaults.viewTransitions ??= {};
+const proto = BaseRouter.prototype;
 const { applyCascade } = proto;
 
 proto.applyCascade = async function(matched, resolved, event = null) {

@@ -1,4 +1,4 @@
-import { getRouter, Router, View } from 'nav-router';
+import { BaseRouter, getRouter, View } from 'nav-router';
 import { createElement, useSyncExternalStore } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
@@ -24,7 +24,7 @@ export class ReactView extends View {
   }
 }
 
-export class ReactRouter extends Router {
+export class ReactRouter extends BaseRouter {
   static View = ReactView;
 }
 

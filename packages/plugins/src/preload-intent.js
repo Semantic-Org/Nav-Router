@@ -1,6 +1,5 @@
 import { each, noop } from '@semantic-ui/utils';
-import { Navigator } from 'nav-router';
-import { Router } from 'nav-router';
+import { BaseRouter, Navigator } from 'nav-router';
 
 // warms a link's view chunks on hover, focus or touch, and adds router.preload() for warming one
 // by hand. data and guards belong to the navigation; the module cache is the cache
@@ -8,12 +7,12 @@ const proto = Navigator.prototype;
 const { attach, detach } = proto;
 const events = ['pointerover', 'focusin', 'touchstart'];
 
-Router.prototype.preloadViews = function(matched) {
+BaseRouter.prototype.preloadViews = function(matched) {
   return this.resolveRouteViews(matched.routes);
 };
 
 // nothing is returned because nothing was decided
-Router.prototype.preload = async function(target, args = {}) {
+BaseRouter.prototype.preload = async function(target, args = {}) {
   const matched = this.match(this.href(target, args));
   if (matched) {
     await this.preloadViews(matched);
