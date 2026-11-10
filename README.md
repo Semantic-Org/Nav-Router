@@ -50,6 +50,7 @@ app.start();
 | [nav-router](src) | The router and the reactive scaffold integrations build on |
 | [@nav-router/plugins](packages/plugins) | The plugins, each installed by importing it |
 | [@nav-router/solid](integrations/solid) | Nav Router for Solid |
+| [@nav-router/react](integrations/react) | Nav Router for React |
 | [@nav-router/core](packages/core) | The router under its scoped name, a thin re-export |
 
 ## Examples
@@ -61,6 +62,7 @@ npm install
 npm run flat     # a flat route table
 npm run nested   # nested layouts and slots
 npm run solid    # the same app as Solid components
+npm run react    # the same app as React components
 ```
 
 ## License
