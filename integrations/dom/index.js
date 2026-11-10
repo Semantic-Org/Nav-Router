@@ -21,7 +21,7 @@ export class View {
   start(context) {
     this.open();
     try {
-      this.create({ view: this.view, context, target: this.target, anchor: this.end, element: this.target });
+      this.create({ view: this.view, context, target: this.target, anchor: this.endAnchor, element: this.target });
     }
     catch (error) {
       // a view that failed leaves nothing behind
@@ -53,7 +53,7 @@ export class View {
   }
 
   destroy() {
-    for (const node of [...this.nodes, this.start, this.end]) {
+    for (const node of [...this.nodes, this.startAnchor, this.endAnchor]) {
       node?.remove();
     }
     if (this.fallback) {
@@ -75,9 +75,9 @@ export class View {
       target.replaceChildren();
     }
     if (this.constructor.place === 'anchor') {
-      this.start = target.insertBefore(document.createTextNode(''), this.parent ? null : target.firstChild);
-      this.end = document.createTextNode('');
-      this.start.after(this.end);
+      this.startAnchor = target.insertBefore(document.createTextNode(''), this.parent ? null : target.firstChild);
+      this.endAnchor = document.createTextNode('');
+      this.startAnchor.after(this.endAnchor);
     }
   }
 
@@ -102,11 +102,11 @@ export class View {
 
   // what this view rendered
   get nodes() {
-    if (!this.start) {
+    if (!this.startAnchor) {
       return [...this.target.childNodes];
     }
     const nodes = [];
-    for (let node = this.start.nextSibling; node && node !== this.end; node = node.nextSibling) {
+    for (let node = this.startAnchor.nextSibling; node && node !== this.endAnchor; node = node.nextSibling) {
       nodes.push(node);
     }
     return nodes;
