@@ -1,0 +1,19 @@
+{
+  "name": "nav-router-preact",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite"
+  },
+  "dependencies": {
+    "@nav-router/plugins": "0.1.0",
+    "@nav-router/preact": "0.1.0",
+    "@preact/signals": "^2",
+    "nav-router": "0.1.0",
+    "preact": "^10"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2",
+    "vite": "^7"
+  }
+}
