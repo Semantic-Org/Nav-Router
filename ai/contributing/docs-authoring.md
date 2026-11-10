@@ -111,7 +111,7 @@ Launch in English, and leave room for languages from day one, because retrofitti
 - **No visible words in code.** Labels, headings, sentences, `aria-label`, `title`, placeholders: all keys in one English strings file, read through `t()` at build, `{{t:key}}` in a raw template, `ui()` in a script. Code, API names, product names and file names stay as they are. Markdown pages need nothing; they translate as files.
 - **One key per whole passage.** A sentence is one string, with `{placeholders}` for values and its inline tags inside it, so a language can order it as it reads. Never join a sentence from pieces. Counts go through `plural()`.
 - **A key names one wording.** Change what the English says and it takes a new key, so no language keeps a translation of the old meaning. A typo fix keeps the key.
-- **Links take the reader's language** (`localePath()`), and one route serves every page under every language, English at the root.
+- **Links take the reader's language** (`localePath()`), and each kind of page's route covers every language, English at the root. Don't merge the kinds into one route: a route file is what the build bundles by.
 - **Logical CSS,** as in Design Conventions. A diagram that must stay left to right is pinned, and its sentences left free to follow the page.
 - **A place for the language choice:** in the topbar beside the version menu, and in the menu drawer on narrow screens. It shows itself once a second language is enabled.
 - **The list of languages** exists with English alone enabled.
