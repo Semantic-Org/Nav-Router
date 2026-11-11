@@ -1,5 +1,5 @@
 import { getRouter, Router, View } from 'nav-router';
-import { createElement, memo, useSyncExternalStore } from 'react';
+import { Component, createElement, memo, useSyncExternalStore } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 
@@ -18,8 +18,31 @@ const Outlet = memo(({ view }) => {
   for (const name of Object.keys(view.fills)) {
     props[name] = view.slots[name] ??= createElement(Slot, { layout: view, name });
   }
-  return createElement(view.view, props);
+  return createElement(Boundary, { view }, createElement(view.view, props));
 });
+
+// a view that throws as it renders goes to onError and renders nothing, and the layouts around it
+// stand, where react alone would empty the whole mount. it is tried again on the next page: the
+// router does not update a layout kept through a navigation, so the boundary listens for one
+class Boundary extends Component {
+  state = {};
+
+  componentDidCatch(error) {
+    const { router, context } = this.props.view;
+    this.setState({ failed: router.page });
+    this.stop ??= router.subscribe(() => this.forceUpdate());
+    router.onError(error, context);
+  }
+
+  componentWillUnmount() {
+    this.stop?.();
+  }
+
+  render() {
+    const { view, children } = this.props;
+    return this.state.failed === view.router.page ? null : children;
+  }
+}
 
 // a react component. the top view has a root in the mount. a view inside a react layout has none:
 // its layout renders it, as children, or as the prop named for its slot, so a layout is plain react,
