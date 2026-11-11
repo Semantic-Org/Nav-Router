@@ -246,7 +246,7 @@ export class ReactiveRouter extends Router {
         const current = activeRoutes.get();
         if (current !== cachedRoutes) {
           cachedRoutes = current;
-          cachedData = router.dataFor(current);
+          cachedData = router.getLiveData(current);
         }
         return cachedData;
       },
@@ -254,10 +254,11 @@ export class ReactiveRouter extends Router {
     return { context: live, update: (next) => activeRoutes.set(next.activeRoutes) };
   }
 
-  // merges ancestor active routes behind per-key getters, so reading data.team tracks team's cell alone.
-  // a getter exists for the keys an active route holds, so a key a run returns only sometimes is read plain
-  // on the runs it is absent: a data() returns every key every run, undefined when it has none
-  dataFor(activeRoutes) {
+  // the data of the routes given, merged behind per-key getters, so reading data.team tracks team's
+  // cell alone: what a live context holds, where a page holds the plain merge as it was written. a
+  // getter exists for the keys an active route holds, so a key a run returns only sometimes is read
+  // plain on the runs it is absent: a data() returns every key every run, undefined when it has none
+  getLiveData(activeRoutes) {
     const data = {};
     each(activeRoutes, (activeRoute) => {
       each(activeRoute.data, (_, key) => {
@@ -315,7 +316,7 @@ export class ReactiveRouter extends Router {
     // what the hook sees of the user is live, a getter on its own context, so a guard that read it
     // runs again when the user moves and a hook that did not read it is left alone
     const createHookContext = (extra) =>
-      Object.defineProperty({ ...context, data: this.dataFor(activeRoutes), ...extra }, 'user', {
+      Object.defineProperty({ ...context, data: this.getLiveData(activeRoutes), ...extra }, 'user', {
         get: () => this.user,
         enumerable: true,
       });
@@ -395,7 +396,7 @@ export class ReactiveRouter extends Router {
   applyHookResult(route, changed, value) {
     const handleError = (error) => {
       if (error?.name !== 'AbortError' && this.onPage(route)) {
-        this.onError(error, this.contextFor(route, this.page));
+        this.onError(error, this.untrack(() => route.viewContext(this.page)));
       }
     };
     try {
