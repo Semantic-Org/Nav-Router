@@ -1,4 +1,4 @@
-import { each, extend, inArray, isArray, isFunction, isPlainObject, isPromise } from '@semantic-ui/utils';
+import { each, extend, isArray, isFunction, isPlainObject, isPromise } from '@semantic-ui/utils';
 import { Router } from 'nav-router';
 
 const PROPERTY_PREFIX = /^(og|article|profile|book|fb):/;
@@ -58,14 +58,7 @@ const restoreEntry = (key, record) => {
 // the hook sees what the other hooks see, with the page's data and active routes, so a reactive router
 // tracks what it reads. a sync answer waits for the render's write, an async one lands on its own
 proto.evaluateMeta = function(route) {
-  // the hook sees what the other hooks see: the active routes of the route and the routes above it
-  const activeRoutes = (this.page.activeRoutes ?? []).filter((activeRoute) =>
-    inArray(activeRoute.route, route.ancestors)
-  );
-  const data = {};
-  each(activeRoutes, (activeRoute) => extend(data, activeRoute.data));
-  const context = this.contextFor(route, this.page, { data, activeRoutes });
-  const value = this.evaluateHook(route, route.meta, context, {
+  const value = this.evaluateHook(route, route.meta, route.viewContext(this.page), {
     kind: 'data',
     changed: (value) => this.metaChanged(route, value),
   });

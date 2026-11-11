@@ -246,7 +246,7 @@ export class ReactiveRouter extends Router {
         const current = activeRoutes.get();
         if (current !== cachedRoutes) {
           cachedRoutes = current;
-          cachedData = router.dataFor(current);
+          cachedData = router.getData(current);
         }
         return cachedData;
       },
@@ -254,10 +254,11 @@ export class ReactiveRouter extends Router {
     return { context: live, update: (next) => activeRoutes.set(next.activeRoutes) };
   }
 
-  // merges ancestor active routes behind per-key getters, so reading data.team tracks team's cell alone.
-  // a getter exists for the keys an active route holds, so a key a run returns only sometimes is read plain
-  // on the runs it is absent: a data() returns every key every run, undefined when it has none
-  dataFor(activeRoutes) {
+  // the data of the routes given, merged behind per-key getters, so reading data.team tracks team's
+  // cell alone. a getter exists for the keys an active route holds, so a key a run returns only
+  // sometimes is read plain on the runs it is absent: a data() returns every key every run,
+  // undefined when it has none
+  getData(activeRoutes) {
     const data = {};
     each(activeRoutes, (activeRoute) => {
       each(activeRoute.data, (_, key) => {
@@ -310,12 +311,12 @@ export class ReactiveRouter extends Router {
     if (!isFunction(fn)) {
       return fn;
     }
-    const { signal, activeRoutes } = context;
+    const { signal } = context;
     let first;
     // what the hook sees of the user is live, a getter on its own context, so a guard that read it
     // runs again when the user moves and a hook that did not read it is left alone
     const createHookContext = (extra) =>
-      Object.defineProperty({ ...context, data: this.dataFor(activeRoutes), ...extra }, 'user', {
+      Object.defineProperty({ ...context, ...extra }, 'user', {
         get: () => this.user,
         enumerable: true,
       });

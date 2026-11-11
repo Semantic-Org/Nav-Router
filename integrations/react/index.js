@@ -125,11 +125,10 @@ export class ReactRouter extends Router {
   }
 }
 
-// the router's state, read in a component and kept current: useRouter((router) => router.pending)
-export const useRouter = (read) => {
-  const router = getRouter();
-  return useSyncExternalStore((listener) => router.subscribe(listener), () => read(router));
-};
+// the router's state, read in a component and kept current: useRouter((router) => router.pending).
+// one function for every component, so react subscribes once and not again at each render
+const subscribe = (listener) => getRouter().subscribe(listener);
+export const useRouter = (read) => useSyncExternalStore(subscribe, () => read(getRouter()));
 
 export * from 'nav-router';
 export const reactRouter = (options) => new ReactRouter(options);

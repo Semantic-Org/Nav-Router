@@ -988,10 +988,6 @@ export class Router {
     });
   }
 
-  async runCascade(matched, navigation) {
-    return (await this.runGuards(matched, navigation)) ?? this.runData(matched, navigation);
-  }
-
   // what a hook sees. activeRoutes is what the routes above settled, route by route, none before
   // the data phase, and data is theirs merged; the signal is the navigation's while one is in
   // flight and the route's own otherwise
