@@ -762,19 +762,11 @@ export class Router {
       }
       const activeRoutes = previous?.activeRoutes
         ?? (this.root.data === undefined ? [this.createActiveRoute(this.root, {})] : []);
-      await this.batch(() => {
-        this.page = {
-          ...(pending ? this.pageFor(pending) : (previous ?? {})),
-          activeRoutes,
-          unresolvedRoutes: this.getUnresolvedRoutes(activeRoutes, pending?.routes ?? []),
-          views,
-          view,
-          status: 'error',
-          error,
-        };
-        this.settleRoutes(previous, this.page);
-        return this.renderPage(this.page);
-      }).catch(noop);
+      // landed as every page is, at the page the navigation was going to, or the one standing
+      const matched = pending ?? { ...previous, routes: [] };
+      const resolved = this.buildCascadeResult(matched, { status: 'error', error, view, views, activeRoutes });
+      await this.applyCascade(matched, resolved).catch(() => this.notify());
+      return;
     }
     this.notify();
   }
