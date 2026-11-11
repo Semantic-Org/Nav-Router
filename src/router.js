@@ -743,9 +743,9 @@ export class Router {
     // a failure before commit left the standing page in place; only a committed one is shown as an error
     if (!pending || pending.committed) {
       const previous = this.page;
-      const view = await this.resolveStatusView(pending?.route ?? previous?.route ?? this.root, 'error').catch(() =>
-        null
-      );
+      // the error view nearest the route the navigation was going to
+      const route = pending?.route ?? previous?.route ?? this.root;
+      const view = await this.resolveStatusView(route, 'error').catch(() => null);
       // the routes on screen stay active under the error page. a cold error, nothing yet shown, is
       // framed by the root when it has no data of its own, since the data that failed may be the
       // root's, and stands at the mount with no route active otherwise
