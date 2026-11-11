@@ -208,24 +208,8 @@ export class Router {
     if (event.signal.aborted) {
       return;
     }
-    const page = {
-      view,
-      views,
-      unresolvedRoutes: [],
-      activeRoutes,
-      ...this.getDataAndTitles(activeRoutes),
-      status: 'notFound',
-      url,
-      user: this.user,
-    };
-    await this.batch(() => {
-      this.page = page;
-      this.settleRoutes(null, page);
-      if (globalThis.document && page.title) {
-        globalThis.document.title = page.title;
-      }
-      return this.renderPage(page);
-    });
+    // no route matched, so the page has none of its own: it lands as every page does
+    await this.applyCascade({ url, routes: [] }, { status: 'notFound', view, views, activeRoutes }, event);
   }
 
   // a route was added: a page standing as not-found for want of a route is matched again a
@@ -1007,10 +991,10 @@ export class Router {
     return (await this.runGuards(matched, navigation)) ?? this.runData(matched, navigation);
   }
 
-  // what a hook sees. data is what the routes above settled, merged, and activeRoutes the same route by
-  // route, none before the data phase; the signal is the navigation's while one is in flight and
-  // the route's own otherwise
-  contextFor(route, matched, { data = {}, activeRoutes = [], signal = route.abortSignal } = {}) {
+  // what a hook sees. activeRoutes is what the routes above settled, route by route, none before
+  // the data phase, and data is theirs merged; the signal is the navigation's while one is in
+  // flight and the route's own otherwise
+  contextFor(route, matched, { activeRoutes = [], signal = route.abortSignal } = {}) {
     return {
       params: matched.params,
       query: matched.query,
@@ -1018,7 +1002,7 @@ export class Router {
       user: this.user,
       route,
       router: this,
-      data,
+      data: this.getData(activeRoutes),
       activeRoutes,
     };
   }
@@ -1134,7 +1118,6 @@ export class Router {
   // route; a refusal walks the routes above the refusing one, so their layouts stand with what they read
   async loadRoutes(routes, matched, navigation) {
     const { signal } = navigation;
-    const data = {};
     const activeRoutes = [];
     let flaggedNotFound = false;
     const notFound = () => {
@@ -1147,14 +1130,13 @@ export class Router {
         const kept = this.keptActiveRoute(route, matched, navigation);
         if (kept) {
           activeRoutes.push(kept);
-          extend(data, kept.data);
           continue;
         }
 
         let routeData = {};
         if (route.data !== undefined) {
           const rawData = await this.evaluateData(route, route.data, {
-            ...this.contextFor(route, matched, { data: { ...data }, activeRoutes: [...activeRoutes], signal }),
+            ...this.contextFor(route, matched, { activeRoutes: [...activeRoutes], signal }),
             notFound,
           });
           if (flaggedNotFound || rawData === NOT_FOUND) {
@@ -1166,10 +1148,8 @@ export class Router {
         }
         // the entry exists before the title and the routes below run, so they can read it
         const activeRoute = this.createActiveRoute(route, routeData);
-        extend(data, activeRoute.data);
         if (route.title !== undefined) {
           activeRoute.title = await this.resolveTitle(route, matched, {
-            data: { ...data },
             activeRoutes: [...activeRoutes, activeRoute],
             titles: this.getTitles(activeRoutes),
             signal,
@@ -1213,12 +1193,11 @@ export class Router {
       || Object.keys(route.querySpecs).some((key) => !isEqual(previous.query?.[key], matched.query[key]));
   }
 
-  // what a page reads from its active routes: their data merged, root first, and their titles
-  getDataAndTitles(activeRoutes) {
+  // the data of the routes given, merged root first: what a route's context holds, and a page
+  getData(activeRoutes) {
     const data = {};
     each(activeRoutes, (activeRoute) => extend(data, activeRoute.data));
-    const titles = this.getTitles(activeRoutes);
-    return { data, titles, title: titles[0] ?? '' };
+    return data;
   }
 
   // the titles a page carries, nearest first: the leaf's, its parent's, up to the root's
@@ -1228,11 +1207,11 @@ export class Router {
 
   // a title function is handed the titles above it, nearest first, so the common full title is a
   // spread: ({ data, titles }) => [data.member.name, ...titles].join(' | ')
-  async resolveTitle(route, matched, { data, activeRoutes, titles, signal }) {
+  async resolveTitle(route, matched, { activeRoutes, titles, signal }) {
     const value = await this.evaluateTitle(
       route,
       route.title,
-      { ...this.contextFor(route, matched, { data, activeRoutes, signal }), titles },
+      { ...this.contextFor(route, matched, { activeRoutes, signal }), titles },
     );
     return this.titleText(value);
   }
@@ -1247,7 +1226,6 @@ export class Router {
       params,
       query,
       ...resolved,
-      ...this.getDataAndTitles(resolved.activeRoutes),
     };
   }
 
@@ -1328,14 +1306,20 @@ export class Router {
     }
     const { key } = this.getEntrySnapshot();
     const previous = this.page;
+    const { activeRoutes } = resolved;
+    const titles = this.getTitles(activeRoutes);
     // the page's write, its settle and its render are one moment to anything watching
     const rendering = this.batch(() => {
       // what stood at the mount with no route active leaves before the page's routes are created
       this.clearMountView();
+      // a result holds what was loaded, and the page reads the rest from its active routes
       this.page = {
         ...this.pageFor(matched),
         ...resolved,
-        unresolvedRoutes: this.getUnresolvedRoutes(resolved.activeRoutes, matched.routes),
+        unresolvedRoutes: this.getUnresolvedRoutes(activeRoutes, matched.routes),
+        data: this.getData(activeRoutes),
+        titles,
+        title: titles[0] ?? '',
         key,
         user: this.user,
       };
@@ -1343,8 +1327,8 @@ export class Router {
       if (key && resolved.status === 'ok') {
         this.entryCache?.set(key, { resolved, user: this.user });
       }
-      if (globalThis.document && resolved.title) {
-        globalThis.document.title = resolved.title;
+      if (globalThis.document && this.page.title) {
+        globalThis.document.title = this.page.title;
       }
       return this.renderPage(this.page, event);
     });
@@ -1581,8 +1565,16 @@ export class Router {
       return;
     }
     const activeRoutes = changes ? previous.activeRoutes.slice(0, index) : previous.activeRoutes;
+    const titles = this.getTitles(activeRoutes);
     const rendering = this.batch(() => {
-      this.page = { ...previous, ...changes, activeRoutes, ...this.getDataAndTitles(activeRoutes) };
+      this.page = {
+        ...previous,
+        ...changes,
+        activeRoutes,
+        data: this.getData(activeRoutes),
+        titles,
+        title: titles[0] ?? '',
+      };
       if (globalThis.document && this.page.title) {
         globalThis.document.title = this.page.title;
       }
