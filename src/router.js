@@ -59,8 +59,6 @@ export class Router {
     base: '',
     // where the app goes on the page, a selector or an element
     mount: 'body',
-    // the view for each status a page can stand in: loading, notFound, forbidden, error
-    statusViews: {},
     signInRoute: null,
     // the user the guards read: a value, or a function of the navigation returning one or a promise of one
     identity: null,
@@ -96,7 +94,6 @@ export class Router {
     // the resolved settings, read from here and nowhere else; a plugin's default lands here too
     this.config = extend({}, defaults, settings);
     this.config.base = this.normalizeBase(this.config.base);
-    this.config.statusViews = { ...defaults.statusViews, ...settings.statusViews };
     // not settings, though declared among the defaults so the constructor keeps them from the root
     // route: the user is state the identity door writes, the callbacks are the app's to assign
     this.user = this.config.user;
@@ -201,7 +198,7 @@ export class Router {
     const navigation = { signal: event.signal, reload: false, previous: null };
     await this.resolveIdentity(navigation);
     const [view, views, { data, activeRoutes }] = await Promise.all([
-      this.resolveView(this.config.statusViews?.notFound),
+      this.resolveStatusView(this.root, 'notFound'),
       this.resolveRouteViews([this.root]),
       this.loadRoutes([this.root], { params: {}, query: {} }, navigation),
     ]);
@@ -746,7 +743,9 @@ export class Router {
     // a failure before commit left the standing page in place; only a committed one is shown as an error
     if (!pending || pending.committed) {
       const previous = this.page;
-      const view = await this.resolveView(this.config.statusViews?.error).catch(() => null);
+      const view = await this.resolveStatusView(pending?.route ?? previous?.route ?? this.root, 'error').catch(() =>
+        null
+      );
       // the routes on screen stay active under the error page. a cold error, nothing yet shown, is
       // framed by the root when it has no data of its own, since the data that failed may be the
       // root's, and stands at the mount with no route active otherwise
@@ -894,8 +893,8 @@ export class Router {
         if (this.pending) {
           this.pending = { ...this.pending, loading: true };
         }
-        if (this.config.statusViews?.loading) {
-          const loadingView = await this.resolveView(this.config.statusViews.loading);
+        const loadingView = await this.resolveStatusView(matched.route, 'loading');
+        if (loadingView) {
           if (!active.settled && !event.signal.aborted) {
             // page stays the settled page: a loading view is rendered over it by its last active
             // route, and pending.loading says so. on a cold boot no route is active, so the render
@@ -1056,7 +1055,7 @@ export class Router {
           this.contextFor(ancestor, matched, { signal }),
         );
         if (!allowed) {
-          if ((!this.user || !this.config.statusViews?.forbidden) && this.config.signInRoute) {
+          if ((!this.user || !this.getStatusView(ancestor, 'forbidden')) && this.config.signInRoute) {
             // the return address rides to the sign-in page, which reads it as query.returnTo
             return {
               status: 'redirect',
@@ -1076,7 +1075,7 @@ export class Router {
             return this.notFoundResult(matched, viewsReady, { data, activeRoutes });
           }
           const [view, views] = await Promise.all([
-            this.resolveView(this.config.statusViews?.forbidden),
+            this.resolveStatusView(ancestor, 'forbidden'),
             viewsReady,
           ]);
           const titles = this.getTitles(activeRoutes);
@@ -1188,7 +1187,7 @@ export class Router {
   }
 
   async notFoundResult(matched, viewsReady, { data, activeRoutes }) {
-    const [views, view] = await Promise.all([viewsReady, this.resolveView(this.config.statusViews?.notFound)]);
+    const [views, view] = await Promise.all([viewsReady, this.resolveStatusView(matched.route, 'notFound')]);
     const titles = this.getTitles(activeRoutes);
     return this.buildCascadeResult(matched, {
       status: 'notFound',
@@ -1239,6 +1238,16 @@ export class Router {
       query,
       ...resolved,
     };
+  }
+
+  // the view a status shows at a route: the route's own, or the nearest above that names one, the
+  // root's last. null or false on a route is an answer too, and no route above is asked
+  getStatusView(route, status) {
+    return route.ancestors.findLast((above) => above.statusViews[status] !== undefined)?.statusViews[status];
+  }
+
+  resolveStatusView(route, status) {
+    return this.resolveView(this.getStatusView(route, status));
   }
 
   // a value, a class, a module object, a promise, or a lazy thunk. a plain function is a view
@@ -1462,7 +1471,7 @@ export class Router {
       }
       return;
     }
-    if ((!this.user || !this.config.statusViews?.forbidden) && this.config.signInRoute) {
+    if ((!this.user || !this.getStatusView(route, 'forbidden')) && this.config.signInRoute) {
       this.navigator.navigate(this.href(this.config.signInRoute, { returnTo: this.returnAddress(this.current) }), {
         history: 'replace',
       });
@@ -1472,7 +1481,7 @@ export class Router {
     if (!route.active) {
       return;
     }
-    const view = await this.resolveView(this.config.statusViews?.forbidden);
+    const view = await this.resolveStatusView(route, 'forbidden');
     if (stale()) {
       return;
     }
@@ -1527,7 +1536,7 @@ export class Router {
       return;
     }
     if (resolved === NOT_FOUND) {
-      const view = await this.resolveView(this.config.statusViews?.notFound);
+      const view = await this.resolveStatusView(route, 'notFound');
       if (stale()) {
         return;
       }

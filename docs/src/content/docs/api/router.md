@@ -64,7 +64,7 @@ Every setting and its default. The resolved values are on `router.config`.
 | `holdCommit` | `duration` | `'300ms'` | How long the URL waits for guards and data before committing. A fast load settles before the URL moves. |
 | `loadingDelay` | `duration` | `'200ms'` | Time after commit before the loading view shows. |
 | `loadingMin` | `duration` | `'500ms'` | Once shown, how long the loading view stays, so it never flickers. |
-| `statusViews` | `object` | `{}` | Views for `loading`, `notFound`, `forbidden` and `error`. |
+| `statusViews` | `object` | `{}` | Views for `loading`, `notFound`, `forbidden` and `error`. A route can name its own, and the nearest one to the page wins. |
 | `signInRoute` | `string` | `null` | Where a refused guard sends a signed-out user. |
 | `identity` | `value \| function` | `null` | The user guards read: a value, or a function of the navigation returning one or a promise of one. |
 | `restoreScroll` | `string` | `null` | Selector of an inner scroller whose position is restored on back and forward. |
