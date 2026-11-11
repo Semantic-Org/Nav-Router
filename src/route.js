@@ -304,9 +304,7 @@ export class Route {
   // what a view sees: the page's params and query, and the data of this route and the routes above it
   viewContext(page) {
     const activeRoutes = (page.activeRoutes ?? []).filter((activeRoute) => inArray(activeRoute.route, this.ancestors));
-    const data = {};
-    each(activeRoutes, (activeRoute) => extend(data, activeRoute.data));
-    return { ...this.router.contextFor(this, page, { data, activeRoutes }), page };
+    return { ...this.router.contextFor(this, page, { activeRoutes }), page };
   }
 
   timeout(fn, ms) {

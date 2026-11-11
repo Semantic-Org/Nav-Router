@@ -197,35 +197,19 @@ export class Router {
   async applyNotFound(url, event) {
     const navigation = { signal: event.signal, reload: false, previous: null };
     await this.resolveIdentity(navigation);
-    const [view, views, { data, activeRoutes }] = await Promise.all([
+    const [view, views, { activeRoutes, error }] = await Promise.all([
       this.resolveStatusView(this.root, 'notFound'),
       this.resolveRouteViews([this.root]),
       this.loadRoutes([this.root], { params: {}, query: {} }, navigation),
     ]);
+    if (error) {
+      throw error;
+    }
     if (event.signal.aborted) {
       return;
     }
-    const titles = this.getTitles(activeRoutes);
-    const page = {
-      view,
-      views,
-      unresolvedRoutes: [],
-      data,
-      activeRoutes,
-      status: 'notFound',
-      url,
-      title: titles[0] ?? '',
-      titles,
-      user: this.user,
-    };
-    await this.batch(() => {
-      this.page = page;
-      this.settleRoutes(null, page);
-      if (globalThis.document && page.title) {
-        globalThis.document.title = page.title;
-      }
-      return this.renderPage(page);
-    });
+    // no route matched, so the page has none of its own: it lands as every page does
+    await this.applyCascade({ url, routes: [] }, { status: 'notFound', view, views, activeRoutes }, event);
   }
 
   // a route was added: a page standing as not-found for want of a route is matched again a
@@ -739,6 +723,11 @@ export class Router {
       from: globalThis.navigation?.transition?.from ?? null,
       url: pending?.url ?? this.navigator.entry?.url ?? null,
     };
+    // a route's failed load was handed to onError as it failed, and its error page stands
+    if (this.page?.error === error) {
+      this.notify();
+      return;
+    }
     this.onError(error, pending && this.contextFor(pending.route, pending));
     // a failure before commit left the standing page in place; only a committed one is shown as an error
     if (!pending || pending.committed) {
@@ -757,19 +746,11 @@ export class Router {
       }
       const activeRoutes = previous?.activeRoutes
         ?? (this.root.data === undefined ? [this.createActiveRoute(this.root, {})] : []);
-      await this.batch(() => {
-        this.page = {
-          ...(pending ? this.pageFor(pending) : (previous ?? {})),
-          activeRoutes,
-          unresolvedRoutes: this.getUnresolvedRoutes(activeRoutes, pending?.routes ?? []),
-          views,
-          view,
-          status: 'error',
-          error,
-        };
-        this.settleRoutes(previous, this.page);
-        return this.renderPage(this.page);
-      }).catch(noop);
+      // landed as every page is, at the page the navigation was going to, or the one standing
+      const matched = pending ?? { ...previous, routes: [] };
+      const resolved = this.buildCascadeResult(matched, { status: 'error', error, view, views, activeRoutes });
+      await this.applyCascade(matched, resolved).catch(() => this.notify());
+      return;
     }
     this.notify();
   }
@@ -945,6 +926,11 @@ export class Router {
       }
 
       await this.applyCascade(matched, resolved, event);
+      // the error page stands, and the navigation still failed, which the platform and whoever
+      // awaits it are told
+      if (resolved?.status === 'error') {
+        throw resolved.error;
+      }
     }
     finally {
       // a cold boot's loading view, shown at the mount, leaves with a navigation that was aborted
@@ -1005,10 +991,10 @@ export class Router {
     return (await this.runGuards(matched, navigation)) ?? this.runData(matched, navigation);
   }
 
-  // what a hook sees. data is what the routes above settled, merged, and activeRoutes the same route by
-  // route, none before the data phase; the signal is the navigation's while one is in flight and
-  // the route's own otherwise
-  contextFor(route, matched, { data = {}, activeRoutes = [], signal = route.abortSignal } = {}) {
+  // what a hook sees. activeRoutes is what the routes above settled, route by route, none before
+  // the data phase, and data is theirs merged; the signal is the navigation's while one is in
+  // flight and the route's own otherwise
+  contextFor(route, matched, { activeRoutes = [], signal = route.abortSignal } = {}) {
     return {
       params: matched.params,
       query: matched.query,
@@ -1016,7 +1002,7 @@ export class Router {
       user: this.user,
       route,
       router: this,
-      data,
+      data: this.getData(activeRoutes),
       activeRoutes,
     };
   }
@@ -1070,23 +1056,19 @@ export class Router {
           const viewsReady = this.resolveRouteViews(routes);
           viewsReady.catch(noop);
           const routesAbove = routes.slice(0, routes.indexOf(ancestor));
-          const { data, activeRoutes, notFound } = await this.loadRoutes(routesAbove, matched, navigation);
-          if (notFound) {
-            return this.notFoundResult(matched, viewsReady, { data, activeRoutes });
+          const loaded = await this.loadRoutes(routesAbove, matched, navigation);
+          if (loaded.status) {
+            return this.statusResult(matched, viewsReady, loaded);
           }
           const [view, views] = await Promise.all([
             this.resolveStatusView(ancestor, 'forbidden'),
             viewsReady,
           ]);
-          const titles = this.getTitles(activeRoutes);
           return this.buildCascadeResult(matched, {
             status: 'forbidden',
             view,
             views,
-            data,
-            activeRoutes,
-            title: titles[0] ?? '',
-            titles,
+            activeRoutes: loaded.activeRoutes,
           });
         }
       }
@@ -1117,30 +1099,25 @@ export class Router {
     const viewsReady = this.resolveRouteViews(routes);
     viewsReady.catch(noop);
 
-    const { data, activeRoutes, notFound } = await this.loadRoutes(routes, matched, navigation);
-    if (notFound) {
-      return this.notFoundResult(matched, viewsReady, { data, activeRoutes });
+    const loaded = await this.loadRoutes(routes, matched, navigation);
+    if (loaded.status) {
+      return this.statusResult(matched, viewsReady, loaded);
     }
     const views = await viewsReady;
-    const titles = this.getTitles(activeRoutes);
     return this.buildCascadeResult(matched, {
       status: 'ok',
       view: views.at(-1)?.view ?? null,
       views,
-      data,
-      activeRoutes,
-      title: titles[0] ?? '',
-      titles,
+      activeRoutes: loaded.activeRoutes,
     });
   }
 
   // the page's active routes in route order, each seeing the data of the routes above it: a route keeps
   // the entry it had when the url as it sees it did not move and runs its data otherwise, and one
-  // returning not-found ends the walk. the data path walks every route; a refusal walks the routes
-  // above the refusing one, so their layouts stand with what they read
+  // returning not-found, or throwing, ends the walk with that status. the data path walks every
+  // route; a refusal walks the routes above the refusing one, so their layouts stand with what they read
   async loadRoutes(routes, matched, navigation) {
     const { signal } = navigation;
-    const data = {};
     const activeRoutes = [];
     let flaggedNotFound = false;
     const notFound = () => {
@@ -1148,58 +1125,61 @@ export class Router {
       return NOT_FOUND;
     };
 
-    for (const route of routes) {
-      const kept = this.keptActiveRoute(route, matched, navigation);
-      if (kept) {
-        activeRoutes.push(kept);
-        extend(data, kept.data);
-        continue;
-      }
+    try {
+      for (const route of routes) {
+        const kept = this.keptActiveRoute(route, matched, navigation);
+        if (kept) {
+          activeRoutes.push(kept);
+          continue;
+        }
 
-      let routeData = {};
-      if (route.data !== undefined) {
-        const rawData = await this.evaluateData(route, route.data, {
-          ...this.contextFor(route, matched, { data: { ...data }, activeRoutes: [...activeRoutes], signal }),
-          notFound,
-        });
-        if (flaggedNotFound || rawData === NOT_FOUND) {
-          return { data, activeRoutes, notFound: true };
+        let routeData = {};
+        if (route.data !== undefined) {
+          const rawData = await this.evaluateData(route, route.data, {
+            ...this.contextFor(route, matched, { activeRoutes: [...activeRoutes], signal }),
+            notFound,
+          });
+          if (flaggedNotFound || rawData === NOT_FOUND) {
+            return { activeRoutes, status: 'notFound' };
+          }
+          if (isPlainObject(rawData)) {
+            routeData = await this.resolveData(rawData);
+          }
         }
-        if (isPlainObject(rawData)) {
-          routeData = await this.resolveData(rawData);
+        // the entry exists before the title and the routes below run, so they can read it
+        const activeRoute = this.createActiveRoute(route, routeData);
+        if (route.title !== undefined) {
+          activeRoute.title = await this.resolveTitle(route, matched, {
+            activeRoutes: [...activeRoutes, activeRoute],
+            titles: this.getTitles(activeRoutes),
+            signal,
+          });
         }
+        activeRoutes.push(activeRoute);
       }
-      // the entry exists before the title and the routes below run, so they can read it
-      const activeRoute = this.createActiveRoute(route, routeData);
-      extend(data, activeRoute.data);
-      if (route.title !== undefined) {
-        activeRoute.title = await this.resolveTitle(route, matched, {
-          data: { ...data },
-          activeRoutes: [...activeRoutes, activeRoute],
-          titles: this.getTitles(activeRoutes),
-          signal,
-        });
+    }
+    catch (error) {
+      // a navigation that was superseded or cancelled is not an error to show
+      if (signal.aborted || error?.name === 'AbortError') {
+        throw error;
       }
-      activeRoutes.push(activeRoute);
+      return { activeRoutes, status: 'error', error };
     }
 
-    return { data, activeRoutes, notFound: false };
+    return { activeRoutes };
   }
 
-  async notFoundResult(matched, viewsReady, { data, activeRoutes }) {
-    // routes load in order, so the one that returned not-found is the first that is not active
+  // a route's load ended with no page for it, in not-found or in an error: the routes above it
+  // are the page, and the status view stands in for it and the routes below
+  async statusResult(matched, viewsReady, { activeRoutes, status, error }) {
+    // routes load in order, so the one the load ended at is the first that is not active
     const route = matched.routes[activeRoutes.length];
-    const [views, view] = await Promise.all([viewsReady, this.resolveStatusView(route, 'notFound')]);
-    const titles = this.getTitles(activeRoutes);
-    return this.buildCascadeResult(matched, {
-      status: 'notFound',
-      view,
-      views,
-      data,
-      activeRoutes,
-      title: titles[0] ?? '',
-      titles,
-    });
+    if (error) {
+      // before anything is awaited, so a navigation superseded while its page loads has still said so
+      this.onError(error, this.contextFor(route, matched, { activeRoutes }));
+    }
+    const [views, view] = await Promise.all([viewsReady, this.resolveStatusView(route, status)]);
+    return this.buildCascadeResult(matched, { status, ...(error && { error }), view, views, activeRoutes });
   }
 
   // a route's share of the page. the reactive scaffold gives it a signal the routes below read
@@ -1213,6 +1193,13 @@ export class Router {
       || Object.keys(route.querySpecs).some((key) => !isEqual(previous.query?.[key], matched.query[key]));
   }
 
+  // the data of the routes given, merged root first: what a route's context holds, and a page
+  getData(activeRoutes) {
+    const data = {};
+    each(activeRoutes, (activeRoute) => extend(data, activeRoute.data));
+    return data;
+  }
+
   // the titles a page carries, nearest first: the leaf's, its parent's, up to the root's
   getTitles(activeRoutes) {
     return activeRoutes.map((activeRoute) => activeRoute.title).filter((title) => title !== null).reverse();
@@ -1220,11 +1207,11 @@ export class Router {
 
   // a title function is handed the titles above it, nearest first, so the common full title is a
   // spread: ({ data, titles }) => [data.member.name, ...titles].join(' | ')
-  async resolveTitle(route, matched, { data, activeRoutes, titles, signal }) {
+  async resolveTitle(route, matched, { activeRoutes, titles, signal }) {
     const value = await this.evaluateTitle(
       route,
       route.title,
-      { ...this.contextFor(route, matched, { data, activeRoutes, signal }), titles },
+      { ...this.contextFor(route, matched, { activeRoutes, signal }), titles },
     );
     return this.titleText(value);
   }
@@ -1319,14 +1306,20 @@ export class Router {
     }
     const { key } = this.getEntrySnapshot();
     const previous = this.page;
+    const { activeRoutes } = resolved;
+    const titles = this.getTitles(activeRoutes);
     // the page's write, its settle and its render are one moment to anything watching
     const rendering = this.batch(() => {
       // what stood at the mount with no route active leaves before the page's routes are created
       this.clearMountView();
+      // a result holds what was loaded, and the page reads the rest from its active routes
       this.page = {
         ...this.pageFor(matched),
         ...resolved,
-        unresolvedRoutes: this.getUnresolvedRoutes(resolved.activeRoutes, matched.routes),
+        unresolvedRoutes: this.getUnresolvedRoutes(activeRoutes, matched.routes),
+        data: this.getData(activeRoutes),
+        titles,
+        title: titles[0] ?? '',
         key,
         user: this.user,
       };
@@ -1334,8 +1327,8 @@ export class Router {
       if (key && resolved.status === 'ok') {
         this.entryCache?.set(key, { resolved, user: this.user });
       }
-      if (globalThis.document && resolved.title) {
-        globalThis.document.title = resolved.title;
+      if (globalThis.document && this.page.title) {
+        globalThis.document.title = this.page.title;
       }
       return this.renderPage(this.page, event);
     });
@@ -1572,11 +1565,16 @@ export class Router {
       return;
     }
     const activeRoutes = changes ? previous.activeRoutes.slice(0, index) : previous.activeRoutes;
-    const data = {};
-    each(activeRoutes, (activeRoute) => extend(data, activeRoute.data));
     const titles = this.getTitles(activeRoutes);
     const rendering = this.batch(() => {
-      this.page = { ...previous, ...changes, activeRoutes, data, title: titles[0] ?? '', titles };
+      this.page = {
+        ...previous,
+        ...changes,
+        activeRoutes,
+        data: this.getData(activeRoutes),
+        titles,
+        title: titles[0] ?? '',
+      };
       if (globalThis.document && this.page.title) {
         globalThis.document.title = this.page.title;
       }
