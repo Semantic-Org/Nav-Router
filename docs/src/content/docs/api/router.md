@@ -66,7 +66,6 @@ Every setting and its default. The resolved values are on `router.config`.
 | `loadingMin` | `duration` | `'500ms'` | Once shown, how long the loading view stays, so it never flickers. |
 | `statusViews` | `object` | `{}` | Views for `loading`, `notFound`, `forbidden` and `error`. |
 | `signInRoute` | `string` | `null` | Where a refused guard sends a signed-out user. |
-| `errorRoute` | `string` | `null` | Where a navigation that throws is sent. |
 | `identity` | `value \| function` | `null` | The user guards read: a value, or a function of the navigation returning one or a promise of one. |
 | `restoreScroll` | `string` | `null` | Selector of an inner scroller whose position is restored on back and forward. |
 | `attachGlobal` | `string` | `'router'` | Name the router is exposed under on `window`, for the console. |

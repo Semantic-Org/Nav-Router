@@ -69,7 +69,6 @@ export class Router {
     loadingMin: '500ms',
     restoreScroll: null,
     attachGlobal: 'router',
-    errorRoute: null,
     // the one state key declared here: the user the guards read, which the identity door writes
     // after this, so config shows the one the router started with
     user: null,
@@ -745,11 +744,7 @@ export class Router {
     };
     this.onError(error, pending && this.contextFor(pending.route, pending));
     // a failure before commit left the standing page in place; only a committed one is shown as an error
-    const committed = !pending || pending.committed;
-    if (committed && this.config.errorRoute) {
-      this.navigator.deferNavigate(this.href(this.config.errorRoute), { history: 'replace' });
-    }
-    else if (committed) {
+    if (!pending || pending.committed) {
       const previous = this.page;
       const view = await this.resolveView(this.config.statusViews?.error).catch(() => null);
       // the routes on screen stay active under the error page. a cold error, nothing yet shown, is
