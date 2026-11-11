@@ -1187,7 +1187,9 @@ export class Router {
   }
 
   async notFoundResult(matched, viewsReady, { data, activeRoutes }) {
-    const [views, view] = await Promise.all([viewsReady, this.resolveStatusView(matched.route, 'notFound')]);
+    // routes load in order, so the one that returned not-found is the first that is not active
+    const route = matched.routes[activeRoutes.length];
+    const [views, view] = await Promise.all([viewsReady, this.resolveStatusView(route, 'notFound')]);
     const titles = this.getTitles(activeRoutes);
     return this.buildCascadeResult(matched, {
       status: 'notFound',
