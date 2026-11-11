@@ -15,8 +15,6 @@ export class Route {
     params: {},
     query: {},
     slots: {},
-    // the view for each status a page can stand in here: loading, notFound, forbidden, error
-    statusViews: {},
   };
 
   // the root is made by its router, with no parent; every route below takes the router from its parent

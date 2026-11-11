@@ -1245,7 +1245,7 @@ export class Router {
   // the view a status shows at a route: the route's own, or the nearest above that names one, the
   // root's last. null or false on a route is an answer too, and no route above is asked
   getStatusView(route, status) {
-    return route.ancestors.findLast((above) => above.statusViews[status] !== undefined)?.statusViews[status];
+    return route.ancestors.findLast((above) => above.statusViews?.[status] !== undefined)?.statusViews[status];
   }
 
   resolveStatusView(route, status) {
