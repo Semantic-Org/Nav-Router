@@ -196,11 +196,13 @@ export class Router {
   // first, so a root with data frames the cold not-found with what it reads
   async applyNotFound(url, event) {
     const navigation = { signal: event.signal, reload: false, previous: null };
+    // no route matched, so the page has none of its own
+    const matched = { url, params: {}, query: {}, routes: [] };
     await this.resolveIdentity(navigation);
     const [view, views, { activeRoutes, error }] = await Promise.all([
       this.resolveStatusView(this.root, 'notFound'),
       this.resolveRouteViews([this.root]),
-      this.loadRoutes([this.root], { params: {}, query: {} }, navigation),
+      this.loadRoutes([this.root], matched, navigation),
     ]);
     if (error) {
       throw error;
@@ -208,8 +210,7 @@ export class Router {
     if (event.signal.aborted) {
       return;
     }
-    // no route matched, so the page has none of its own: it lands as every page does
-    await this.applyCascade({ url, routes: [] }, { status: 'notFound', view, views, activeRoutes }, event);
+    await this.applyCascade(matched, { status: 'notFound', view, views, activeRoutes }, event);
   }
 
   // a route was added: a page standing as not-found for want of a route is matched again a
@@ -748,8 +749,8 @@ export class Router {
         ?? (this.root.data === undefined ? [this.createActiveRoute(this.root, {})] : []);
       // landed as every page is, at the page the navigation was going to, or the one standing
       const matched = pending ?? { ...previous, routes: [] };
-      const resolved = this.buildCascadeResult(matched, { status: 'error', error, view, views, activeRoutes });
-      await this.applyCascade(matched, resolved).catch(() => this.notify());
+      await this.applyCascade(matched, { status: 'error', error, view, views, activeRoutes })
+        .catch(() => this.notify());
       return;
     }
     this.notify();
@@ -1014,7 +1015,7 @@ export class Router {
     }
     const { signal } = navigation;
 
-    const { route, params, query, routes } = matched;
+    const { params, routes } = matched;
 
     for (const ancestor of routes) {
       if (ancestor.redirect) {
@@ -1023,13 +1024,7 @@ export class Router {
           ancestor.redirect,
           this.contextFor(ancestor, matched, { signal }),
         );
-        return {
-          status: 'redirect',
-          redirect: this.href(target, this.paramsFor(target, params)),
-          route,
-          params,
-          query,
-        };
+        return { status: 'redirect', redirect: this.href(target, this.paramsFor(target, params)) };
       }
     }
 
@@ -1046,9 +1041,6 @@ export class Router {
             return {
               status: 'redirect',
               redirect: this.href(this.config.signInRoute, { returnTo: this.returnAddress(matched) }),
-              route,
-              params,
-              query,
             };
           }
           // the routes above the refusing one run their data as a landing would, so their layouts
@@ -1057,19 +1049,7 @@ export class Router {
           viewsReady.catch(noop);
           const routesAbove = routes.slice(0, routes.indexOf(ancestor));
           const loaded = await this.loadRoutes(routesAbove, matched, navigation);
-          if (loaded.status) {
-            return this.statusResult(matched, viewsReady, loaded);
-          }
-          const [view, views] = await Promise.all([
-            this.resolveStatusView(ancestor, 'forbidden'),
-            viewsReady,
-          ]);
-          return this.buildCascadeResult(matched, {
-            status: 'forbidden',
-            view,
-            views,
-            activeRoutes: loaded.activeRoutes,
-          });
+          return this.statusResult(matched, viewsReady, { status: 'forbidden', ...loaded });
         }
       }
     }
@@ -1104,12 +1084,7 @@ export class Router {
       return this.statusResult(matched, viewsReady, loaded);
     }
     const views = await viewsReady;
-    return this.buildCascadeResult(matched, {
-      status: 'ok',
-      view: views.at(-1)?.view ?? null,
-      views,
-      activeRoutes: loaded.activeRoutes,
-    });
+    return { status: 'ok', view: views.at(-1)?.view ?? null, views, activeRoutes: loaded.activeRoutes };
   }
 
   // the page's active routes in route order, each seeing the data of the routes above it: a route keeps
@@ -1169,17 +1144,17 @@ export class Router {
     return { activeRoutes };
   }
 
-  // a route's load ended with no page for it, in not-found or in an error: the routes above it
+  // a route has no page: it refused, returned not-found or failed to load. the routes above it
   // are the page, and the status view stands in for it and the routes below
   async statusResult(matched, viewsReady, { activeRoutes, status, error }) {
-    // routes load in order, so the one the load ended at is the first that is not active
+    // routes load in order, so the one this is for is the first that is not active
     const route = matched.routes[activeRoutes.length];
     if (error) {
       // before anything is awaited, so a navigation superseded while its page loads has still said so
       this.onError(error, this.contextFor(route, matched, { activeRoutes }));
     }
     const [views, view] = await Promise.all([viewsReady, this.resolveStatusView(route, status)]);
-    return this.buildCascadeResult(matched, { status, ...(error && { error }), view, views, activeRoutes });
+    return { status, ...(error && { error }), view, views, activeRoutes };
   }
 
   // a route's share of the page. the reactive scaffold gives it a signal the routes below read
@@ -1218,15 +1193,6 @@ export class Router {
 
   titleText(value) {
     return value === undefined || value === null || value === '' ? null : String(value);
-  }
-
-  buildCascadeResult({ route, params, query }, resolved) {
-    return {
-      route,
-      params,
-      query,
-      ...resolved,
-    };
   }
 
   // the view a status shows at a route: the route's own, or the nearest above that names one, the

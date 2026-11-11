@@ -395,7 +395,7 @@ export class ReactiveRouter extends Router {
   applyHookResult(route, changed, value) {
     const handleError = (error) => {
       if (error?.name !== 'AbortError' && this.onPage(route)) {
-        this.onError(error, this.contextFor(route, this.page));
+        this.onError(error, this.untrack(() => route.viewContext(this.page)));
       }
     };
     try {
