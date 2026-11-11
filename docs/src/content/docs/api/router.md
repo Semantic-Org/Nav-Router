@@ -72,6 +72,7 @@ Every setting and its default. The resolved values are on `router.config`.
 | `attachGlobal` | `string` | `'router'` | Name the router is exposed under on `window`, for the console. |
 | `onChange` | `function` | `null` | Called when the page or pending state changes. |
 | `onRender` | `function` | `null` | Called after each render. |
+| `onError` | `function` | logs the error | Called with every error the router meets, a navigation that fails or a view that fails to render, and the context of the route when there is one. |
 
 :::tip[See the timing settings run]
 The trace on the [homepage](/) plays one navigation against `holdCommit`, `loadingDelay` and `loadingMin`.

@@ -30,8 +30,8 @@ export class View {
 
   // the view's life begins: its slot is found, its place opened there, and it is created. apart
   // from the constructor, so a view that extends this has its own fields in place before create runs.
-  // a view that fails to render is logged and stands empty, with nothing of it left behind, and the
-  // page stands. what goes inside a layout that failed has no slot, which is not a failure of its own
+  // a view that fails to render goes to onError and stands empty, with nothing of it left behind,
+  // and the page stands. what goes inside a layout that failed has no slot, which is not a failure of its own
   start(context) {
     this.route = context.route;
     this.failed = this.parent?.failed;
@@ -45,7 +45,7 @@ export class View {
       catch (error) {
         this.destroy();
         this.failed = true;
-        this.router.logError(error);
+        this.router.onError(error, context);
       }
     }
     return this;

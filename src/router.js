@@ -75,6 +75,9 @@ export class Router {
     user: null,
     onRender: null,
     onChange: null,
+    // every error the router meets, a navigation that fails or a view that fails to render, with
+    // the context of the route it was met at when there is one. logged, unless the app says otherwise
+    onError: (error) => console.error(error),
     // whether data recomputed outside a navigation moved: a deep compare, since a render costs more
     // than the walk. plain data asks it of the whole entry, and a reactive entry asks its cells instead
     dataChanged: (previous, next) => !isEqual(next, previous),
@@ -96,10 +99,11 @@ export class Router {
     this.config.base = this.normalizeBase(this.config.base);
     this.config.statusViews = { ...defaults.statusViews, ...settings.statusViews };
     // not settings, though declared among the defaults so the constructor keeps them from the root
-    // route: the user is state the identity door writes, the two callbacks are the app's to assign
+    // route: the user is state the identity door writes, the callbacks are the app's to assign
     this.user = this.config.user;
     this.onRender = this.config.onRender;
     this.onChange = this.config.onChange;
+    this.onError = this.config.onError;
 
     this.routesByName = new Map();
     this.leaves = [];
@@ -739,6 +743,7 @@ export class Router {
       from: globalThis.navigation?.transition?.from ?? null,
       url: pending?.url ?? this.navigator.entry?.url ?? null,
     };
+    this.onError(error, pending && this.contextFor(pending.route, pending));
     // a failure before commit left the standing page in place; only a committed one is shown as an error
     const committed = !pending || pending.committed;
     if (committed && this.config.errorRoute) {
@@ -747,9 +752,6 @@ export class Router {
     else if (committed) {
       const previous = this.page;
       const view = await this.resolveView(this.config.statusViews?.error).catch(() => null);
-      if (!view) {
-        this.logError(error);
-      }
       // the routes on screen stay active under the error page. a cold error, nothing yet shown, is
       // framed by the root when it has no data of its own, since the data that failed may be the
       // root's, and stands at the mount with no route active otherwise
@@ -775,16 +777,7 @@ export class Router {
         return this.renderPage(this.page);
       }).catch(noop);
     }
-    else {
-      this.logError(error);
-    }
     this.notify();
-  }
-
-  // the one place core logs. an integration that wants its own namespace replaces this, the way
-  // the timeline plugin wraps a moment
-  logError(error) {
-    console.error(error);
   }
 
   // back from bfcache with the dom intact: the route lifecycle sees an update, the page stays

@@ -390,19 +390,19 @@ export class ReactiveRouter extends Router {
 
   // a later value applied to the standing page through its consequence, untracked since a
   // consequence reads the page before its first await and the page is a cell. a run aborted at its
-  // route's teardown and a route since gone say nothing; a failure is logged with the page kept,
+  // route's teardown and a route since gone say nothing; a failure goes to onError with the page kept,
   // since the entry the route had still stands
   applyHookResult(route, changed, value) {
-    const onError = (error) => {
+    const handleError = (error) => {
       if (error?.name !== 'AbortError' && this.onPage(route)) {
-        this.logError(error);
+        this.onError(error, this.contextFor(route, this.page));
       }
     };
     try {
-      Promise.resolve(this.untrack(() => changed(value))).catch(onError);
+      Promise.resolve(this.untrack(() => changed(value))).catch(handleError);
     }
     catch (error) {
-      onError(error);
+      handleError(error);
     }
   }
 

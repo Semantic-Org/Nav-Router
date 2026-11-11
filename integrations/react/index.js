@@ -21,17 +21,17 @@ const Outlet = memo(({ view }) => {
   return createElement(Boundary, { view }, createElement(view.view, props));
 });
 
-// a view that throws as it renders is logged and renders nothing, and the layouts around it
+// a view that throws as it renders goes to onError and renders nothing, and the layouts around it
 // stand, where react alone would empty the whole mount. it is tried again on the next page: the
 // router does not update a layout kept through a navigation, so the boundary listens for one
 class Boundary extends Component {
   state = {};
 
   componentDidCatch(error) {
-    const { router } = this.props.view;
+    const { router, context } = this.props.view;
     this.setState({ failed: router.page });
     this.stop ??= router.subscribe(() => this.forceUpdate());
-    router.logError(error);
+    router.onError(error, context);
   }
 
   componentWillUnmount() {
