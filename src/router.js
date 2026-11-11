@@ -797,21 +797,15 @@ export class Router {
     const work = {
       matched,
       settled: false,
-      result: null,
       redirected: null,
       identity: identity ?? this.resolveIdentity(navigation),
     };
     work.guards = work.identity.then(() => this.runGuards(matched, navigation));
     work.ready = work.guards.then((guard) => guard ?? cachedResult() ?? this.runData(matched, navigation));
-    work.ready.then(
-      (result) => {
-        work.settled = true;
-        work.result = result;
-      },
-      () => {
-        work.settled = true;
-      },
-    );
+    const settle = () => {
+      work.settled = true;
+    };
+    work.ready.then(settle, settle);
     return work;
   }
 
@@ -902,7 +896,7 @@ export class Router {
         return;
       }
 
-      if (resolved?.status === 'redirect' && resolved.redirect) {
+      if (resolved.status === 'redirect' && resolved.redirect) {
         if (!precommitRan) {
           // no precommit on this browser: the refused url has shown, its slot becomes the redirect target,
           // a task later so this handler is not aborted by its own replacement
@@ -929,7 +923,7 @@ export class Router {
       await this.applyCascade(matched, resolved, event);
       // the error page stands, and the navigation still failed, which the platform and whoever
       // awaits it are told
-      if (resolved?.status === 'error') {
+      if (resolved.status === 'error') {
         throw resolved.error;
       }
     }
@@ -945,17 +939,12 @@ export class Router {
               Cascade
   *******************************/
 
-  // the plain seam
-  evaluate(route, fn, context) {
-    return isFunction(fn) ? fn(context) : fn;
-  }
-
   // the door a hook rides, with what to do should its answer change. nothing here, since plain
   // data never moves on its own; the reactive scaffold runs the hook again when what it read moves
   // and hands each later answer to changed. kind is guard or data: a guard runs every navigation,
   // data only when its route does. a plugin's own hook rides the same door
   evaluateHook(route, fn, context, { kind, changed }) {
-    return this.evaluate(route, fn, context);
+    return isFunction(fn) ? fn(context) : fn;
   }
 
   // one seam per hook, each naming its consequence: a redirect moves the page, a refused
@@ -1006,11 +995,7 @@ export class Router {
 
   // null when the route may be entered, otherwise the redirect or forbidden result
   async runGuards(matched, navigation) {
-    if (!matched) {
-      return null;
-    }
     const { signal } = navigation;
-
     const { params, routes } = matched;
 
     for (const ancestor of routes) {
@@ -1068,7 +1053,6 @@ export class Router {
   }
 
   async runData(matched, navigation) {
-    const { signal } = navigation;
     const { routes } = matched;
 
     // the chunks load while the data runs, and a failed chunk waits to throw where the data's turn comes
@@ -1263,9 +1247,6 @@ export class Router {
 
   // every moment carries the navigation that caused it, so a plugin never holds one across moments
   async applyCascade(matched, resolved, event = null) {
-    if (!resolved) {
-      return;
-    }
     const { key } = this.getEntrySnapshot();
     const previous = this.page;
     const { activeRoutes } = resolved;
