@@ -27,6 +27,11 @@ const FRAMEWORK_GUIDES = {
 // an integration's own exports, listed only where the package exists
 const FRAMEWORK_API = {
   solid: [['SolidRouter', 'solid-router', true], ['solidRouter()', 'solid-router-fn', true]],
+  svelte: [['SvelteRouter', 'svelte-router', true], ['svelteRouter()', 'svelte-router-fn', true], [
+    'Slot',
+    'slot',
+    true,
+  ]],
 };
 
 // a section's or group's name is one of the interface's words (nav.… in content/strings.json): name

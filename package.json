@@ -36,6 +36,7 @@
     "flat": "npm -w examples/flat run dev",
     "nested": "npm -w examples/nested run dev",
     "solid": "npm -w examples/solid run dev",
+    "svelte": "npm -w examples/svelte run dev",
     "format": "npx dprint fmt",
     "setup": "npx simple-git-hooks"
   },
