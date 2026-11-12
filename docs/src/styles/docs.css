@@ -227,7 +227,8 @@
 .doc ul:not([class]), .doc ol:not([class]) { margin: 16px 0 0; padding-inline-start: 22px; }
 .doc ul:not([class]) li + li, .doc ol:not([class]) li + li { margin-top: 6px; }
 .doc ul:not([class]) li::marker { color: var(--text-4); }
-.doc > .code, .doc > .callout, .doc > .table-wrap, .doc > .truth, .doc > .steps, .doc > .params, .doc > .entry { margin-top: 20px; }
+.doc > .code, .doc > .callout, .doc > .table-wrap, .doc > .truth, .doc > .steps, .doc > .params, .doc > .entry,
+.fw-slot > .code, .fw-slot > .callout, .fw-slot > .table-wrap, .fw-slot > .truth, .fw-slot > .steps, .fw-slot > .params, .fw-slot > .entry { margin-top: 20px; }
 .entry > .code, .entry > .callout, .entry > .table-wrap { margin-top: 20px; }
 
 /* heading anchors: visible on hover and focus, never take layout */
@@ -311,12 +312,13 @@ h2:hover .anchor, h3:hover .anchor, .anchor:focus-visible { opacity: 1; }
 .steps > li > p:first-child > strong:first-child,
 .step-title { display: block; color: var(--text); font-weight: 600; font-size: var(--fs-md); line-height: 28px; }
 .steps > li > p { margin-top: 4px; }
-.steps > li > .code { margin-top: 12px; }
+.steps > li > .code, .steps > li > :is(.code, ul, ol) + p, .steps > li > .fw-slot { margin-top: 12px; }
 
 /* ---------- reference entries ---------- */
 
 /* a method or function: its heading is the symbol, the signature sits under it as code */
 .entry { margin-top: 48px; padding-top: 32px; border-top: 1px solid var(--line); }
+.doc-meta + .entry { margin-top: 36px; padding-top: 0; border-top: 0; }
 .entry > h3 { margin-top: 0; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .entry > h3 code {
   font-size: var(--fs-lg); line-height: var(--lh-lg); color: var(--text);

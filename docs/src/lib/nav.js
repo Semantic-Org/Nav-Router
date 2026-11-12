@@ -201,7 +201,8 @@ export function navFor(ids, currentId, { code = DEFAULT_LOCALE, titles = new Map
     ...section,
     label: label(section),
     href: hrefFor(
-      section.groups.flatMap((g) => g.items).find((it) => exists.has(it.slug.split('#')[0]))?.slug ?? section.key,
+      section.groups.filter((g) => !g.framework).flatMap((g) => g.items).find((it) => exists.has(it.slug.split('#')[0]))
+        ?.slug ?? section.key,
       code,
     ),
     groups: section.groups.map((g) => ({
