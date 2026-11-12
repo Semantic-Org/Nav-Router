@@ -312,6 +312,11 @@ export class Navigator {
       return false;
     }
 
+    // a link marked rel="external" leaves the app, even for a url on this origin that a route would match
+    if (event.sourceElement?.relList?.contains('external')) {
+      return false;
+    }
+
     const origin = globalThis.location?.origin;
     if (origin) {
       try {
