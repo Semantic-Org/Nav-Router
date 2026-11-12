@@ -103,7 +103,7 @@ export class Router {
 
     this.routesByName = new Map();
     this.leaves = [];
-    this.root = new Route(routeOptions, null, this);
+    this.root = new Route({ ...routeOptions, isSection: true }, null, this);
 
     this.current = null;
     this.page = null;
@@ -483,6 +483,7 @@ export class Router {
     }
 
     const segments = rawPath === '/' ? [] : rawPath.replace(/^\//, '').split('/');
+    const valueFor = (paramName) => params[paramName] ?? route.paramSpecs[paramName]?.default;
     const resolvedSegments = [];
     for (let index = 0; index < segments.length; index++) {
       const segment = segments[index];
@@ -501,9 +502,13 @@ export class Router {
       }
       const isOptionalFlag = segment.endsWith('?');
       const paramName = segment.slice(1).replace(/\?$/, '');
-      const value = params[paramName] ?? route?.paramSpecs[paramName]?.default;
+      const value = valueFor(paramName);
       if (value === undefined || value === null) {
-        if (isOptionalFlag && index === segments.length - 1) {
+        // an optional leaves the path only with every segment after it, or what follows would read back in its place
+        const restOmitted = segments.slice(index + 1).every((later) =>
+          later === '*' ? !params['*'] : later.endsWith('?') && valueFor(later.slice(1, -1)) == null
+        );
+        if (isOptionalFlag && restOmitted) {
           continue;
         }
         throw new Error(`Router.href: missing required param "${paramName}" for "${route?.name ?? target}"`);
@@ -1005,7 +1010,10 @@ export class Router {
           ancestor.redirect,
           this.contextFor(ancestor, matched, { signal }),
         );
-        return { status: 'redirect', redirect: this.href(target, this.paramsFor(target, params)) };
+        // a redirect that answers nothing leaves the navigation on its way, as it does on the standing page
+        if (target) {
+          return { status: 'redirect', redirect: this.href(target, this.paramsFor(target, params)) };
+        }
       }
     }
 

@@ -72,7 +72,12 @@ proto.renderPage = async function(page, event = null) {
     || event?.navigationType === 'reload';
   announcer.lastPage = { route: page.route, params: page.params };
   const text = String(getSettings(this).format(page) ?? '');
-  if (!lastPage || event?.initial || !text || (!moved && text === announcer.lastText)) {
+  if (!lastPage || event?.initial) {
+    // the browser announced the load itself, so its text is what was last heard
+    announcer.lastText = text;
+    return;
+  }
+  if (!text || (!moved && text === announcer.lastText)) {
     return;
   }
   if (this.pending) {

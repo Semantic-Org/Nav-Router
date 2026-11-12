@@ -21,7 +21,10 @@ Router.prototype.preload = async function(target, args = {}) {
 
 proto.onPreloadIntent = function(event) {
   const link = event?.target?.closest?.('a[href], area[href]');
-  if (!link?.href || link.hasAttribute('download') || (link.target && link.target !== '_self')) {
+  if (
+    !link?.href || link.hasAttribute('download') || link.relList?.contains('external')
+    || (link.target && link.target !== '_self')
+  ) {
     return;
   }
   if (globalThis.navigator?.connection?.saveData) {
