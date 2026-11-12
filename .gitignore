@@ -3,3 +3,5 @@ dist
 .DS_Store
 *.log
 .vercel
+# per-user scratch for agents and reference files
+ai/workspace
