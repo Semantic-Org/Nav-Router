@@ -506,7 +506,7 @@ export class Router {
       if (value === undefined || value === null) {
         // an optional leaves the path only with every segment after it, or what follows would read back in its place
         const restOmitted = segments.slice(index + 1).every((later) =>
-          later.endsWith('?') && valueFor(later.slice(1, -1)) == null
+          later === '*' ? !params['*'] : later.endsWith('?') && valueFor(later.slice(1, -1)) == null
         );
         if (isOptionalFlag && restOmitted) {
           continue;
