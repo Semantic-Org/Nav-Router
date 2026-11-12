@@ -1,56 +1,40 @@
-// the plugins, one list for the landing page, the sidebar and the homepage table. descriptions follow
-// each plugin's own header comment in nav-router/src/plugins; sizes are measured at build.
+// the plugins, one list for the landing page, the sidebar and the homepage table. a plugin's words are
+// in content/strings.json: its description (plugins.<name>.description, following its own header
+// comment in nav-router/src/plugins) and its category's name (plugins.category.<category>). sizes
+// are measured at build.
 
 export const PLUGINS = [
   {
     name: 'head',
-    short: 'Title, meta and canonical tags per page',
-    category: 'Document',
-    description: 'Title, meta tags and canonical link for each page, merged down the active routes.',
+    category: 'document',
   },
   {
     name: 'view-transitions',
-    short: 'Each page change inside a view transition',
-    category: 'Motion',
-    description:
-      'Crosses each page change inside a view transition, so what leaves animates out and what appears animates in.',
+    category: 'motion',
   },
   {
     name: 'announcer',
-    short: 'Tells screen readers the page changed',
-    category: 'Accessibility',
-    description: 'Announces each new page through a live region, where Safari stays silent on intercepted navigations.',
+    category: 'accessibility',
   },
   {
     name: 'confirm-leave',
-    short: 'Asks before leaving unsaved work',
-    category: 'Forms',
-    description: 'Holds unsaved forms and edits across link clicks, back and forward, and closing the tab.',
+    category: 'forms',
   },
   {
     name: 'preload-intent',
-    short: 'Warms a route’s code on hover or focus',
-    category: 'Performance',
-    description:
-      'Warms a link’s view code on hover, focus or touch, and adds `router.preload()` for warming one by hand.',
+    category: 'performance',
   },
   {
     name: 'chunk-reload',
-    short: 'Recovers when a deploy removes old chunks',
-    category: 'Resilience',
-    description: 'Recovers once when a fresh deploy has removed the old code chunk a page needs.',
+    category: 'resilience',
   },
   {
     name: 'timeline',
-    short: 'Navigations in the devtools performance panel',
-    category: 'Devtools',
-    description: 'Draws each navigation and its steps in the devtools performance panel.',
+    category: 'devtools',
   },
   {
     name: 'sitemap',
-    short: 'Every route, for a crawler or generator',
-    category: 'Tooling',
-    description: 'Lists every route as a page a crawler or a generator can read, and adds `router.sitemap()`.',
+    category: 'tooling',
   },
 ];
 
@@ -58,12 +42,13 @@ export const PLUGINS = [
 export const bindingFor = (name) => name.replace(/-(\w)/g, (_, c) => c.toUpperCase());
 
 // the setup for a set of plugins, as nav-router's own examples write it: one import per plugin, for
-// its effect, beside the router, which renders the dom without one
-export function sampleFor(names) {
+// its effect, beside the router, which renders the dom without one.
+// hint is the comment an empty setup carries, in the page's language (plugins.sample.empty)
+export function sampleFor(names, hint) {
   const picked = PLUGINS.map((p) => p.name).filter((n) => names.includes(n));
   const lines = [];
   picked.forEach((n) => lines.push(`import '@nav-router/plugins/${n}';`));
-  if (!picked.length) { lines.push('// select plugins below to add them here'); }
+  if (!picked.length) { lines.push(`// ${hint}`); }
   lines.push("import { router } from 'nav-router';", '');
   lines.push('const app = router({');
   lines.push("  mount: '#app',");

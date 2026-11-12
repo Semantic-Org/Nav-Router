@@ -1,0 +1,130 @@
+---
+// the plugins landing: every plugin as a card or a row, filterable, with its size measured at build
+import { getCollection } from 'astro:content';
+
+import LocaleNotice from '../components/LocaleNotice.astro';
+import DocsChrome from '../layouts/DocsChrome.astro';
+import { englishIn, draftStrings, languagesWith, localePath, t } from '../lib/i18n.js';
+import { inline } from '../lib/markdown/inline.js';
+import { PLUGINS, sampleFor } from '../lib/plugins.js';
+import { formatSize, sizeOf } from '../lib/sizes.js';
+
+// the page is its words (plugins.… in content/strings.json): a language that has them has the page
+const locale = Astro.currentLocale;
+const writtenIn = languagesWith('plugins.');
+const translated = writtenIn.includes(locale);
+const translatedIn = languagesWith('plugins.', { reviewed: true });
+const english = translated ? {} : englishIn(locale);
+const written = new Set((await getCollection('docs')).map((e) => e.id));
+const plugins = await Promise.all(PLUGINS.map(async (p) => {
+  const bytes = await sizeOf(p.name);
+  // the plugin's words in the page's language; category stays the id
+  const category = t(locale, `plugins.category.${p.category}`);
+  const description = t(locale, `plugins.${p.name}.description`);
+  return {
+    ...p,
+    categoryName: category,
+    description,
+    bytes,
+    size: formatSize(bytes),
+    href: written.has(`plugins/${p.name}`) ? localePath(`/plugins/${p.name}/`, locale) : null,
+    // what the filter matches against
+    text: `${p.name} ${category} ${description}`.toLowerCase().replace(/`/g, ''),
+  };
+}));
+const coreBytes = await sizeOf('core');
+// the sample starts empty; the page fills it from the reader's picks (and ?use= in the url)
+const EXAMPLE = sampleFor([], t(locale, 'plugins.sample.empty'));
+const lede = t(locale, 'plugins.lede');
+// a counted noun takes the form the language's rules pick, and plugins.count.other where it has none
+const counted = (key, count, vars) => {
+  const form = `${key}.${new Intl.PluralRules(locale).select(count)}`;
+  const text = t(locale, form, vars);
+  return text === form ? t(locale, `${key}.other`, vars) : text;
+};
+
+const ICONS = {
+  filter: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
+  cards: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>',
+  list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1" fill="currentColor"/><circle cx="4.5" cy="12" r="1" fill="currentColor"/><circle cx="4.5" cy="18" r="1" fill="currentColor"/></svg>',
+};
+---
+<DocsChrome title={t(locale, 'plugins.title')} description={lede} currentId="plugins" wide extraIds={['plugins']} writtenIn={writtenIn} translatedIn={translatedIn}>
+  <main class="doc is-wide" id="content" data-pagefind-body {...english}>
+    <LocaleNotice translated={translated} draft={translated && draftStrings(locale)} />
+    <span hidden data-pagefind-meta={`title:${t(locale, 'nav.plugins')}`}></span>
+    <span hidden data-pagefind-meta={`section:${t(locale, 'nav.plugins')}`}></span>
+    <span hidden data-pagefind-meta={`crumb:${t(locale, 'nav.plugins')}`}></span>
+
+    <h1>{t(locale, 'nav.plugins')}</h1>
+    <p class="doc-lede">{lede}</p>
+
+    <div class="plugins-intro" data-pagefind-ignore>
+      <div class="code" data-plugin-sample>
+        <div class="code-head">
+          <span class="code-file">app.js</span>
+          <button class="clear-picks" type="button" data-clear-picks hidden>{t(locale, 'plugins.sample.clear')}</button>
+          <button class="copy" type="button" data-copy></button>
+        </div>
+<pre data-hl set:text={EXAMPLE} />
+      </div>
+      <dl class="plugins-stats" data-core-bytes={coreBytes ?? 0} aria-live="polite">
+        <div><dt>{t(locale, 'plugins.stats.selected')}</dt><dd set:html={t(locale, 'plugins.stats.picked', { count: '<span data-picked-count>0</span>', total: plugins.length })} /></div>
+        <div><dt>{t(locale, 'plugins.stats.pluginSize')}</dt><dd><bdi><span data-picked-size>0.0 kB</span> <abbr title={t(locale, 'page.minBr')}>{t(locale, 'plugins.minBr')}</abbr></bdi></dd></div>
+        <div><dt>{t(locale, 'plugins.stats.totalSize')}</dt><dd><bdi><span data-total-size>{formatSize(coreBytes) ?? '–'}</span> <abbr title={t(locale, 'page.minBr')}>{t(locale, 'plugins.minBr')}</abbr></bdi></dd></div>
+      </dl>
+    </div>
+
+    <div class="plugin-toolbar" data-pagefind-ignore>
+      <label class="plugin-filter">
+        <Fragment set:html={ICONS.filter} />
+        <span class="visually-hidden">{t(locale, 'plugins.filter.label')}</span>
+        <input type="search" placeholder={t(locale, 'plugins.filter.placeholder')} autocomplete="off" spellcheck="false" data-plugin-filter aria-controls="plugin-list">
+        <span class="swap plugin-count" aria-live="polite">
+          <span data-count-all>{counted('plugins.count', plugins.length, { count: plugins.length })}</span>
+          <span data-count-some hidden>{t(locale, 'plugins.count.shown', { shown: plugins.length, total: plugins.length })}</span>
+        </span>
+      </label>
+      <div class="view-toggle" role="radiogroup" aria-label={t(locale, 'plugins.view.label')}>
+        <button type="button" role="radio" aria-checked="true" data-view="cards" aria-label={t(locale, 'plugins.view.cards')} title={t(locale, 'plugins.view.cards')} set:html={ICONS.cards} />
+        <button type="button" role="radio" aria-checked="false" data-view="list" aria-label={t(locale, 'plugins.view.list')} title={t(locale, 'plugins.view.list')} set:html={ICONS.list} />
+      </div>
+    </div>
+
+    <ul class="plugin-list" id="plugin-list" data-view="cards" role="list">
+      {plugins.map((p) => (
+        <li class="plugin" data-text={p.text} data-name={p.name} data-bytes={p.bytes ?? 0}>
+          <input class="plugin-pick" type="checkbox" id={`pick-${p.name}`} value={p.name} />
+          {/* the whole card toggles the pick; the name (to its page) and the tag sit above it */}
+          <label class="plugin-hit" for={`pick-${p.name}`}><span class="visually-hidden">{t(locale, 'plugins.add', { name: p.name })}</span></label>
+          <h2 class="plugin-name">{p.href ? <a class="plugin-link" href={p.href}>{p.name}</a> : p.name}</h2>
+          <button class="plugin-tag" type="button" data-tag={p.categoryName} aria-label={t(locale, 'plugins.showCategory', { category: p.categoryName })}>{p.categoryName}</button>
+          <p class="plugin-desc" set:html={inline(p.description)} />
+          <span class="plugin-size"><bdi><b>{p.size ?? '–'}</b> {t(locale, 'plugins.minBr')}</bdi></span>
+        </li>
+      ))}
+    </ul>
+    <script is:inline>
+      // the reader's last view, set before paint so the list never jumps from cards to rows
+      try { const v = localStorage.getItem('nr:plugin-view'); if (v) document.getElementById('plugin-list').dataset.view = v; } catch {}
+    </script>
+
+    <div class="plugin-empty" hidden data-plugin-empty>
+      <p set:html={t(locale, 'plugins.empty.none', { query: '<span data-empty-query></span>' })} />
+      <button class="btn" type="button" data-clear-filter>{t(locale, 'plugins.empty.clear')}</button>
+    </div>
+
+    <div class="callout" data-kind="tip">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.6.5 1.1 1.3 1.1 2.2h5c0-.9.5-1.7 1.1-2.2A6 6 0 0 0 12 3Z"/></svg>
+      <div>
+        <p class="callout-title">{t(locale, 'plugins.callout.title')}</p>
+        <p set:html={t(locale, 'plugins.callout.body', { href: localePath('/guides/writing-a-plugin/', locale) })} />
+      </div>
+    </div>
+  </main>
+
+  <script>
+    import { mountPlugins } from '../scripts/plugins.js';
+    mountPlugins();
+  </script>
+</DocsChrome>

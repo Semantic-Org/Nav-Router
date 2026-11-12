@@ -1,0 +1,70 @@
+---
+// one live example: what it shows and what to try, the playground, then what just happened
+import { getCollection, render } from 'astro:content';
+
+import Playground from '../components/Playground.astro';
+import LocaleNotice from '../components/LocaleNotice.astro';
+import DocsChrome from '../layouts/DocsChrome.astro';
+import { filesFor } from '../lib/examples.js';
+import { englishIn, inLanguage, languagesOf, localePath, t, titlesIn } from '../lib/i18n.js';
+import { inline } from '../lib/markdown/inline.js';
+import { SECTIONS } from '../lib/nav.js';
+
+const { entry } = Astro.props;
+// the example in the reader's language: its translation where there is one, else english
+const locale = Astro.currentLocale;
+const { page, translated, stale, draft } = await inLanguage(entry, locale);
+const english = translated ? {} : englishIn(locale);
+const { writtenIn, translatedIn } = await languagesOf(entry);
+const { Content } = await render(page);
+const { title, description, tabs, try: steps, related } = page.data;
+const files = filesFor(entry.id);
+
+// previous and next in the section's order
+const order = SECTIONS.find((s) => s.key === 'examples').groups.flatMap((g) => g.items)
+  .map((it) => it.slug).filter((slug) => slug.startsWith('examples/'));
+const at = order.indexOf(`examples/${entry.id}`);
+const titles = await titlesIn(locale);
+const titleOf = (slug) => titles.get(slug) ?? SECTIONS.find((s) => s.key === 'examples').groups.flatMap((g) => g.items).find((it) => it.slug === slug)?.title;
+const prev = order[at - 1];
+const next = order[at + 1];
+const group = SECTIONS.find((s) => s.key === 'examples').groups.find((g) => g.items.some((it) => it.slug === `examples/${entry.id}`));
+const groupLabel = group && t(locale, group.name);
+// a related page goes by its title in the language, where it has been translated
+const titleIn = (r) => (r.href.includes('#') ? null : titles.get(r.href.replace(/^\/|\/$/g, ''))) ?? r.title;
+// the related pages as one list, joined as the language joins one, to sit inside the sentence
+const links = new Intl.ListFormat(locale, { type: 'unit', style: 'short' })
+  .format(related.map((r) => `<a href="${localePath(r.href, locale)}">${inline(titleIn(r))}</a>`));
+---
+<DocsChrome title={t(locale, 'examples.pageTitle', { title })} description={description} currentId={`examples/${entry.id}`} wide writtenIn={writtenIn} translatedIn={translatedIn}>
+  <main class="doc is-wide example-page" id="content" data-pagefind-body {...english}>
+    <LocaleNotice translated={translated} stale={stale} draft={draft} />
+    <span hidden data-pagefind-meta={`title:${title}`}></span>
+    <span hidden data-pagefind-meta={`section:${t(locale, 'nav.examples')}`}></span>
+    <span hidden data-pagefind-meta={`crumb:${groupLabel ?? t(locale, 'nav.examples')}`}></span>
+
+    <p class="doc-crumb" data-pagefind-ignore><a class="crumb" href={localePath('/examples/', locale)}>{t(locale, 'nav.examples')}</a> / {groupLabel}</p>
+    <h1>{title}</h1>
+    <p class="doc-lede" set:html={inline(description)} />
+
+    <div class="example-try" data-pagefind-ignore>
+      <p class="example-try-label">{t(locale, 'examples.tryThis')}</p>
+      <ol>{steps.map((s) => <li set:html={inline(s)} />)}</ol>
+    </div>
+
+    <div data-pagefind-ignore><Playground files={files} tabs={tabs} label={t(locale, 'examples.live', { title })} /></div>
+
+    <div class="example-notes">
+      <h2 id="how-it-works">{t(locale, 'examples.how')}</h2>
+      <Content />
+      {related.length > 0 && (
+        <p class="example-related" set:html={t(locale, 'examples.readMore', { links })} />
+      )}
+    </div>
+
+    <nav class="pager" aria-label={t(locale, 'nav.examples')} data-pagefind-ignore>
+      {prev ? <a class="pager-link is-prev" href={localePath(`/${prev}/`, locale)}><span class="pager-dir">{t(locale, 'page.previous')}</span><span class="pager-title">{titleOf(prev)}</span></a> : <span></span>}
+      {next ? <a class="pager-link is-next" href={localePath(`/${next}/`, locale)}><span class="pager-dir">{t(locale, 'page.next')}</span><span class="pager-title">{titleOf(next)}</span></a> : <span></span>}
+    </nav>
+  </main>
+</DocsChrome>

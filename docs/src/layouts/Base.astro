@@ -1,6 +1,7 @@
 ---
 // every page: the document, the fonts and tokens, and the theme set before first paint
 import { FRAMEWORKS } from '../lib/frameworks.js';
+import { DEFAULT_LOCALE, languageOffer, localeOf, localePath, scriptStrings, t, unlocalized } from '../lib/i18n.js';
 import '@fontsource-variable/schibsted-grotesk/wght.css';
 import '@fontsource/fragment-mono/400.css';
 import '@fontsource/fragment-mono/400-italic.css';
@@ -9,23 +10,41 @@ import '../styles/tokens.css';
 import sansLatin from '@fontsource-variable/schibsted-grotesk/files/schibsted-grotesk-latin-wght-normal.woff2?url';
 import monoLatin from '@fontsource/fragment-mono/files/fragment-mono-latin-400-normal.woff2?url';
 
-const { title, description = 'A thin router on the browser’s Navigation API.', share = true, pageFramework = null } = Astro.props;
+// writtenIn: the languages this page is written in, english always. translatedIn: those of them
+// that have been reviewed, which are the ones a search engine is told of
+const { title, description = 'A thin router on the browser’s Navigation API.', share = true, pageFramework = null, writtenIn = [DEFAULT_LOCALE], translatedIn = [DEFAULT_LOCALE] } = Astro.props;
+// the page's language, from its url: english at the root, the rest under their path
+const locale = localeOf(Astro.currentLocale);
+// the words the scripts ask for, in this language; < escaped so the text can't close its script
+const strings = JSON.stringify(scriptStrings(locale.code, { home: unlocalized(Astro.url.pathname) === '/' })).replace(/</g, '\\u003c');
 const frameworkIds = FRAMEWORKS.map((f) => f.id);
-// the page's share card, rendered at build by pages/og/[...slug].png.js
-const path = Astro.url.pathname.replace(/^\/|\/$/g, '');
-const image = new URL(`/og/${path || 'index'}.png`, Astro.site);
-const canonical = new URL(Astro.url.pathname, Astro.site);
+// the page's share card, rendered at build by pages/og/[...slug].png.js; a translated page uses the
+// english page's card until cards are made per language
+const path = unlocalized(Astro.url.pathname);
+const image = new URL(`/og/${path.replace(/^\/|\/$/g, '') || 'index'}.png`, Astro.site);
+// a page shown in english for want of a translation is the english page to a search engine, and
+// the versions it's told about are the ones that are written
+const urlIn = (code) => new URL(localePath(path, code), Astro.site);
+const canonical = urlIn(translatedIn.includes(locale.code) ? locale.code : DEFAULT_LOCALE);
+const alternates = translatedIn.length > 1 ? translatedIn : [];
+// the page in the other languages it's written in, for offering a reader theirs
+const offer = JSON.stringify(languageOffer(Astro.url.pathname, locale.code, writtenIn)).replace(/</g, '\\u003c');
 ---
 <!doctype html>
-<html lang="en">
+<html lang={locale.code} dir={locale.dir}>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{title}</title>
   <meta name="description" content={description}>
+  {alternates.map((code) => <link rel="alternate" hreflang={code} href={urlIn(code)} />)}
+  {alternates.length > 0 && <link rel="alternate" hreflang="x-default" href={urlIn(DEFAULT_LOCALE)} />}
   <link rel="preload" href={sansLatin} as="font" type="font/woff2" crossorigin>
   <link rel="preload" href={monoLatin} as="font" type="font/woff2" crossorigin>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  {/* a build for anywhere but production (staging) stays out of search, while link previews still read it */}
+  {Astro.site?.hostname !== 'navrouter.dev' && <meta name="robots" content="noindex">}
   <link rel="manifest" href="/site.webmanifest">
   <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
@@ -49,6 +68,89 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
       document.documentElement.dataset.theme = t || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
     })();
   </script>
+  <script is:inline type="application/json" id="language-offer" set:html={offer}></script>
+  <script is:inline>
+    // a reader's language. the page never moves a reader on its own account: it offers the page in a
+    // language their browser asks for, and after a reader switches it asks whether to always open
+    // the docs in that language. only a yes to that sends later visits there, and picking another
+    // language takes the yes back
+    (() => {
+      const data = JSON.parse(document.getElementById('language-offer').textContent);
+      const store = (area, key, value) => {
+        try {
+          if (value === undefined) { return area.getItem(key); }
+          if (value === null) { area.removeItem(key); } else { area.setItem(key, value); }
+        } catch {}
+        return null;
+      };
+      const picked = store(sessionStorage, 'nr:language-picked');
+      store(sessionStorage, 'nr:language-picked', null);
+      const always = store(localStorage, 'nr:language');
+
+      // sent here by an earlier yes, unless the reader has just picked this page's language
+      if (!picked && always && always !== data.page && data.paths[always]) {
+        location.replace(data.paths[always] + location.search + location.hash);
+        return;
+      }
+      if (picked && always && always !== data.page) { store(localStorage, 'nr:language', null); }
+
+      const toast = (text, actions, { lang, dir } = {}) => {
+        const el = document.createElement('div');
+        el.className = 'language-toast';
+        el.setAttribute('role', 'region');
+        if (lang) { el.lang = lang; el.dir = dir; }
+        const p = document.createElement('p');
+        p.textContent = text;
+        el.append(p, ...actions.map(([label, run, primary]) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = primary ? 'btn primary' : 'btn ghost';
+          button.textContent = label;
+          button.addEventListener('click', () => { el.remove(); run(); });
+          return button;
+        }));
+        document.body.append(el);
+      };
+      const pick = (code) => store(sessionStorage, 'nr:language-picked', code);
+
+      addEventListener('DOMContentLoaded', () => {
+        // every language link says which language was picked, so the page it opens knows it was chosen
+        document.addEventListener('click', (event) => {
+          const link = event.target.closest?.('[data-language-pick]');
+          if (link) { pick(link.dataset.languagePick); }
+        });
+
+        const asked = (store(localStorage, 'nr:language-asked') ?? '').split(' ');
+        if (picked === data.page) {
+          // english is where a reader lands anyway, so picking it only quiets the offer
+          if (data.page === data.english) { store(localStorage, 'nr:language-quiet', '1'); }
+          else if (always !== data.page && !asked.includes(data.page)) {
+            const answered = () => store(localStorage, 'nr:language-asked', [...asked, data.page].join(' ').trim());
+            toast(data.remember.ask, [
+              [data.remember.yes, () => { answered(); store(localStorage, 'nr:language', data.page); }, true],
+              [data.remember.no, answered],
+            ]);
+          }
+          return;
+        }
+        if (always || store(localStorage, 'nr:language-quiet')) { return; }
+        // the first language the browser asks for that this page is in. if that is the page's own,
+        // there is nothing to offer
+        const matches = (tag, code) => tag.toLowerCase() === code.toLowerCase() || tag.split('-')[0].toLowerCase() === code.split('-')[0].toLowerCase();
+        for (const tag of navigator.languages ?? []) {
+          if (matches(tag, data.page)) { return; }
+          const o = data.others.find((candidate) => matches(tag, candidate.code));
+          if (o) {
+            toast(o.offer, [
+              [o.go, () => { pick(o.code); location.assign(o.href + location.search + location.hash); }, true],
+              [o.dismiss, () => store(localStorage, 'nr:language-quiet', '1')],
+            ], { lang: o.code, dir: o.dir });
+            return;
+          }
+        }
+      });
+    })();
+  </script>
   <script is:inline define:vars={{ frameworkIds, pageFramework }}>
     // the reader's framework, set before first paint so the sidebar shows the right slots: a
     // ?framework= in the link, else the page's own (a Solid page is read as Solid), else the
@@ -61,10 +163,11 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     } catch {}
     document.documentElement.dataset.framework = frameworkIds.includes(fw) ? fw : frameworkIds[0];
   </script>
+  <script is:inline type="application/json" id="ui-strings" set:html={strings}></script>
   <slot name="head" />
 </head>
 <body {...Astro.props.bodyAttrs}>
-  <a class="visually-hidden" href="#content">Skip to content</a>
+  <a class="visually-hidden" href="#content">{t(locale.code, 'nav.skip')}</a>
   <slot />
 </body>
 </html>

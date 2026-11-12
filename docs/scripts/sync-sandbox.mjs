@@ -4,7 +4,7 @@
 // docs, and the one-file
 // build of @semantic-ui/utils it depends on (its importmap export), reached through the examples'
 // import map
-import { promises as fs } from 'node:fs';
+import { existsSync, promises as fs } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,7 +12,9 @@ import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
 const here = dirname(fileURLToPath(import.meta.url));
 const pub = resolve(here, '../public');
-const NAV_ROUTER = resolve(here, '../..');
+// the repo root above these docs in the monorepo, else the sibling nav-router checkout
+const NAV_ROUTER = [resolve(here, '../..'), resolve(here, '../../../nav-router')]
+  .find((dir) => existsSync(resolve(dir, 'src/index.js')));
 
 const copy = async (from, to) => {
   await fs.rm(to, { recursive: true, force: true });

@@ -1,6 +1,10 @@
 import { FALLBACK, FRAMEWORKS, fwById } from '../lib/frameworks.js';
+import { animateFavicon } from './favicon.js';
 import { logoFor } from './framework-logos.js';
+import { wireMarkPulse } from './mark-pulse.js';
 import { mountSearch } from './search.js';
+import { ui } from './strings.js';
+import { wireVersionMenus } from './version-menu.js';
 
 // prototype-only helpers: a tiny js highlighter (astro will use shiki), copy buttons, code tabs, theme.
 
@@ -229,7 +233,7 @@ export function wireTheme() {
   };
   const label = () =>
     document.querySelectorAll('[data-theme-toggle]').forEach((btn) => {
-      btn.setAttribute('aria-label', root.dataset.theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme');
+      btn.setAttribute('aria-label', ui(root.dataset.theme === 'light' ? 'nav.themeToDark' : 'nav.themeToLight'));
     });
   document.querySelectorAll('[data-theme-toggle]').forEach((btn) =>
     btn.addEventListener('click', () => {
@@ -459,7 +463,7 @@ export function wireVariants(root = document) {
       show(pre);
       const primary = pre.dataset.for.split(/\s+/)[0];
       const f = fwById(fw);
-      note.title = fw === primary || !f.pkg ? '' : `Same code in ${f.label}, imported from ${f.pkg}`;
+      note.title = fw === primary || !f.pkg ? '' : ui('framework.sameCode', { framework: f.label, pkg: f.pkg });
       note.innerHTML = fw === primary || !f.pkg ? '' : `${f.label}: <code>${f.pkg}</code>`;
     };
 
@@ -490,7 +494,7 @@ export function wireFramework(root = document) {
   });
   const pickers = [...root.querySelectorAll('[data-framework-picker]')].map((host) =>
     createDropdown(host, {
-      label: 'Framework',
+      label: ui('framework.picker'),
       size: host.dataset.frameworkPicker || 'md',
       options: FRAMEWORKS.map((f) => ({
         value: f.id,
@@ -523,7 +527,7 @@ export function wireFrameworkPage(root = document) {
   const equivalents = JSON.parse(notice.querySelector('[data-fw-equivalents]').textContent);
   const text = notice.querySelector('[data-fw-notice-text]');
   const back = notice.querySelector('[data-fw-back]');
-  back.textContent = `Back to ${pageLabel}`;
+  back.textContent = ui('framework.backTo', { page: pageLabel });
   back.addEventListener('click', () => setFramework(pageFramework));
   document.addEventListener('nr:framework', ({ detail: fw }) => {
     if (fw !== pageFramework && equivalents[fw]) {
@@ -531,14 +535,27 @@ export function wireFrameworkPage(root = document) {
       return;
     }
     notice.hidden = fw === pageFramework;
-    text.textContent = `This page is for ${pageLabel}. It isn’t written for ${fwById(fw).label} yet.`;
+    text.textContent = ui('framework.pageFor', { page: pageLabel, framework: fwById(fw).label });
   });
 }
 
 export function init() {
+  animateFavicon();
+  wireMarkPulse();
   mountSearch();
   wireFramework();
   wireFrameworkPage();
+  wireVersionMenus();
+  // the language select in the menu drawer goes to the page in the language picked
+  document.querySelectorAll('[data-language-select]').forEach((select) =>
+    select.addEventListener('change', () => {
+      try {
+        sessionStorage.setItem('nr:language-picked', select.selectedOptions[0].dataset.code);
+      }
+      catch {}
+      location.assign(select.value);
+    })
+  );
   wireVariants();
   highlightAll();
   highlightInline();

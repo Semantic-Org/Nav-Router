@@ -1,0 +1,13 @@
+{
+  "language.label": "언어",
+  "language.untranslated": "이 페이지는 아직 한국어로 번역되지 않아 영어로 표시됩니다.",
+  "language.stale": "번역 이후 영어 페이지가 변경되어 내용이 최신이 아닐 수 있습니다.",
+  "language.draft": "이 페이지는 기계 번역되었으며 아직 검토되지 않았습니다.",
+  "language.readEnglish": "영어로 읽기",
+  "language.offer": "이 페이지는 한국어로 볼 수 있습니다.",
+  "language.go": "한국어로 읽기",
+  "language.dismiss": "닫기",
+  "language.remember": "앞으로도 이 문서를 한국어로 여시겠습니까?",
+  "language.remember.yes": "항상",
+  "language.remember.no": "나중에"
+}

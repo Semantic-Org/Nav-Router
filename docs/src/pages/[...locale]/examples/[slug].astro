@@ -1,0 +1,16 @@
+---
+// every example, in every language: english at the root and each other language under its path
+import { getCollection } from 'astro:content';
+
+import { DEFAULT_LOCALE, ENABLED } from '../../../lib/i18n.js';
+import Example from '../../../views/Example.astro';
+
+export async function getStaticPaths() {
+  const entries = await getCollection('examples');
+  return ENABLED.flatMap((l) => entries.map((entry) => ({
+    params: { locale: l.code === DEFAULT_LOCALE ? undefined : l.path, slug: entry.id },
+    props: { entry },
+  })));
+}
+---
+<Example entry={Astro.props.entry} />

@@ -1,32 +1,71 @@
 ---
 // a live example: editor tabs beside a preview in a browser bar, built and served in the browser by
 // the playground engine. pass the example's files ({ name: content }) and the tabs to show
-const { files, tabs, label = 'Live example' } = Astro.props;
+import '../styles/playground.css';
+import { t } from '../lib/i18n.js';
+
+const locale = Astro.currentLocale;
+const { files, tabs, label = t(locale, 'playground.label'), lineNumbers = true } = Astro.props;
+// until the editor loads, its pane shows the first file as text, so nothing moves when it arrives
+const preview = (files[tabs[0]] ?? '').replace(/\/\* playground-hide \*\/[\s\S]*?\/\* playground-hide-end \*\/\n?/g, '');
 // the files ride a json script, so their braces and tags never meet astro's template
 const data = JSON.stringify({ files, tabs }).replace(/</g, '\\u003c');
 const editorId = `pg-editor-${Math.random().toString(36).slice(2, 8)}`;
 ---
-<div class="pg" data-playground aria-label={label}>
+<div class:list={['pg', { 'no-line-numbers': !lineNumbers }]} data-playground data-line-numbers={lineNumbers ? undefined : 'off'} aria-label={label}>
   <div class="pg-editor-pane" id={editorId}>
-    <div class="code-head pg-tabs" role="tablist" aria-label="Files" data-own-tabs data-pg-tabs></div>
-    <div class="pg-editor" data-pg-editor></div>
+    <div class="code-head pg-tabs" role="tablist" aria-label={t(locale, 'playground.files')} data-own-tabs data-pg-tabs>
+      {tabs.map((name, i) => <button class="code-tab" role="tab" type="button" aria-selected={i === 0 ? 'true' : 'false'} tabindex="-1">{name}</button>)}
+    </div>
+    <div class="pg-editor" data-pg-editor><pre class="pg-static" data-pg-static>{preview}</pre></div>
   </div>
-  <div class="pg-split" role="separator" tabindex="0" aria-label="Resize editor and preview" aria-controls={editorId} title="Drag to resize · double-click to reset" data-pg-split></div>
+  <div class="pg-split" role="separator" tabindex="0" aria-label={t(locale, 'playground.resize')} aria-controls={editorId} title={t(locale, 'playground.resize.hint')} data-pg-split></div>
   <div class="pg-preview-pane">
     <div class="pg-bar">
-      <button class="pg-nav" type="button" data-pg-back aria-label="Back" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
-      <button class="pg-nav" type="button" data-pg-forward aria-label="Forward" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
-      <button class="pg-nav" type="button" data-pg-reload aria-label="Reload"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></svg></button>
+      <button class="pg-nav" type="button" data-pg-back aria-label={t(locale, 'playground.back')} disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+      <button class="pg-nav" type="button" data-pg-forward aria-label={t(locale, 'playground.forward')} disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+      <button class="pg-nav" type="button" data-pg-reload aria-label={t(locale, 'playground.reload')}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></svg></button>
       <div class="pg-url"><span class="pg-host">app</span><span data-pg-path>/</span></div>
     </div>
     <div class="pg-frame" data-pg-frame></div>
-    <p class="pg-status" aria-live="polite" data-pg-status>Starting…</p>
+    <p class="pg-status" aria-live="polite" data-pg-status>{t(locale, 'playground.starting')}</p>
   </div>
   <script is:inline type="application/json" data-pg-files set:html={data}></script>
 </div>
 
 <script>
-  import { mountPlayground } from '../scripts/playground.js';
-  import { mountSplit } from '../scripts/pg-split.js';
-  document.querySelectorAll('[data-playground]').forEach((root) => { mountSplit(root); mountPlayground(root); });
+  import { ui } from '../scripts/strings.js';
+
+  // the editor, its workers and the preview are the heaviest thing on any page, so they load only as
+  // the playground comes near the screen (or is reached for). with data saver on, they wait to be asked
+  const start = async (root) => {
+    if (root.dataset.started !== undefined) { return; }
+    root.dataset.started = '';
+    root.querySelector('[data-pg-status]').textContent = ui('playground.starting');
+    const [{ mountPlayground }, { mountSplit }] = await Promise.all([
+      import('../scripts/playground.js'),
+      import('../scripts/pg-split.js'),
+    ]);
+    mountSplit(root);
+    mountPlayground(root);
+  };
+
+  document.querySelectorAll('[data-playground]').forEach((root) => {
+    const status = root.querySelector('[data-pg-status]');
+    if (navigator.connection?.saveData) {
+      status.innerHTML = ui('playground.paused');
+      status.querySelector('.pg-run').addEventListener('click', () => start(root));
+      return;
+    }
+    status.textContent = ui('playground.lazy');
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) {
+        io.disconnect();
+        start(root);
+      }
+    }, { rootMargin: '600px 0px' });
+    io.observe(root);
+    root.addEventListener('pointerenter', () => start(root), { once: true });
+    root.addEventListener('focusin', () => start(root), { once: true });
+  });
 </script>

@@ -27,6 +27,10 @@ export function rehypeDocs() {
       }
 
       if (node.tagName === 'table' && parent && !(parent.properties?.className ?? []).includes('table-wrap')) {
+        // a table of rows stacks on narrow screens; a truth table is a grid read across, so it stays
+        if (!(parent.properties?.className ?? []).includes('truth')) {
+          node.properties = { ...node.properties, className: [...(node.properties?.className ?? []), 'stacks'] };
+        }
         parent.children[index] = {
           type: 'element',
           tagName: 'div',
@@ -58,6 +62,13 @@ export function rehypeDocs() {
         const ths = [];
         walk(node, (n) => {
           if (n.type === 'element' && n.tagName === 'th') { ths.push(textOf(n).trim()); }
+        });
+        // each cell carries its column's name, the label a stacked row shows beside it
+        walk(node, (row) => {
+          if (row.type !== 'element' || row.tagName !== 'tr') { return; }
+          row.children.filter((c) => c.type === 'element' && c.tagName === 'td').forEach((td, i) => {
+            td.properties.dataLabel = ths[i];
+          });
         });
         const col = ths.indexOf('Type');
         if (col >= 0) {

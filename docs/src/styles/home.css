@@ -13,9 +13,11 @@
   color: var(--text-2); text-decoration: none; font-size: var(--fs-sm); line-height: var(--lh-sm); font-weight: 500;
 }
 .topnav a:hover { color: var(--text); background: var(--surface-2); }
-.topbar-tools { margin-left: auto; display: flex; align-items: center; gap: 6px; }
-.topbar-tools .search-trigger { margin-right: 8px; }
+.topbar-tools { margin-inline-start: auto; display: flex; align-items: center; gap: 6px; }
+.topbar-tools .search-trigger { margin-inline-end: 8px; }
 .version { color: var(--text-3); font: 400 var(--fs-2xs)/1 var(--font-mono); padding: 0 6px; }
+/* named through the topbar so it outranks the shared button style whichever stylesheet loads last */
+.topbar .menu-toggle, .home-menu { display: none; }
 
 /* ---------- hero ---------- */
 
@@ -56,7 +58,7 @@
 
 .install-cmd {
   display: flex; align-items: center; gap: 12px;
-  height: 50px; padding: 0 8px 0 16px;
+  height: 50px; padding-block: 0; padding-inline: 16px 8px;
   border: 1px solid var(--line-2); border-radius: var(--r-3);
   background: var(--code-bg);
   font-size: var(--fs-sm); color: var(--text);
@@ -64,7 +66,7 @@
 .install-cmd .prompt { color: var(--text-4); font-family: var(--font-mono); }
 .install-cmd .swap { flex: 1; }
 .install-cmd code { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.install-cmd .copy { margin-left: auto; }
+.install-cmd .copy { margin-inline-start: auto; }
 
 .hero-actions { margin-top: 14px; display: flex; gap: 10px; }
 
@@ -79,7 +81,7 @@
   box-shadow: 0 0 0 1px oklch(0 0 0 / 0.6), 0 40px 120px -40px oklch(0.74 0.15 249.95 / 0.18);
 }
 
-.browser { border-right: 1px solid var(--line-2); display: flex; flex-direction: column; min-width: 0; background: var(--surface-2); }
+.browser { border-inline-end: 1px solid var(--line-2); display: flex; flex-direction: column; min-width: 0; background: var(--surface-2); }
 .browser-bar {
   position: relative;
   display: flex; align-items: center; gap: 8px;
@@ -107,7 +109,7 @@
 @keyframes url-flash { from { color: var(--accent-strong); } to { color: var(--text); } }
 
 .pending-bar {
-  position: absolute; left: 0; bottom: -1px; height: 2px; width: 0;
+  position: absolute; inset-inline-start: 0; bottom: -1px; height: 2px; width: 0;
   background: var(--accent); opacity: 0;
 }
 .pending-bar.on { opacity: 1; }
@@ -137,13 +139,13 @@
   background: var(--surface-1); font-size: var(--fs-xs); line-height: var(--lh-xs); color: var(--text-2);
 }
 .app-page .row i { width: 18px; height: 18px; border-radius: 50%; background: var(--surface-3); flex: none; }
-.app-page .row em { margin-left: auto; font-style: normal; color: var(--text-3); font-family: var(--font-mono); font-size: var(--fs-2xs); }
+.app-page .row em { margin-inline-start: auto; font-style: normal; color: var(--text-3); font-family: var(--font-mono); font-size: var(--fs-2xs); }
 .app-page .stat { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 14px; }
 .app-page .stat div { padding: 10px; border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface-1); }
 .app-page .stat b { display: block; color: var(--text); font-weight: 600; font-size: var(--fs-md); line-height: var(--lh-md); }
 .app-page .stat span { font-size: var(--fs-2xs); line-height: var(--lh-2xs); color: var(--text-3); }
 
-.app-page .skeleton { display: grid; gap: 8px; margin-top: 14px; }
+.app-page .skeleton { display: grid; gap: 8px; margin-top: 4px; }
 .app-page .skeleton span {
   height: 34px; border-radius: var(--r-2);
   background: linear-gradient(90deg, var(--surface-1) 0%, var(--surface-3) 50%, var(--surface-1) 100%);
@@ -151,11 +153,6 @@
 }
 .app-page .skeleton span:first-child { width: 40%; height: 16px; }
 @keyframes shimmer { to { background-position: -200% 0; } }
-.app-page .status-tag {
-  display: inline-flex; align-items: center; gap: 6px;
-  font: 400 var(--fs-2xs)/1 var(--font-mono); color: var(--c-amber);
-}
-.app-page .status-tag::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .app-page .field { margin-top: 12px; display: grid; gap: 6px; }
 .app-page .field label { font-size: var(--fs-2xs); line-height: var(--lh-2xs); color: var(--text-3); }
 .app-page .field span { height: 32px; border: 1px solid var(--line-2); border-radius: var(--r-2); background: var(--bg); }
@@ -170,7 +167,7 @@
   font: 400 var(--fs-xs)/1 var(--font-mono);
 }
 .trace-title { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.trace-speed { margin-left: auto; color: var(--text-4); white-space: nowrap; }
+.trace-speed { margin-inline-start: auto; color: var(--text-4); white-space: nowrap; }
 
 .trace-plot {
   --label-w: 128px;
@@ -196,13 +193,15 @@
 }
 .bar.is-error { --lane: var(--c-coral); }
 .bar-label {
-  position: absolute; top: 9px; margin-left: 6px; line-height: var(--lh-3xs);
+  /* a patch of the trace's own surface, so a threshold guide passes behind the figure, not through it */
+  position: absolute; z-index: 1; top: 9px; margin-inline-start: 2px; padding: 0 4px; background: var(--surface-1); line-height: var(--lh-3xs);
   color: var(--text-3); white-space: nowrap; font-size: var(--fs-3xs); opacity: 0;
   transition: opacity 0.2s;
 }
 .bar-label.on { opacity: 1; }
+.bar-label:empty { display: none; }
 .tick-mark {
-  position: absolute; top: 6px; bottom: 6px; width: 2px; margin-left: -1px;
+  position: absolute; top: 6px; bottom: 6px; width: 2px; margin-inline-start: -1px;
   background: var(--lane); border-radius: 2px; opacity: 0;
   box-shadow: 0 0 12px var(--lane);
 }
@@ -212,16 +211,16 @@
 .guides { position: absolute; inset: 26px 20px 30px calc(20px + var(--label-w)); pointer-events: none; }
 .guide {
   position: absolute; top: 0; bottom: 0; width: 0;
-  border-left: 1px dashed var(--line-3);
+  border-inline-start: 1px dashed var(--line-3);
   transition: left 0.3s var(--ease), opacity 0.3s;
 }
 .guide span {
-  position: absolute; top: -14px; left: -6px;
+  position: absolute; top: -14px; inset-inline-start: -6px;
   white-space: nowrap; color: var(--text-3); font-size: var(--fs-3xs); line-height: var(--lh-3xs);
   padding: 2px 6px; border-radius: var(--r-1); background: var(--surface-1);
 }
-.guide[data-guide='min'] span { left: auto; right: -6px; }  /* last guide sits near the edge: label reads leftward */
-.guide.is-hit { border-left-color: var(--accent-line); }
+.guide[data-guide='min'] span { inset-inline-start: auto; inset-inline-end: -6px; }  /* last guide sits near the edge: label reads leftward */
+.guide.is-hit { border-inline-start-color: var(--accent-line); }
 .guide.is-hit span { color: var(--accent-strong); }
 .guide.is-off { opacity: 0; }
 
@@ -229,11 +228,11 @@
 .playhead.on { opacity: 0.6; }
 
 .ruler {
-  margin: 10px 0 0 var(--label-w);
+  margin-block: 10px 0; margin-inline: var(--label-w) 0;
   position: relative; height: 20px;
   color: var(--text-4); font-size: var(--fs-3xs); line-height: var(--lh-3xs);
 }
-.ruler span { position: absolute; line-height: var(--lh-3xs); padding-left: 4px; border-left: 1px solid var(--line-2); }
+.ruler span { position: absolute; line-height: var(--lh-3xs); padding-inline-start: 4px; border-inline-start: 1px solid var(--line-2); }
 
 .trace-caption {
   margin: 14px 20px 0; padding: 14px 0 18px;
@@ -259,7 +258,10 @@
 
 .facts { list-style: none; margin: 28px 0 0; padding: 0; border-top: 1px solid var(--line); }
 .facts li { padding: 14px 0; border-bottom: 1px solid var(--line); font-size: var(--fs-sm); line-height: var(--lh-sm); color: var(--text-2); }
-.facts strong { color: var(--text); font-weight: 600; }
+/* each fact leads with its name on a line of its own, then the sentence */
+.facts strong { display: block; margin-bottom: 2px; color: var(--text); font-weight: 600; }
+/* a fact's own line of code, shown where the code block is out of reach below (scripts/xray.js) */
+.facts .fact-line { display: none; }
 
 .text-link {
   display: inline-flex; margin-top: 24px;
@@ -274,7 +276,7 @@
   background: var(--surface-1);
 }
 .triad article { padding: 28px; display: flex; flex-direction: column; min-width: 0; }
-.triad article + article { border-left: 1px solid var(--line-2); }
+.triad article + article { border-inline-start: 1px solid var(--line-2); }
 .triad h3 { font-size: var(--fs-lg); line-height: var(--lh-lg); font-weight: 600; }
 .triad p { margin-top: 8px; font-size: var(--fs-sm); line-height: var(--lh-sm); color: var(--text-2); }
 .triad pre.mini {
@@ -298,18 +300,19 @@
 a.pt-row:hover { background: var(--surface-2); }
 a.pt-row:hover code { color: var(--accent-strong); }
 .pt-row code { color: var(--text); font-size: var(--fs-xs); }
-.pt-row .num { text-align: right; font: 400 var(--fs-2xs)/1 var(--font-mono); color: var(--text-3); }
+.pt-row .num { text-align: end; font: 400 var(--fs-2xs)/1 var(--font-mono); color: var(--text-3); }
 .pt-head { padding-block: 11px; background: var(--surface-2); color: var(--text-3); font-size: var(--fs-xs); line-height: var(--lh-xs); }
 
-.adapters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 12px; }
+/* each row takes its tallest card's height, so the code stub's row doesn't stretch the first */
+.adapters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .adapter {
   display: flex; flex-direction: column; align-items: flex-start;
   padding: 20px; min-height: 176px;
-  border: 1px solid var(--line-2); border-radius: var(--r-3);
+  border: 1px solid var(--line-2); border-radius: var(--r-3); background: var(--sheen);
   text-decoration: none; color: var(--text-2); font-size: var(--fs-sm); line-height: var(--lh-sm);
   transition: border-color 0.15s, background 0.15s;
 }
-.adapter:hover { border-color: var(--line-3); background: var(--surface-1); }
+.adapter:hover { border-color: var(--line-3); background: var(--sheen-hover); }
 .adapter-logo { width: 24px; height: 24px; color: var(--text-3); transition: color 0.15s; }
 /* the logo takes its brand color on hover; a brand too dark for black gets a lighter tint of its
    own, and light mode uses the official color */
@@ -361,16 +364,37 @@ a.pt-row:hover code { color: var(--accent-strong); }
 }
 @media (max-width: 1080px) {
   .instrument { grid-template-columns: 1fr; }
-  .browser { border-right: 0; border-bottom: 1px solid var(--line-2); }
+  .browser { border-inline-end: 0; border-bottom: 1px solid var(--line-2); }
   .adapters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 900px) {
-  .topnav, .version { display: none; }
+  .topnav, .version, .version-menu { display: none; }
+  /* the topnav folds into a menu under the topbar */
+  .topbar-inner { gap: 16px; }
+  .topbar .menu-toggle { display: inline-grid; }
+  .home-menu:not([hidden]) {
+    display: grid; position: absolute; inset-inline-start: 0; inset-inline-end: 0; top: 100%;
+    padding: 8px 16px 16px; background: var(--bg); border-bottom: 1px solid var(--line-2);
+    box-shadow: 0 12px 24px oklch(0 0 0 / 0.35);
+  }
+  .home-menu a {
+    display: flex; align-items: center; height: 44px; padding: 0 10px; border-radius: var(--r-2);
+    color: var(--text-2); text-decoration: none; font-size: var(--fs-md); line-height: var(--lh-md); font-weight: 500;
+  }
+  .home-menu a:hover { color: var(--text); background: var(--surface-2); }
   .topbar .search-trigger { min-width: 0; }
   .ribbon-split, .ribbon-split.reverse { grid-template-columns: 1fr; }
+  .facts .fact-line {
+    display: block; margin-top: 10px; padding: 8px 12px;
+    border: 0; border-inline-start: 2px solid var(--accent); border-radius: 0 var(--r-2) var(--r-2) 0;
+    background: var(--accent-wash); box-shadow: none; color: var(--text);
+    font: 400 var(--code-sm-fs)/20px var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere;
+    /* the font shorthand turns ligatures back on, and => must stay two characters */
+    font-variant-ligatures: none; font-feature-settings: 'liga' 0, 'calt' 0;
+  }
   .ribbon-copy { position: static; }
   .triad { grid-template-columns: 1fr; }
-  .triad article + article { border-left: 0; border-top: 1px solid var(--line-2); }
+  .triad article + article { border-inline-start: 0; border-top: 1px solid var(--line-2); }
 }
 @media (max-width: 600px) {
   .topbar-inner { gap: 12px; }
@@ -378,16 +402,60 @@ a.pt-row:hover code { color: var(--accent-strong); }
   .topbar .search-trigger .keys { display: none; }
   .topbar .search-trigger .label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .install, .install-cmd { width: 100%; min-width: 0; }
-  .install-cmd { font-size: var(--fs-xs); }
+  .install-cmd { font-size: var(--fs-xs); height: 44px; }
+  /* above the fold on a phone: headline, lede, install and actions finish inside the usable height
+     (the screen less the browser's bars), and the trace starts in view below them */
+  /* no one installs from a phone: the picker and the install lines step aside for the actions */
+  .hero .install, .closer .install-cmd { display: none; }
+  /* the pitch centers on a phone, as a single column reads best there */
+  .hero-copy { text-align: center; }
+  .hero-copy h1, .hero .lede { margin-inline: auto; text-wrap: balance; }
+  .hero-side { align-items: center; }
+  .hero-actions { justify-content: center; }
+  .hero-copy h1 { margin-bottom: 16px; }
+  .hero .lede { font-size: var(--fs-md); line-height: var(--lh-md); }
+  .hero-side { margin-top: 20px; }
+  .fw-picker { margin-bottom: 10px; }
+  .hero-actions { margin-top: 12px; }
+  /* on a phone the app keeps a strip of its page above the trace: the page going stale, the loading
+     view taking over and the new page landing are what the trace is the explanation of, so they
+     stay in view with it. the strip fades out where the page would run on */
+  .instrument { margin-top: 24px; }
+  .instrument .app-page {
+    flex: none; min-height: 0; height: 116px; padding: 12px 14px 0; overflow: hidden;
+    border-bottom: 1px solid var(--line);
+    mask-image: linear-gradient(to bottom, #000 62%, transparent);
+  }
+  .instrument .app-page .rows, .instrument .app-page .skeleton { margin-top: 10px; }
   .trace-plot { --label-w: 100px; padding-inline: 14px; font-size: var(--fs-3xs); }
   .trace-plot { padding-top: 56px; }
   .guides { top: 42px; }
   .guide span { font-size: var(--fs-3xs); padding: 2px 3px; }
   .guide[data-guide='delay'] span { top: -28px; }
+  /* narrower still, holdCommit and loadingMin would meet on their row: holdCommit reads leftward */
+  @media (max-width: 380px) { .guide[data-guide='hold'] span { inset-inline: auto -6px; } }
   .ruler span:nth-child(even) { display: none; }
   .guides { inset: 26px 14px 30px calc(14px + var(--label-w)); }
   .trace-speed { display: none; }
-  .adapters { grid-template-columns: 1fr; }
+  /* "one import per plugin" has to show whole imports: the sample steps down a size so neither line
+     is cut on a phone */
+  #plugins .ribbon-copy .code pre { padding-inline: 14px; font-size: var(--fs-3xs); line-height: var(--code-sm-lh); }
+  /* the point of the integrations is how many there are, so a phone shows them all at once: two
+     across, each a logo in its own color, its name and its package. what each one does is a tap away */
+  .adapters { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .adapter { display: grid; grid-template-columns: 24px minmax(0, 1fr); align-items: center; gap: 6px 10px; padding: 14px; min-height: 0; }
+  .adapter-logo { color: var(--brand); }
+  :root[data-theme='light'] .adapter-logo { color: var(--brand-light, var(--brand)); }
+  .adapter-name { margin-top: 0; font-size: var(--fs-sm); line-height: var(--lh-sm); }
+  .adapter-pkg { grid-column: 1 / -1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .adapter > p { display: none; }
+  /* an odd one out before the open slot takes the row, so the grid has no hole */
+  .adapter:nth-last-child(2):nth-child(odd) { grid-column: 1 / -1; }
+  /* the open slot keeps its sentence and its three seams, across both columns */
+  .adapter.is-planned { grid-column: 1 / -1; }
+  .adapter.is-planned .adapter-logo { color: var(--accent); }
+  .adapter.is-planned > p { display: block; grid-column: 1 / -1; margin-top: 4px; }
+  .adapter.is-planned .adapter-stub { grid-column: 1 / -1; margin-top: 2px; }
   .pt-row { grid-template-columns: 1fr auto; }
   .pt-row > span:not(.num) { grid-column: 1 / -1; grid-row: 2; }
   .pt-head > span:nth-child(2) { display: none; }
@@ -396,4 +464,522 @@ a.pt-row:hover code { color: var(--accent-strong); }
 
 :root[data-theme='light'] .instrument {
   box-shadow: 0 1px 2px oklch(0.3 0.03 265 / 0.06), 0 30px 80px -40px oklch(0.52 0.17 254 / 0.25);
+}
+
+/* ---------- try it: a live app ---------- */
+.ribbon-try .pg { height: 520px; }
+@media (min-width: 1280px) { .ribbon-try .pg { height: 600px; } }
+.ribbon-try .text-link { display: inline-block; margin-top: 20px; }
+@media (max-width: 900px) { .ribbon-try .pg { height: auto; } }
+
+/* ---------- projection: routes fill the page's slots ----------
+   the routes on the left, a small app on the right, and a wire from each live piece to the region
+   it fills. regions keep fixed sizes, so a swap never moves the page or the wires around it */
+.pj {
+  margin: 0; border: 1px solid var(--line-2); border-radius: var(--r-4); background: var(--surface-1); overflow: hidden;
+  box-shadow: 0 0 0 1px oklch(0 0 0 / 0.6), 0 40px 120px -48px oklch(0.74 0.15 249.95 / 0.16);
+}
+:root[data-theme='light'] .pj { box-shadow: 0 1px 2px oklch(0.3 0.03 265 / 0.06), 0 30px 80px -40px oklch(0.52 0.17 254 / 0.22); }
+
+.pj-stage {
+  position: relative; display: grid; grid-template-columns: 216px minmax(0, 1fr); column-gap: 112px; align-items: center;
+  padding: 48px 40px;
+}
+/* the column heads: what's on the left, what they fill, what they build. a caption of the diagram,
+   quiet beside it, in the first row of the stage's grid */
+.pj-head {
+  position: relative; z-index: 1; margin: 0 0 20px; padding-bottom: 10px; align-self: end;
+  border-bottom: 1px solid var(--line-2);
+  color: var(--text); font: 600 var(--fs-sm)/var(--lh-sm) var(--font-sans);
+}
+.pj-head-tree { grid-column: 1; grid-row: 1; display: flex; justify-content: space-between; padding-inline-end: 4px; }
+.pj-head-page { grid-column: 2; grid-row: 1; }
+.pj-tree { grid-column: 1; grid-row: 2; }
+.pj-window { grid-column: 2; grid-row: 2; }
+/* a faint pegboard behind the wiring, the hero's ruler in another key */
+.pj-stage::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background-image: radial-gradient(circle, var(--line-2) 1px, transparent 1px);
+  background-size: 16px 16px; background-position: 8px 8px;
+  mask-image: linear-gradient(to right, #000 0, #000 30%, transparent 70%);
+  opacity: 0.6;
+}
+
+/* the routes: indented by depth, each with a port per piece it declares */
+/* the routes start level with the page's top edge, under their heading */
+.pj-tree { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; position: relative; z-index: 1; align-self: start; }
+.pj-node { position: relative; display: flex; align-items: flex-start; gap: 12px; padding-inline-start: calc(var(--depth) * 18px); }
+/* the tree's guides: lines at 18px per level, each row drawing its own segments and reaching up into
+   the 10px gap above so they join across rows of any height. the name sits on the row's first 24px
+   line, so branches meet it at 12px */
+.pj-guide { position: absolute; inset-inline-start: calc(var(--level) * 18px - 12px); width: 7px; border-inline-start: 1px solid var(--line-3); pointer-events: none; }
+.pj-guide.is-pass, .pj-guide.is-tee { top: -10px; bottom: 0; }
+.pj-guide.is-tee::after { content: ''; position: absolute; inset-inline-start: 0; top: 22px; width: 7px; border-top: 1px solid var(--line-3); }
+.pj-guide.is-end { top: -10px; height: 22px; border-bottom: 1px solid var(--line-3); border-end-start-radius: 4px; }
+.pj-guide.is-stem { top: 18px; bottom: 0; }
+.pj-name {
+  padding: 0; border: 0; background: none; cursor: pointer; text-align: start;
+  font: 400 var(--fs-xs)/24px var(--font-mono); color: var(--text-4); white-space: nowrap;
+  transition: color 0.3s var(--ease);
+}
+/* a route is a button: pick it to jump to the page it shows */
+.pj-name:hover { color: var(--text); text-decoration: underline; text-decoration-color: var(--line-3); text-underline-offset: 4px; }
+.pj-name:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-1); }
+.pj-node.is-on .pj-name { color: var(--text); }
+.pj-ports { margin-inline-start: auto; display: grid; gap: 4px; justify-items: end; }
+.pj-port {
+  position: relative; display: inline-flex; align-items: center; height: 24px; padding-block: 0; padding-inline: 9px 12px;
+  border: 1px solid var(--line-2); border-radius: 999px; background: var(--surface-1);
+  font: 400 var(--fs-3xs)/1 var(--font-mono); color: var(--text-4); white-space: nowrap;
+  transition: color 0.3s var(--ease), border-color 0.3s var(--ease), background-color 0.3s var(--ease);
+}
+/* the jack a wire leaves from */
+.pj-port::after {
+  content: ''; position: absolute; inset-inline-end: -4px; top: 7px; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--surface-1); border: 1px solid var(--line-3); transition: background-color 0.3s var(--ease), border-color 0.3s var(--ease);
+}
+.pj-port.is-live { color: var(--text); border-color: color-mix(in oklab, var(--slot) 65%, transparent); background: color-mix(in oklab, var(--slot) 16%, var(--surface-1)); }
+.pj-port.is-live::after { background: var(--slot); border-color: var(--slot); }
+/* a piece on the page's chain whose slot a deeper route took over for now */
+.pj-port.is-taken { border-style: dashed; color: var(--text-3); text-decoration: line-through; }
+
+.pj-wires { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; overflow: visible; }
+.pj-line-w { fill: none; stroke: var(--slot); stroke-width: 2; stroke-linecap: round; opacity: 0.42; transition: opacity 0.8s var(--ease); }
+.pj-wire.is-fresh .pj-line-w { opacity: 0.95; }
+.pj-packet { fill: none; stroke: color-mix(in oklab, var(--slot) 70%, white); stroke-width: 4; stroke-linecap: round; opacity: 0; filter: drop-shadow(0 0 4px var(--slot)); }
+.pj-wire.is-fresh .pj-packet { opacity: 1; }
+.pj-socket { fill: var(--slot); stroke: var(--bg); stroke-width: 2; }
+
+/* the app: a browser window around a layout with four slots */
+.pj-window {
+  /* no stacking layer of its own, so the slot tags inside it can float above the wires */
+  position: relative; min-width: 0;
+  border: 1px solid var(--line-2); border-radius: var(--r-3); background: var(--bg); overflow: hidden;
+}
+.pj-chrome { display: flex; align-items: center; gap: 12px; height: 34px; padding: 0 12px; border-bottom: 1px solid var(--line); background: var(--surface-1); }
+.pj-dots { display: flex; gap: 6px; }
+.pj-dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--surface-3); }
+.pj-url {
+  flex: 1; max-width: 320px; height: 22px; display: flex; align-items: center; padding: 0 10px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--bg);
+  font: 400 var(--fs-3xs)/1 var(--font-mono); color: var(--text); white-space: nowrap; overflow: hidden;
+}
+.pj-host { color: var(--text-4); }
+
+.pj-app {
+  /* the app layout's frame, the whole body: its tag rides the top-right corner, above the header */
+  position: relative; display: grid; gap: 16px 12px; padding: 24px 14px 20px;
+  grid-template-columns: 148px minmax(0, 1fr) 164px;
+  grid-template-rows: 40px 30px 280px;
+  grid-template-areas: 'header header header' 'crumbs crumbs crumbs' 'sidebar main aside';
+  font-size: var(--fs-2xs); line-height: var(--lh-2xs); color: var(--text-2);
+}
+.pj-r-header { grid-area: header; }
+.pj-r-crumbs { grid-area: crumbs; }
+.pj-r-sidebar { grid-area: sidebar; }
+.pj-r-main { grid-area: main; }
+.pj-r-aside { grid-area: aside; }
+
+.pj-r {
+  position: relative; min-width: 0;
+  border: 1px solid var(--line-2); border-radius: var(--r-2); background: var(--surface-1);
+  transition: border-color 0.3s var(--ease), background-color 0.3s var(--ease);
+}
+.pj-fill { position: relative; height: 100%; padding: 10px 12px; overflow: hidden; border-radius: inherit; }
+/* the sidebar is too narrow to share its first row with its tag, so its content starts below it */
+.pj-r-sidebar > .pj-fill { padding-top: 24px; }
+/* each slot's color, carried by its port, its wire, its tag and its region's edge. picked as a chart's
+   categories are: four hues apart for every pair, color-blind included (validated all-pairs, both
+   modes), the default slots in the accent's blue, the layout neutral. text stays in its own ink */
+.pj-ribbon { --slot-main: #4697e4; --slot-crumbs: #875a00; --slot-sidebar: #47aa62; --slot-aside: #854494; --slot-layout: var(--text-3); }
+:root[data-theme='light'] .pj-ribbon { --slot-main: #3284d0; --slot-crumbs: #b68700; --slot-sidebar: #006925; --slot-aside: #763584; }
+.pj-ribbon [data-slot] { --slot: var(--slot-main); }
+.pj-ribbon [data-slot='crumbs'] { --slot: var(--slot-crumbs); }
+.pj-ribbon [data-slot='sidebar'] { --slot: var(--slot-sidebar); }
+.pj-ribbon [data-slot='aside'] { --slot: var(--slot-aside); }
+.pj-ribbon [data-slot='layout'] { --slot: var(--slot-layout); }
+
+/* each region names its slot in a tag tucked inside its top-right corner, an annotation lifted off
+   the page by its shadow rather than part of the app; inside, so it never crosses a connector. the names match the ports on the left, so a piece can be
+   followed from its route to its place. the app layout's tag names the whole body, below the browser's bar */
+.pj-tag {
+  position: absolute; z-index: 3; top: 2px; inset-inline-end: 2px;
+  height: 18px; padding: 0 7px; border: 1px solid color-mix(in oklab, var(--slot) 65%, transparent); border-radius: 999px;
+  background: color-mix(in oklab, var(--slot) 18%, var(--surface-2)); color: var(--text);
+  font: 400 11px/16px var(--font-mono); white-space: nowrap; pointer-events: none;
+  box-shadow: 0 6px 14px -4px oklch(0 0 0 / 0.7), 0 1px 0 oklch(1 0 0 / 0.08) inset;
+  transition: color 0.3s var(--ease), border-color 0.3s var(--ease), background-color 0.3s var(--ease);
+}
+:root[data-theme='light'] .pj-tag { box-shadow: 0 6px 14px -6px oklch(0.3 0.03 265 / 0.35); }
+/* the crumbs bar is one line tall: its tag centers on it, so it doesn't read as a near miss */
+.pj-r-crumbs > .pj-tag { top: 5px; }
+.pj-r.is-fallback > .pj-tag { border-style: dashed; border-color: var(--line-3); background: var(--surface-2); color: var(--text-3); box-shadow: 0 4px 10px -4px oklch(0 0 0 / 0.5); }
+.pj-fill p { margin: 0; }
+/* a slot no route fills shows its own children: drawn as the layout's dashed default */
+.pj-r[data-slot]:not(.is-fallback) { border-color: color-mix(in oklab, var(--slot) 45%, var(--line-2)); }
+.pj-r.is-fallback { border-style: dashed; background: transparent; }
+.pj-r.is-fallback .pj-fill { color: var(--text-4); }
+.pj-r.is-fallback::after, .pj-r[data-from]::after {
+  position: absolute; bottom: 5px; inset-inline-end: 8px; z-index: 1;
+  font: 400 10px/16px var(--font-mono); color: var(--text-4);
+}
+.pj-r.is-fallback::after { content: 'default'; }
+
+/* a swap: the old piece fades where it stood, the new one settles as the region's edge lights */
+.pj-fill.is-out { position: absolute; inset: 0; animation: pj-out 0.2s var(--ease) forwards; }
+.pj-fill.is-pending { opacity: 0; }
+.pj-fill.is-in { animation: pj-in 0.45s var(--ease); }
+.pj-r.is-swapped { animation: pj-lit 1.6s var(--ease); }
+@keyframes pj-out { to { opacity: 0; transform: translateY(-4px); } }
+@keyframes pj-in { from { opacity: 0; transform: translateY(6px); } }
+@keyframes pj-lit {
+  0%, 30% { border-color: var(--slot); box-shadow: 0 0 0 3px color-mix(in oklab, var(--slot) 20%, transparent), 0 0 24px -6px var(--slot); }
+  100% { box-shadow: 0 0 0 3px transparent; }
+}
+
+/* the layout's own markup: never replaced */
+.pj-r-header { display: flex; align-items: center; gap: 16px; padding: 0 12px; }
+.pj-logo { display: flex; align-items: center; gap: 8px; color: var(--text); font-weight: 650; font-size: var(--fs-xs); }
+.pj-logo i { width: 14px; height: 14px; border-radius: 4px; background: var(--accent); }
+.pj-topnav { display: flex; gap: 12px; color: var(--text-3); }
+.pj-search {
+  margin-inline-start: auto; width: 140px; height: 24px; display: flex; align-items: center; padding: 0 10px;
+  border: 1px solid var(--line); border-radius: 999px; color: var(--text-4); font-size: var(--fs-3xs);
+}
+.pj-avatar { width: 22px; height: 22px; border-radius: 50%; background: var(--bevel), oklch(0.62 0.09 30); flex: none; }
+
+.pj-r-crumbs .pj-fill { display: flex; align-items: center; gap: 8px; padding-block: 0; color: var(--text-3); }
+.pj-r-crumbs b { color: var(--text); font-weight: 500; }
+.pj-r-crumbs i { font-style: normal; color: var(--text-4); }
+
+.pj-r-sidebar .pj-fill { display: flex; flex-direction: column; gap: 10px; }
+.pj-team { display: flex; align-items: center; gap: 8px; color: var(--text); font-weight: 600; font-size: var(--fs-xs); }
+.pj-tile {
+  display: inline-grid; place-items: center; width: 20px; height: 20px; flex: none; border-radius: 5px;
+  background: var(--accent-wash); border: 1px solid var(--accent-line); color: var(--accent-strong); font-size: 10px; font-weight: 650;
+}
+/* typed before the loop began, and still there on every page of the team */
+.pj-field {
+  display: flex; align-items: center; height: 26px; padding: 0 8px;
+  border: 1px solid var(--accent-line); border-radius: var(--r-2); background: var(--bg); color: var(--text);
+}
+.pj-caret { width: 1px; height: 14px; margin-inline-start: 1px; background: var(--accent); animation: pj-blink 1.1s steps(1) infinite; }
+@keyframes pj-blink { 50% { opacity: 0; } }
+.pj.is-still .pj-caret { animation-play-state: paused; }
+.pj-tnav, .pj-wnav { position: relative; display: grid; grid-auto-rows: 28px; }
+.pj-tnav > span:not(.pj-hl), .pj-wnav span { position: relative; display: flex; align-items: center; padding: 0 8px; }
+.pj-tnav > span:not(.pj-hl) { color: var(--text-3); transition: color 0.3s var(--ease) 0.5s; }
+.pj-tnav > span.is-here { color: var(--text); font-weight: 500; }
+/* the current item as an app's sidebar marks it: a filled row, no bar. a bar belongs flush to the
+   sidebar's edge on square rows, never inset on a rounded one */
+.pj-hl {
+  position: absolute; inset-inline-start: 0; inset-inline-end: 0; top: 0; height: 28px; border-radius: var(--r-2);
+  background: var(--surface-3);
+  transform: translateY(calc(var(--i, 0) * 28px)); transition: transform 0.5s var(--ease) 0.5s;
+}
+.pj-wnav .is-here { border-radius: var(--r-2); background: var(--surface-2); color: var(--text-3); }
+.pj-quiet { margin-top: auto; padding: 0 8px; color: var(--text-4); }
+
+.pj-h { color: var(--text); font-weight: 600; font-size: var(--fs-sm); line-height: var(--lh-sm); }
+.pj-sub { color: var(--text-3); }
+.pj-line { display: block; height: 6px; margin-top: 10px; border-radius: 3px; background: var(--surface-3); }
+.pj-av { display: inline-block; width: 16px; height: 16px; flex: none; border-radius: 50%; background: var(--bevel), oklch(0.6 0.08 var(--h)); }
+:root[data-theme='light'] .pj-av { background: var(--bevel), oklch(0.72 0.1 var(--h)); }
+.pj-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+.pj-cards > div { padding: 10px; border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface-2); }
+.pj-cards b { display: block; color: var(--text); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pj-rows { display: grid; gap: 6px; margin-top: 12px; }
+.pj-rows > div {
+  display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px; min-width: 0;
+  border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface-2); white-space: nowrap; overflow: hidden;
+}
+.pj-rows em { flex: none; margin-inline-start: auto; font: normal 400 var(--fs-3xs)/1 var(--font-mono); color: var(--text-4); }
+/* a long row gives way before its time does */
+.pj-rows > div > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pj-rows .is-picked { border-color: var(--accent-line); background: var(--accent-wash); color: var(--text); }
+
+/* team's layout fills the main slot with its banner and a slot of its own for the pages */
+.pj-banner { display: flex; align-items: center; gap: 10px; height: 36px; margin-bottom: 20px; }
+.pj-banner b { display: block; color: var(--text); font-weight: 600; font-size: var(--fs-xs); line-height: 18px; }
+.pj-banner small { display: block; color: var(--text-3); font-size: var(--fs-3xs); line-height: 16px; }
+.pj-banner .pj-tile { width: 30px; height: 30px; border-radius: 7px; font-size: var(--fs-xs); }
+.pj-stack { margin-inline-start: auto; margin-inline-end: 48px; display: flex; }  /* clear of the region's tag */
+.pj-stack .pj-av { width: 22px; height: 22px; margin-inline-start: -6px; box-shadow: 0 0 0 2px var(--surface-1); }
+.pj-r-page { height: calc(100% - 56px); background: var(--bg); }
+
+.pj-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+.pj-stats > div { padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface-2); }
+.pj-stats b { display: block; color: var(--text); font-size: var(--fs-sm); line-height: 20px; font-weight: 600; }
+.pj-stats small { color: var(--text-3); font-size: var(--fs-3xs); line-height: 16px; }
+.pj-spark { display: block; width: 100%; height: 72px; margin-top: 16px; }
+.pj-spark path { fill: none; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+
+.pj-big .pj-av { width: 36px; height: 36px; margin-bottom: 8px; }
+
+/* above the graphic: the literal action, the tally, and the controls to step through it */
+.pj-step { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+.pj-controls { display: flex; gap: 4px; }
+.pj-action { min-width: 0; color: var(--text-3); font-size: var(--fs-sm); line-height: var(--lh-sm); }
+.pj-action b { color: var(--text); font-weight: 600; }
+.pj-tally { flex: none; margin-inline-start: auto; text-align: end; color: var(--text-3); font: 400 var(--fs-2xs)/var(--lh-2xs) var(--font-mono); }
+.pj-ctl {
+  flex: none; display: grid; place-items: center; width: 28px; height: 28px; padding: 0;
+  border: 1px solid var(--line-2); border-radius: var(--r-2); background: transparent; color: var(--text-3); cursor: pointer;
+}
+.pj-ctl:hover { color: var(--text); border-color: var(--line-3); }
+.pj-ctl svg { width: 14px; height: 14px; }
+
+/* without room for the wires, each region names the route that filled it instead */
+@media (max-width: 1000px) {
+  /* the routes stack above the page; the wires run down one lane beside it, so the page gives it room */
+  .pj-stage { --pj-lanes: 28px; grid-template-columns: minmax(0, 1fr); padding: 20px; }
+  .pj-head-tree { grid-column: 1; grid-row: 1; margin-inline-end: var(--pj-lanes); }
+  .pj-tree { grid-column: 1; grid-row: 2; margin-block: 0 32px; margin-inline: 0 var(--pj-lanes); }
+  .pj-head-page { grid-column: 1; grid-row: 3; margin-block: 0 14px; margin-inline: 0 var(--pj-lanes); }
+  .pj-window { grid-column: 1; grid-row: 4; margin-inline-end: var(--pj-lanes); }
+}
+@media (max-width: 640px) {
+  .pj-stage { padding: 12px; }
+  .pj-chrome { height: 30px; }
+  .pj-dots { display: none; }
+  .pj-app {
+    padding: 10px; gap: 10px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 36px 30px 40px 204px 60px;
+    grid-template-areas: 'header' 'crumbs' 'sidebar' 'main' 'aside';
+  }
+  .pj-topnav { display: none; }
+  .pj-search { width: auto; flex: 1; max-width: 120px; }
+  /* the sidebar lies down as a strip of its links */
+  .pj-r-sidebar .pj-fill { flex-direction: row; align-items: center; padding: 0 6px; }
+  .pj-team, .pj-field, .pj-quiet { display: none; }
+  .pj-tnav, .pj-wnav { flex: 1; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); grid-auto-rows: 28px; }
+  .pj-tnav > span:not(.pj-hl), .pj-wnav span { justify-content: center; padding: 0 4px; }
+  /* as a row of tabs, the current one is marked the way tabs are: an underline, no fill or rounding */
+  .pj-hl {
+    width: calc(100% / 3); inset-inline-end: auto; transform: translateX(calc(var(--i, 0) * 100%));
+    background: none; border-radius: 0; box-shadow: inset 0 -2px 0 var(--accent);
+  }
+  .pj-wnav .is-here { background: none; border-radius: 0; box-shadow: inset 0 -2px 0 var(--line-3); }
+  .pj-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pj-cards > div:nth-child(3) { display: none; }
+  .pj-r-aside .pj-fill { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-content: start; }
+  .pj-r-aside .pj-line { display: none; }
+  .pj-big { grid-row: span 2; }
+  .pj-big .pj-av { margin: 0; }
+  /* a phone can't hold the routes and the page in one view, so the telling of it stays in view
+     while the graphic scrolls under it: what the user did, then what it cost, which is the point */
+  .pj-step {
+    position: sticky; z-index: 5; top: var(--topbar-h, 60px); flex-wrap: wrap; gap: 2px 16px;
+    margin: 0 calc(var(--gutter) * -1) 12px; padding: 10px var(--gutter);
+    background: color-mix(in oklab, var(--bg) 88%, transparent); backdrop-filter: blur(12px);
+  }
+  .pj-step .pj-tally { order: 3; flex: 1 0 100%; margin: 0; text-align: start; min-height: 16px; }
+  .pj-controls { margin-inline-start: auto; }
+  /* and the graphic gives up what it can to bring the two closer: the page needs no heading, and
+     the overview no chart */
+  .pj-head-page, .pj-spark { display: none; }
+  .pj-tree { margin-block-end: 16px; }
+  /* the regions are too short here for a tag in the corner; the wire's color and its port name the slot */
+  .pj-r > .pj-tag, .pj-app > .pj-tag { display: none; }
+  /* a full-width row of tabs leaves no free corner: the default label sits in a break in the region's
+     top border instead, where it can't cover content */
+  .pj-r.is-fallback::after, .pj-r[data-from]::after { top: -8px; bottom: auto; inset-inline-end: 10px; padding: 0 4px; background: var(--bg); }
+  /* the slot chips are most of the tree's height, so on a phone they and the rows they set are
+     18px where they were 24, 2px apart, and the guides are redrawn to that line: more of the page
+     below stays in view with the routes that fill it */
+  .pj-tree { gap: 4px; }
+  .pj-name { position: relative; line-height: 18px; }
+  /* a route's name is still a comfortable thing to tap */
+  .pj-name::before { content: ''; position: absolute; inset: -5px -8px; }
+  .pj-ports { gap: 2px; }
+  .pj-port { height: 18px; padding-inline: 7px 10px; }
+  .pj-port::after { top: 4px; }
+  .pj-guide.is-pass, .pj-guide.is-tee { top: -4px; }
+  .pj-guide.is-tee::after { top: 13px; }
+  .pj-guide.is-end { top: -4px; height: 13px; }
+  .pj-guide.is-stem { top: 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pj-fill.is-in, .pj-r.is-swapped, .pj-caret { animation: none; }
+  .pj-hl { transition: none; }
+    /* the step's replaced regions stay marked while it shows, in place of the flash */
+  .pj-r.is-changed { border-color: var(--accent-line); }
+}
+
+/* ---------- x-ray: the routes in nav-router, and on the Navigation API alone ----------
+   native turns the panel to film: a cool tint and faint scan lines behind highlighted code */
+.xr { --film: oklch(0.13 0.025 240); --film-line: oklch(1 0 0 / 0.025); transition: background-color 0.4s var(--ease); }
+:root[data-theme='light'] .xr { --film: oklch(0.95 0.02 240); --film-line: oklch(0 0 0 / 0.03); }
+.xr-switch { display: flex; gap: 2px; }
+.xr-switch button {
+  height: 30px; padding: 0 12px; border: 0; border-radius: var(--r-2); background: none; cursor: pointer;
+  color: var(--text-3); font: 400 var(--fs-xs)/1 var(--font-mono);
+}
+.xr-switch button:hover { color: var(--text); }
+.xr-switch button[aria-checked='true'] { color: var(--text); background: var(--surface-3); }
+.xr .code-head .copy { margin-inline-start: 0; }
+.xr-count { flex: none; white-space: nowrap; margin-inline-start: auto; padding-inline-end: 4px; color: var(--text-3); font: 400 var(--fs-2xs)/1 var(--font-mono); }
+.xr-body { position: relative; overflow: hidden; }
+.xr.is-native {
+  background-color: var(--film);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% 0%, color-mix(in oklab, var(--accent) 10%, transparent), transparent 70%),
+    repeating-linear-gradient(to bottom, var(--film-line) 0 1px, transparent 1px 3px);
+}
+.xr.is-native .code-head { background: transparent; }
+/* a fact pointed at: its line stays lit, the other highlights step back */
+.xr pre.has-lit .line-hl:not(.is-lit) { background: transparent; border-inline-start-color: transparent; }
+.xr pre .line-hl { transition: background-color 0.2s var(--ease), border-color 0.2s var(--ease); }
+.facts li[data-line] { cursor: default; transition: opacity 0.2s var(--ease); }
+/* pointing at a fact quiets the others, as the code quiets its other highlighted lines */
+.facts:has(li.is-lit) li:not(.is-lit) { opacity: 0.4; }
+.xr-note { margin: 0; padding: 12px 20px; border-top: 1px solid var(--line); color: var(--text-3); font-size: var(--fs-sm); line-height: var(--lh-sm); }
+.xr-note[hidden] { display: none; }
+/* the scan: one pass down the panel as it turns */
+.xr-body::after {
+  content: ''; position: absolute; inset-inline-start: 0; inset-inline-end: 0; top: 0; height: 96px; pointer-events: none; opacity: 0;
+  background: linear-gradient(to bottom, transparent, color-mix(in oklab, var(--accent) 22%, transparent) 60%, transparent);
+}
+.xr.is-scanning .xr-body::after { animation: xr-scan 0.9s var(--ease) both; }
+@keyframes xr-scan {
+  from { transform: translateY(-96px); opacity: 1; }
+  to { transform: translateY(var(--scan-to, 900px)); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .xr, .xr.is-scanning .xr-body::after { transition: none; animation: none; }
+}
+
+/* ---------- cohort: the routers people use, on the api each is built on ----------
+   the familiar ones cluster at 2010 on the History API; nav-router stands alone at 2026 */
+.cohort { margin: 0; padding: 40px 40px 28px; border: 1px solid var(--line-2); border-radius: var(--r-4); background: var(--sheen); }
+.cohort-stage { display: flex; align-items: flex-end; justify-content: space-between; gap: 40px; }
+.cohort-old { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 196px); gap: 10px; }
+.cohort-tile {
+  display: flex; flex-direction: column; gap: 2px; padding: 14px 16px;
+  border: 1px solid var(--line-2); border-radius: var(--r-3); background: var(--surface-1);
+}
+.cohort-tile svg { flex: none; width: 18px; height: 18px; color: var(--text-3); }
+/* the logo sits on the name's line */
+.cohort-name { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: var(--fs-sm); line-height: var(--lh-sm); font-weight: 600; }
+.cohort-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding-inline-start: 26px; }
+.cohort-for { color: var(--text-3); font-size: var(--fs-xs); line-height: var(--lh-xs); white-space: nowrap; }
+.cohort-size { color: var(--text-3); font: 400 var(--fs-2xs)/var(--lh-2xs) var(--font-mono); white-space: nowrap; }
+.cohort-tile.is-us .cohort-size { color: var(--accent-strong); }
+.cohort-new { flex: none; }
+.cohort-tile.is-us { width: 224px; border-color: var(--accent-line); background: var(--accent-wash); transition: box-shadow 0.6s var(--ease) 1.1s; }
+.cohort-mark { display: inline-flex; }
+.cohort-mark svg { width: 18px; height: 18px; overflow: visible; }
+.cohort-tile.is-us .cohort-for { color: var(--accent-strong); }
+.cohort.is-drawn .cohort-tile.is-us { box-shadow: 0 0 0 1px var(--accent-line), 0 0 40px -8px color-mix(in oklab, var(--accent) 45%, transparent); }
+
+/* the years between them: the line draws from 2010 out to 2026 */
+.cohort-axis { position: relative; height: 34px; margin-top: 32px; }
+.cohort-line {
+  position: absolute; inset-inline-start: 0; inset-inline-end: 0; top: 6px; height: 2px; border-radius: 1px;
+  background: linear-gradient(to right, var(--line-3), var(--accent));
+  transform: scaleX(0); transform-origin: left; transition: transform 1.2s var(--ease);
+}
+.cohort.is-drawn .cohort-line { transform: none; }
+.cohort-year {
+  position: absolute; inset-inline-start: calc(var(--at) * 100%); top: 16px; transform: translateX(-50%);
+  color: var(--text-3); font: 400 var(--fs-2xs)/var(--lh-2xs) var(--font-mono);
+}
+.cohort-year.is-first { transform: none; }
+.cohort-year.is-last { transform: translateX(-100%); color: var(--accent-strong); }
+.cohort-apis { display: flex; justify-content: space-between; gap: 24px; margin-top: 4px; }
+.cohort-apis p { display: flex; flex-direction: column; gap: 2px; margin: 0; font-size: var(--fs-sm); line-height: var(--lh-sm); }
+.cohort-apis p:last-child { text-align: end; }
+.cohort-apis b { color: var(--text); font-weight: 600; }
+.cohort-apis span { color: var(--text-3); font-size: var(--fs-xs); line-height: var(--lh-xs); }
+
+@media (max-width: 1080px) {
+  .cohort-old { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .cohort { padding: 24px 20px 20px; }
+  .cohort-stage { flex-direction: column; align-items: stretch; gap: 16px; }
+  .cohort-old { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cohort-tile.is-us { width: auto; }
+}
+/* two tiles across a phone leave no room for "React only" and its size side by side: the size
+   takes the line under it, in every tile so the pairs stay even */
+/* on a phone time runs down the page, so each router still sits at its year: the History API's six
+   under 2010, the line dropping through the years between, nav-router alone under 2026. a router is
+   a row, its size at the row's end, so the sizes read as one column */
+@media (max-width: 600px) {
+  .cohort { display: grid; grid-template-columns: 12px minmax(0, 1fr); column-gap: 14px; padding: 20px 16px; }
+  .cohort-stage, .cohort-apis, .cohort-meta { display: contents; }
+  .cohort-apis p { position: relative; grid-column: 2; flex-direction: row; align-items: baseline; gap: 8px; }
+  .cohort-apis p:first-child { grid-row: 1; }
+  .cohort-apis p:last-child { grid-row: 3; margin-top: 24px; text-align: start; }
+  .cohort-apis p::before {
+    content: ''; position: absolute; inset-inline-start: -24px; top: 6px; width: 8px; height: 8px;
+    border-radius: 50%; background: var(--line-3); box-shadow: 0 0 0 3px var(--bg);
+  }
+  .cohort-apis p:last-child::before { background: var(--accent); }
+  .cohort-apis p:last-child b { color: var(--accent-strong); }
+  .cohort-old { grid-column: 2; grid-row: 2; grid-template-columns: minmax(0, 1fr); gap: 6px; margin-top: 10px; }
+  .cohort-new { grid-column: 2; grid-row: 4; margin-top: 10px; }
+  .cohort-axis { grid-column: 1; grid-row: 1 / 4; height: auto; margin: 0; }
+  .cohort-line {
+    inset: 10px auto 10px 5px; width: 2px; height: auto;
+    background: linear-gradient(to bottom, var(--line-3) 55%, var(--accent));
+    transform: scaleY(0); transform-origin: top;
+  }
+  .cohort-year { display: none; }
+  .cohort-tile, .cohort-tile.is-us { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 12px; width: auto; padding: 10px 12px; }
+  .cohort-name { grid-column: 1; grid-row: 1; }
+  .cohort-for { grid-column: 1; grid-row: 2; padding-inline-start: 26px; white-space: normal; }
+  .cohort-size { grid-column: 2; grid-row: 1; align-self: center; color: var(--text-2); font-size: var(--fs-xs); line-height: var(--lh-xs); }
+}
+@media (max-width: 480px) {
+  /* each claim's badge takes the line under its sentence, which then has the row's full width */
+  .ribbon-head p.cohort-us, .ribbon-head p.cohort-them { flex-wrap: wrap; }
+  .cohort-us > span:not(.cohort-us-mark), .cohort-them > span:first-child { flex: 1 1 200px; }
+  .cohort-us-base, .cohort-them-base { margin-inline-start: 0; }
+}
+/* the hero app's four tabs fit a 320px window by giving up some of their padding */
+@media (max-width: 360px) {
+  .app-tabs { padding-inline: 4px; }
+  .app-tabs button { padding-inline: 5px; }
+  /* two integrations across leave a package name 9px short of its room: the tiles give it up */
+  .adapter { padding-inline: 8px; }
+  .adapter-pkg { font-size: var(--fs-3xs); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cohort-line, .cohort-tile.is-us { transition: none; }
+}
+/* the answer to the line above it, on its own line */
+.ribbon-head p.cohort-us {
+  display: flex; align-items: center; gap: 10px; margin-top: 20px; padding-block: 10px; padding-inline: 14px 10px; max-width: 640px;
+  border: 1px solid var(--accent-line); border-radius: var(--r-3); background: var(--accent-wash);
+  color: var(--text); font-size: var(--fs-md); line-height: var(--lh-md); font-weight: 500;
+  transition: box-shadow 0.6s var(--ease) 1.1s;
+}
+/* the answer lights with the nav-router tile, when the years reach 2026 */
+.cohort-ribbon:has(.cohort.is-drawn) .cohort-us { box-shadow: 0 0 0 1px var(--accent-line), 0 0 40px -8px color-mix(in oklab, var(--accent) 45%, transparent); }
+.cohort-us-mark { display: inline-flex; }
+.cohort-us-mark svg { width: 20px; height: 20px; overflow: visible; }
+.cohort-us-base {
+  flex: none; margin-inline-start: auto; padding: 3px 8px; border: 1px solid var(--accent-line); border-radius: var(--r-2);
+  color: var(--accent-strong); font: 400 var(--fs-2xs)/var(--lh-2xs) var(--font-mono); text-decoration: none;
+}
+/* both badges share a width, so they stand as one column: 2026 over 2010 */
+.cohort-us-base, .cohort-them-base { min-width: 114px; text-align: center; }
+.cohort-us-base:hover { background: color-mix(in oklab, var(--accent) 14%, transparent); }
+@media (prefers-reduced-motion: reduce) { .ribbon-head p.cohort-us { transition: none; } }
+/* the others: the claim's shape in the old material, the same width so the two read as one
+   comparison. a dim hairline (dashed means an empty slot elsewhere on the page), no fill or glow, a
+   step dimmer, the old api's names flat; the two badges line up at the right edge */
+.ribbon-head p.cohort-them {
+  display: flex; align-items: flex-start; gap: 12px; margin-top: 12px; padding-block: 10px; padding-inline: 14px 10px; max-width: 640px;
+  border: 1px solid var(--line-2); border-radius: var(--r-3);
+  color: var(--text-3); font-size: var(--fs-md); line-height: var(--lh-md);
+}
+.cohort-them code { background: none; box-shadow: inset 0 0 0 1px var(--line-2); color: var(--text-3); }
+.cohort-them-base {
+  flex: none; margin-inline-start: auto; margin-top: 1px; padding: 3px 8px; border: 1px solid var(--line-2); border-radius: var(--r-2);
+  color: var(--text-3); font: 400 var(--fs-2xs)/var(--lh-2xs) var(--font-mono); white-space: nowrap;
 }

@@ -5,18 +5,20 @@ import { getCollection } from 'astro:content';
 
 import '../styles/docs.css';
 import { FRAMEWORKS, frameworkOf, fwById, swapFramework } from '../lib/frameworks.js';
+import { languageSelect, localePath, t, titlesIn } from '../lib/i18n.js';
 import { navFor } from '../lib/nav.js';
 import { logoFor } from '../scripts/framework-logos.js';
 import DocsTopbar from '../components/DocsTopbar.astro';
 import Base from './Base.astro';
 
-const { title, description, currentId, toc = [], wide = false, extraIds = [] } = Astro.props;
+const { title, description, currentId, toc = [], wide = false, extraIds = [], writtenIn, translatedIn } = Astro.props;
+const locale = Astro.currentLocale;
 const ids = [
   ...(await getCollection('docs')).map((e) => e.id),
   ...(await getCollection('examples')).map((e) => `examples/${e.id}`),
   'plugins', 'examples', ...extraIds,
 ];
-const nav = navFor(ids, currentId);
+const nav = navFor(ids, currentId, { code: locale, titles: await titlesIn(locale) });
 const sectionKey = currentId.split('/')[0];
 const section = nav.find((s) => s.key === sectionKey);
 
@@ -25,27 +27,28 @@ const section = nav.find((s) => s.key === sectionKey);
 const pageFramework = frameworkOf(currentId);
 const written = new Set(ids);
 const equivalents = pageFramework
-  ? Object.fromEntries(FRAMEWORKS.map((f) => [f.id, written.has(swapFramework(currentId, f.id)) ? `/${swapFramework(currentId, f.id)}/` : null]))
+  ? Object.fromEntries(FRAMEWORKS.map((f) => [f.id, written.has(swapFramework(currentId, f.id)) ? localePath(`/${swapFramework(currentId, f.id)}/`, locale) : null]))
   : null;
 // a framework's slots show only while it's the reader's pick; data-framework is set before paint
 const fwCss = FRAMEWORKS.map((f) =>
   `:root[data-framework="${f.id}"] [data-fw-slot]:not([data-fw-slot~="${f.id}"]) { display: none; }`
 ).join('\n') + `\n:root:not([data-framework]) [data-fw-slot]:not([data-fw-slot~="${FRAMEWORKS[0].id}"]) { display: none; }`;
 ---
-<Base title={title} description={description} pageFramework={pageFramework} bodyAttrs={{ 'data-section': sectionKey }}>
+<Base title={title} description={description} pageFramework={pageFramework} writtenIn={writtenIn} translatedIn={translatedIn} bodyAttrs={{ 'data-section': sectionKey }}>
   <Fragment set:html={`<style>${fwCss}</style>`} />
   <DocsTopbar nav={nav} sectionKey={sectionKey} />
 
   <div class:list={['docs-shell', { 'is-wide': wide }]}>
     <aside class="docs-sidebar" id="docs-sidebar" aria-label={section.label}>
       <div class="sidebar-scroll">
-        <nav class="drawer-sections" aria-label="Sections">
+        <nav class="drawer-sections" aria-label={t(locale, 'nav.sections')}>
           {nav.map((s) => <a href={s.href} aria-current={s.key === sectionKey ? 'page' : undefined}>{s.label}</a>)}
         </nav>
+        <Fragment set:html={languageSelect(Astro.url.pathname, locale)} />
         {/* live examples run the core version, so the framework choice doesn't apply there yet */}
         {sectionKey !== 'examples' && (
           <div class="framework-panel">
-            <p class="framework-label" id="framework-label">Your framework</p>
+            <p class="framework-label" id="framework-label">{t(locale, 'framework.label')}</p>
             <div class="framework-select" data-framework-picker="lg"></div>
           </div>
         )}
@@ -60,7 +63,7 @@ const fwCss = FRAMEWORKS.map((f) =>
                 <li>
                   {it.href
                     ? <a class:list={['nav-link', { 'is-symbol': it.symbol }]} href={it.href} aria-current={it.current ? 'page' : undefined}>{it.title}</a>
-                    : <span class:list={['nav-link', 'is-stub', { 'is-symbol': it.symbol }]} title="Not written yet">{it.title}</span>}
+                    : <span class:list={['nav-link', 'is-stub', { 'is-symbol': it.symbol }]} title={t(locale, 'nav.notWritten')}>{it.title}</span>}
                 </li>
               ))}
             </ul>
@@ -71,6 +74,22 @@ const fwCss = FRAMEWORKS.map((f) =>
     <div class="drawer-scrim"></div>
 
     <div class="docs-main">
+      {/* on screens too narrow for the on-this-page column: the same list behind a bar that keeps
+          the reader's section in view */}
+      {!wide && toc.length > 0 && (
+        <nav class="toc-bar" aria-label={t(locale, 'toc.label')} data-toc-bar>
+          <button class="toc-bar-button" type="button" aria-expanded="false" aria-controls="toc-sheet">
+            <span class="toc-bar-label">{t(locale, 'toc.label')}</span>
+            <span class="toc-bar-current" data-toc-current></span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <div class="toc-sheet" id="toc-sheet" hidden>
+            <ul class="toc-list">
+              {toc.map((h) => <li class={`toc-h${h.depth}`}><a href={`#${h.slug}`} class:list={{ 'is-symbol': h.symbol }}>{h.text}</a></li>)}
+            </ul>
+          </div>
+        </nav>
+      )}
       {pageFramework && (
         <div class="doc fw-notice" role="status" hidden data-fw-notice data-page-framework={pageFramework} data-page-label={fwById(pageFramework).label}>
           <script is:inline type="application/json" data-fw-equivalents set:html={JSON.stringify(equivalents)}></script>
@@ -80,16 +99,17 @@ const fwCss = FRAMEWORKS.map((f) =>
         </div>
       )}
       <slot />
+      {/* the on-this-page rail rides beside the doc, not at the window's edge */}
+      {!wide && toc.length > 0 && (
+        <aside class="docs-toc" aria-label={t(locale, 'toc.label')}>
+          <p class="toc-label">{t(locale, 'toc.label')}</p>
+          <ul class="toc-list">
+            {toc.map((h) => <li class={`toc-h${h.depth}`}><a href={`#${h.slug}`} class:list={{ 'is-symbol': h.symbol }}>{h.text}</a></li>)}
+          </ul>
+        </aside>
+      )}
     </div>
 
-    {!wide && toc.length > 0 && (
-      <aside class="docs-toc" aria-label="On this page">
-        <p class="toc-label">On this page</p>
-        <ul class="toc-list">
-          {toc.map((h) => <li class={`toc-h${h.depth}`}><a href={`#${h.slug}`} class:list={{ 'is-symbol': h.symbol }}>{h.text}</a></li>)}
-        </ul>
-      </aside>
-    )}
   </div>
 
   <slot name="after" />

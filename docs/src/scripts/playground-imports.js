@@ -7,7 +7,6 @@ export const IMPORT_MAP = {
         'announcer',
         'chunk-reload',
         'confirm-leave',
-        'dom',
         'head',
         'preload-intent',
         'sitemap',

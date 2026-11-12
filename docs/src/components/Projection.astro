@@ -1,0 +1,117 @@
+---
+import { t } from '../lib/i18n.js';
+
+const locale = Astro.currentLocale;
+// the projection: a small app's routes on the left, the page they build on the right, and a wire
+// from each piece a route declares to the slot it fills. it plays a loop of navigations on its own;
+// each one replaces only the regions whose piece changed, and the rest stay as they were.
+// what each route fills, and the loop, live in scripts/projection.js. the tree is drawn here so
+// it holds its size from the first paint, and the wires join it once the script measures it. ports
+// are listed in the order their slots stand on the page, top to bottom, so a route's wires never cross
+// the slot each port fills, for its color: named pieces fill their namesake, a view or a nested
+// layout fills the default slot above it (the app's main, or team's page), the app's layout is the frame
+const slotOf = (route, port) => (['crumbs', 'sidebar', 'aside'].includes(port) ? port
+  : route === 'app' ? 'layout' : ['home', 'team'].includes(route) ? 'main' : 'page');
+// a port reads as the slot it fills, the same word as that slot's tag on the page
+const slotName = (slot) => (slot === 'layout' ? t(locale, 'home.slots.layout') : slot);
+// each route reads as the path segment it adds, as a route tree on disk does: a folder that holds
+// routes ends in /, an index route (one that adds no segment) is index
+const TREE = [
+  { route: 'app', path: '/', depth: 0, ports: ['layout'] },
+  { route: 'home', path: 'index', depth: 1, ports: ['view'] },
+  { route: 'team', path: 'teams/:team/', depth: 1, ports: ['crumbs', 'layout', 'sidebar'] },
+  { route: 'overview', path: 'index', depth: 2, ports: ['view'] },
+  { route: 'members', path: 'members', depth: 2, ports: ['crumbs', 'aside', 'view'] },
+  { route: 'activity', path: 'activity', depth: 2, ports: ['view'], last: true },
+];
+// the file tree's guides for each row, as a file tree draws them: at each ancestor's level, a line
+// passing through while that ancestor has siblings still to come; at the row's own level, a tee if
+// more siblings follow, an elbow if it's the last; and a stem down from a parent to its children
+const laterSibling = (i) => {
+  for (let j = i + 1; j < TREE.length; j++) {
+    if (TREE[j].depth < TREE[i].depth) { return false; }
+    if (TREE[j].depth === TREE[i].depth) { return true; }
+  }
+  return false;
+};
+const ancestorAt = (i, level) => { for (let j = i - 1; j >= 0; j--) { if (TREE[j].depth === level) { return j; } } return -1; };
+const guidesFor = (i) => {
+  const { depth } = TREE[i];
+  const out = [];
+  for (let level = 1; level < depth; level++) {
+    if (laterSibling(ancestorAt(i, level))) { out.push(['pass', level]); }
+  }
+  if (depth > 0) { out.push([laterSibling(i) ? 'tee' : 'end', depth]); }
+  if (TREE[i + 1]?.depth > depth) { out.push(['stem', depth + 1]); }
+  return out;
+};
+---
+<section class="ribbon pj-ribbon">
+  <div class="container">
+    <div class="ribbon-head">
+      <h2>{t(locale, 'home.slots.title')}</h2>
+      <p>{t(locale, 'home.slots.lede')}</p>
+    </div>
+
+    <div class="pj-wrap" data-projection>
+    {/* above the graphic: what the user just did, what it replaced, and the controls to step it */}
+    <div class="pj-step">
+      <span class="pj-action" data-pj-action set:html={t(locale, 'home.slots.on', { page: t(locale, 'home.app.home') })} />
+      <span class="pj-tally" data-pj-tally></span>
+      <span class="pj-controls">
+        <button class="pj-ctl" type="button" data-pj-back aria-label={t(locale, 'home.slots.previous')}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+        <button class="pj-ctl" type="button" data-pj-forward aria-label={t(locale, 'home.slots.next')}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+      </span>
+    </div>
+
+    <figure class="pj" aria-describedby="pj-story">
+      <p class="visually-hidden" id="pj-story" set:html={t(locale, 'home.slots.story')} />
+
+      <div class="pj-stage">
+        {/* what each column is, so a scan of the homepage reads the diagram without decoding it */}
+        <p class="pj-head pj-head-tree"><span>{t(locale, 'home.slots.head.routes')}</span><span>{t(locale, 'home.slots.head.slots')}</span></p>
+        <p class="pj-head pj-head-page">{t(locale, 'home.slots.head.page')}</p>
+        <ol class="pj-tree" aria-label={t(locale, 'home.slots.tree.label')}>
+          {TREE.map((n, i) => (
+            <li class:list={['pj-node', { 'is-last': n.last }]} data-route={n.route} style={`--depth: ${n.depth}`}>
+              {guidesFor(i).map(([kind, level]) => <i class={`pj-guide is-${kind}`} style={`--level: ${level}`}></i>)}
+              <button class="pj-name" type="button" data-go={n.route}>{n.path}</button>
+              <span class="pj-ports">
+                {n.ports.map((p) => <span aria-hidden="true" class="pj-port" data-port={`${n.route}:${p}`} data-slot={slotOf(n.route, p)}>{slotName(slotOf(n.route, p))}</span>)}
+              </span>
+            </li>
+          ))}
+        </ol>
+
+        <svg class="pj-wires" aria-hidden="true"></svg>
+
+        <div class="pj-window" aria-hidden="true">
+          <div class="pj-chrome">
+            <span class="pj-dots"><i></i><i></i><i></i></span>
+            <span class="pj-url"><span class="pj-host">acme.app</span><span data-pj-path>/</span></span>
+          </div>
+          <div class="pj-app" data-slot="layout">
+            <span class="pj-tag" aria-hidden="true">{t(locale, 'home.slots.layout')}</span>
+            <div class="pj-r pj-r-header" data-region="header" data-slot="layout" data-from="app">
+              <span class="pj-logo"><i></i>Acme</span>
+              <span class="pj-topnav"><span>{t(locale, 'home.app.teams')}</span><span>{t(locale, 'home.app.projects')}</span><span>{t(locale, 'home.app.docs')}</span></span>
+              <span class="pj-search">{t(locale, 'home.app.search')}</span>
+              <span class="pj-avatar"></span>
+            </div>
+            <div class="pj-r pj-r-crumbs" data-region="crumbs" data-slot="crumbs"><span class="pj-tag" aria-hidden="true">crumbs</span></div>
+            <div class="pj-r pj-r-sidebar" data-region="sidebar" data-slot="sidebar"><span class="pj-tag" aria-hidden="true">sidebar</span></div>
+            <div class="pj-r pj-r-main" data-region="main" data-slot="main"><span class="pj-tag" aria-hidden="true">main</span></div>
+            <div class="pj-r pj-r-aside" data-region="aside" data-slot="aside"><span class="pj-tag" aria-hidden="true">aside</span></div>
+          </div>
+        </div>
+      </div>
+
+    </figure>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { mountProjection } from '../scripts/projection.js';
+  document.querySelectorAll('[data-projection]').forEach(mountProjection);
+</script>

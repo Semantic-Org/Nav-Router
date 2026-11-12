@@ -1,0 +1,19 @@
+---
+// on a page shown in english for want of a translation, one that is a machine translation nobody has
+// reviewed, or one whose english has moved on: says so in the reader's language, with the way to the
+// english page
+import { DEFAULT_LOCALE, localeOf, t, unlocalized } from '../lib/i18n.js';
+
+const { translated = false, stale = false, draft = false } = Astro.props;
+const locale = localeOf(Astro.currentLocale);
+const notice = locale.code === DEFAULT_LOCALE ? null
+  : !translated ? t(locale.code, 'language.untranslated', { language: locale.name })
+  : draft ? t(locale.code, 'language.draft')
+  : stale ? t(locale.code, 'language.stale') : null;
+---
+{notice && (
+  <div class="locale-notice" role="note" data-pagefind-ignore lang={locale.code} dir={locale.dir}>
+    <p>{notice}</p>
+    <a href={unlocalized(Astro.url.pathname)} hreflang="en" lang="en" data-language-pick="en">{t(locale.code, 'language.readEnglish')}</a>
+  </div>
+)}

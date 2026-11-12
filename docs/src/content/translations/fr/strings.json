@@ -1,0 +1,13 @@
+{
+  "language.label": "Langue",
+  "language.untranslated": "Cette page n’est pas encore traduite en français, elle est donc affichée en anglais.",
+  "language.stale": "La page anglaise a changé depuis cette traduction, qui n’est peut-être plus à jour.",
+  "language.draft": "Cette page a été traduite automatiquement et n’a pas encore été relue.",
+  "language.readEnglish": "Lire en anglais",
+  "language.offer": "Cette page est disponible en français.",
+  "language.go": "Lire en français",
+  "language.dismiss": "Fermer",
+  "language.remember": "Toujours ouvrir cette documentation en français ?",
+  "language.remember.yes": "Toujours",
+  "language.remember.no": "Pas maintenant"
+}

@@ -1,0 +1,112 @@
+---
+import Base from '../layouts/Base.astro';
+import '../styles/home.css';
+import body from '../lib/home-body.html?raw';
+import { getCollection } from 'astro:content';
+
+import Cohort from '../components/Cohort.astro';
+import Playground from '../components/Playground.astro';
+import Projection from '../components/Projection.astro';
+import { filesFor } from '../lib/examples.js';
+import { PLUGINS } from '../lib/plugins.js';
+import { formatSize, sizeOf } from '../lib/sizes.js';
+import { draftStrings, languageMenu, languageSelect, languagesWith, localeOf, localePath, t } from '../lib/i18n.js';
+import { versionMenu } from '../lib/versions.js';
+
+const locale = Astro.currentLocale;
+// the core's size wherever the page's words quote it ({size}), measured like every other size here
+const coreSize = formatSize(await sizeOf('core')).replace(' ', '&nbsp;');
+// the markup is the prototype's, kept as html: its code samples are full of braces astro would
+// read as expressions. plugin sizes are measured from the source at build
+const written = new Set((await getCollection('docs')).map((e) => e.id));
+const rows = await Promise.all(PLUGINS.map(async (p) => {
+  const size = formatSize(await sizeOf(p.name)) ?? '–';
+  const href = written.has(`plugins/${p.name}`) ? `/plugins/${p.name}/` : '/plugins/';
+  return `<a class="pt-row" href="${href}"><code>${p.name}</code><span>${t(locale, `home.plugin.${p.name}`)}</span><span class="num"><bdi>${size}</bdi></span></a>`;
+}));
+// a live app sits between the claims (built on the platform) and extending it (plugins): the
+// reader can check the claims before the page moves on. it loads only as it nears the screen
+const tryEntry = (await getCollection('examples')).find((e) => e.id === 'first-router');
+// the page's words are keys ({{t:home.…}} here, t() in its components, ui() in its scripts) from
+// content/strings.json; a language that has translated them is one the page is written in
+const translatedIn = languagesWith('home.', { reviewed: true });
+const writtenIn = languagesWith('home.');
+const draft = writtenIn.includes(locale) && draftStrings(locale);
+const worded = body
+  .replace('href="#">{{t:home.plugins.link}}', 'href="/plugins/">{{t:home.plugins.link}}')
+  // {{t:key}}, or {{t:key name="value"}} for a string with a {name} in it
+  .replace(/\{\{t:([\w.-]+)((?:\s+\w+="[^"]*")*)\}\}/g, (_, key, vars) =>
+    t(locale, key, { size: coreSize, ...Object.fromEntries([...vars.matchAll(/(\w+)="([^"]*)"/g)].map(([, name, value]) => [name, value])) }))
+  // its links stay in the reader's language
+  .replace(/href="(\/[^"]*)"/g, (_, path) => `href="${localePath(path, locale)}"`);
+// a machine translation nobody has reviewed says so under the topbar, with the way to english
+const notice = draft
+  ? `<p class="archive-banner" lang="${locale}" dir="${localeOf(locale).dir}">${t(locale, 'language.draft')} <a href="/" hreflang="en" lang="en" data-language-pick="en">${t(locale, 'language.readEnglish')}</a></p>`
+  : '';
+const html = worded.replace('</header>', `</header>${notice}`).replace('{{language-select}}', languageSelect(Astro.url.pathname, locale)).replace('<span class="version">v0.1.0</span>', versionMenu(Astro.site, locale) + languageMenu(Astro.url.pathname, locale)).replace('{{plugin-rows}}', rows.join('\n        '));
+const SPLIT = '  <!-- ============ ribbon: plugins ============ -->';
+const [beforeTry, afterTry] = html.split(SPLIT);
+// the projection stands where the three platform cards stood
+const [beforeProjection] = beforeTry.split('  <!-- ============ ribbon: three-up ============ -->');
+// the cohort band comes straight after the hero, before the tree: the surprise first, then the how
+const TREE = '  <!-- ============ ribbon: split ============ -->';
+const [hero, afterHero] = beforeProjection.split(TREE);
+---
+<Base title="nav-router" description={t(locale, 'home.description')} writtenIn={writtenIn} translatedIn={translatedIn}>
+  <Fragment set:html={hero} />
+  <!-- ============ ribbon: cohort ============ -->
+  <Cohort />
+  {/* what's new comes before how it reads: the slots, then the same tree as code */}
+  <!-- ============ ribbon: projection ============ -->
+  <Projection />
+  <Fragment set:html={TREE + afterHero} />
+  <!-- ============ ribbon: try it ============ -->
+  <section class="ribbon ribbon-try">
+    <div class="container">
+      <div class="ribbon-head">
+        <h2>{t(locale, 'home.try.title')}</h2>
+        <p>{t(locale, 'home.try.lede')}</p>
+      </div>
+      <Playground files={filesFor(tryEntry.id)} tabs={tryEntry.data.tabs} label={t(locale, 'home.try.label')} lineNumbers={false} />
+      <a class="text-link" href="/examples/">{t(locale, 'home.try.link')}</a>
+    </div>
+  </section>
+  <Fragment set:html={SPLIT + afterTry} />
+  <script>
+    import { init } from '../scripts/site.js';
+    import { mountTrace } from '../scripts/hero.js';
+    import { mountXray } from '../scripts/xray.js';
+    init();
+    document.querySelectorAll('[data-xray]').forEach(mountXray);
+    mountTrace(document.querySelector('.instrument'));
+
+    // the menu on narrow screens: opens under the topbar, closes on a pick, a tap outside or Escape
+    const toggle = document.querySelector('[data-menu-toggle]');
+    const menu = document.getElementById('home-menu');
+    // both labels come with the button, in the page's language
+    const openLabel = toggle.getAttribute('aria-label');
+    const setMenu = (open) => {
+      menu.hidden = !open;
+      toggle.setAttribute('aria-expanded', open);
+      toggle.setAttribute('aria-label', open ? toggle.dataset.closeLabel : openLabel);
+    };
+    toggle.addEventListener('click', () => setMenu(menu.hidden));
+    menu.addEventListener('click', (e) => { if (e.target.closest('a')) setMenu(false); });
+    document.addEventListener('pointerdown', (e) => {
+      if (!menu.hidden && !menu.contains(e.target) && !toggle.contains(e.target)) setMenu(false);
+    });
+    addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !menu.hidden) { setMenu(false); toggle.focus(); }
+    });
+
+    // the install chip copies whichever command is showing
+    const button = document.querySelector('[data-copy-install]');
+    button.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+    button.addEventListener('click', async () => {
+      const code = document.querySelector('.install-cmd .swap code:not([hidden])');
+      try { await navigator.clipboard.writeText(code.textContent); } catch {}
+      button.dataset.copied = '';
+      setTimeout(() => delete button.dataset.copied, 1400);
+    });
+  </script>
+</Base>

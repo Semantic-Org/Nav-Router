@@ -1,0 +1,13 @@
+{
+  "language.label": "Idioma",
+  "language.untranslated": "Esta página ainda não foi traduzida para o português, por isso é exibida em inglês.",
+  "language.stale": "A página em inglês mudou desde esta tradução, então ela pode estar desatualizada.",
+  "language.draft": "Esta página foi traduzida automaticamente e ainda não foi revisada.",
+  "language.readEnglish": "Ler em inglês",
+  "language.offer": "Esta página está disponível em português.",
+  "language.go": "Ler em português",
+  "language.dismiss": "Dispensar",
+  "language.remember": "Sempre abrir esta documentação em português?",
+  "language.remember.yes": "Sempre",
+  "language.remember.no": "Agora não"
+}

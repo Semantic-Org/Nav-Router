@@ -16,6 +16,7 @@
 
 import { parse as parseYaml } from 'yaml';
 
+import { localePath, LOCALES } from '../locales.js';
 import { esc, inline } from './inline.js';
 import { parseMeta } from './shiki-meta.js';
 
@@ -167,8 +168,17 @@ function transformNode(node) {
   return node;
 }
 
+// a translation links as english does (/guides/…); in its language those links take its prefix
+function localizeLinks(node, code) {
+  if (node.type === 'link') { node.url = localePath(node.url, code); }
+  node.children?.forEach((child) => localizeLinks(child, code));
+}
+
 export function remarkDocs() {
-  return (tree) => {
+  return (tree, file) => {
     transformChildren(tree);
+    const folder = file.path?.match(/content\/translations\/([^/]+)\//)?.[1];
+    const locale = LOCALES.find((l) => l.path === folder);
+    if (locale) { localizeLinks(tree, locale.code); }
   };
 }

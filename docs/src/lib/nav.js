@@ -1,4 +1,5 @@
 import { frameworkOf, FRAMEWORKS } from './frameworks.js';
+import { DEFAULT_LOCALE, localePath, t } from './i18n.js';
 import { PLUGINS } from './plugins.js';
 
 // the docs' order. an item points at a page by slug; a slug with no page yet is listed as a stub,
@@ -11,7 +12,7 @@ import { PLUGINS } from './plugins.js';
 // what changes from one view layer to the next: how views are written and how they read the route.
 // the shape is a sketch until the integrations settle
 const FRAMEWORK_GUIDES = {
-  core: [['Views with the dom plugin', 'dom-views'], ['Web components', 'web-components']],
+  core: [['Strings and elements as views', 'views'], ['Web components', 'web-components']],
   react: [['Quickstart', 'quickstart'], ['Components and hooks', 'components'], [
     'Suspense and transitions',
     'suspense',
@@ -27,6 +28,13 @@ const FRAMEWORK_GUIDES = {
 const FRAMEWORK_API = {
   solid: [['SolidRouter', 'solid-router', true], ['solidRouter()', 'solid-router-fn', true]],
 };
+
+// a section's or group's name is one of the interface's words (nav.… in content/strings.json): name
+// is its key, and label is that name in english, for the pages that are only english
+const named = (name) => ({ name, label: t(DEFAULT_LOCALE, name) });
+
+// an item that isn't a page of its own (a landing, an anchor) is named the same way
+const titled = (name) => ({ name, title: t(DEFAULT_LOCALE, name) });
 
 const frameworkGroups = (section) =>
   FRAMEWORKS.flatMap((f) => {
@@ -50,10 +58,10 @@ const frameworkGroups = (section) =>
 export const SECTIONS = [
   {
     key: 'guides',
-    label: 'Guides',
+    ...named('nav.guides'),
     groups: [
       {
-        label: 'Start',
+        ...named('nav.group.start'),
         items: [
           { title: 'Introduction', slug: 'guides/introduction' },
           { title: 'Installation', slug: 'guides/installation' },
@@ -62,7 +70,7 @@ export const SECTIONS = [
       },
       ...frameworkGroups('guides'),
       {
-        label: 'Routing',
+        ...named('nav.group.routing'),
         items: [
           { title: 'Routes and params', slug: 'guides/routes-and-params' },
           { title: 'Layouts and slots', slug: 'guides/layouts-and-slots' },
@@ -72,7 +80,7 @@ export const SECTIONS = [
         ],
       },
       {
-        label: 'Going further',
+        ...named('nav.group.going-further'),
         items: [
           { title: 'Writing a plugin', slug: 'guides/writing-a-plugin' },
           { title: 'Writing an integration', slug: 'guides/writing-an-integration' },
@@ -83,11 +91,11 @@ export const SECTIONS = [
   },
   {
     key: 'api',
-    label: 'API',
+    ...named('nav.api'),
     groups: [
       ...frameworkGroups('api'),
       {
-        label: 'Classes',
+        ...named('nav.group.classes'),
         items: [
           { title: 'Router', slug: 'api/router', symbol: true },
           { title: 'Route', slug: 'api/route', symbol: true },
@@ -95,39 +103,42 @@ export const SECTIONS = [
         ],
       },
       {
-        label: 'Functions',
+        ...named('nav.group.functions'),
         items: [
           { title: 'router()', slug: 'api/router-fn', symbol: true },
           { title: 'navigate()', slug: 'api/router#navigate', symbol: true },
           { title: 'href()', slug: 'api/router#href', symbol: true },
           { title: 'back()', slug: 'api/router#back', symbol: true },
+          { title: 'update()', slug: 'api/update', symbol: true },
           { title: 'isActive()', slug: 'api/is-active', symbol: true },
+          { title: 'isCurrent()', slug: 'api/is-current', symbol: true },
           { title: 'canAccess()', slug: 'api/can-access', symbol: true },
           { title: 'lazy()', slug: 'api/lazy', symbol: true },
         ],
       },
       {
-        label: 'Options',
+        ...named('nav.group.options'),
         items: [
-          { title: 'Router settings', slug: 'api/router#settings' },
+          { ...titled('nav.item.routerSettings'), slug: 'api/router#settings' },
           { title: 'Route options', slug: 'api/route-options' },
+          { title: 'Moments', slug: 'api/moments' },
         ],
       },
     ],
   },
   {
     key: 'examples',
-    label: 'Examples',
+    ...named('nav.examples'),
     groups: [
-      { label: 'Examples', items: [{ title: 'All examples', slug: 'examples' }] },
+      { ...named('nav.examples'), items: [{ ...titled('nav.item.allExamples'), slug: 'examples' }] },
       {
-        label: 'Start',
+        ...named('nav.group.start'),
         items: [
           { title: 'Your first router', slug: 'examples/first-router' },
         ],
       },
       {
-        label: 'Data and loading',
+        ...named('nav.group.data-and-loading'),
         items: [
           { title: 'Loading states', slug: 'examples/loading-states' },
           { title: 'Back and forward', slug: 'examples/back-and-forward' },
@@ -135,7 +146,7 @@ export const SECTIONS = [
         ],
       },
       {
-        label: 'Params and guards',
+        ...named('nav.group.params-and-guards'),
         items: [
           { title: 'Query params', slug: 'examples/query-params' },
           { title: 'Guards and sign-in', slug: 'examples/guards' },
@@ -145,17 +156,17 @@ export const SECTIONS = [
   },
   {
     key: 'plugins',
-    label: 'Plugins',
+    ...named('nav.plugins'),
     groups: [
       {
-        label: 'Plugins',
+        ...named('nav.plugins'),
         items: [
-          { title: 'All plugins', slug: 'plugins' },
+          { ...titled('nav.item.allPlugins'), slug: 'plugins' },
           { title: 'Writing a plugin', slug: 'guides/writing-a-plugin' },
         ],
       },
       {
-        label: 'Reference',
+        ...named('nav.group.reference'),
         items: [
           ...PLUGINS.map(({ name }) => ({ title: name, slug: `plugins/${name}`, symbol: true })),
         ],
@@ -164,24 +175,32 @@ export const SECTIONS = [
   },
 ];
 
-export const hrefFor = (slug) => {
+// a nav item's href, in a language (english at the root, the rest under their path)
+export const hrefFor = (slug, code) => {
   const [path, hash] = slug.split('#');
-  return `/${path}/${hash ? `#${hash}` : ''}`;
+  return `${localePath(`/${path}/`, code)}${hash ? `#${hash}` : ''}`;
 };
 
-// the nav for a page: every item knows whether its page exists and whether it is this page
-export function navFor(ids, currentId) {
+// the nav for a page, in a language: every item knows whether its page exists and whether it is
+// this page. sections and groups go by their name in the language, and a page translated into it
+// (titles, by slug) goes by its translated title
+export function navFor(ids, currentId, { code = DEFAULT_LOCALE, titles = new Map() } = {}) {
   const exists = new Set(ids);
+  const label = (it) => (it.name ? t(code, it.name) : it.label);
   return SECTIONS.map((section) => ({
     ...section,
+    label: label(section),
     href: hrefFor(
       section.groups.flatMap((g) => g.items).find((it) => exists.has(it.slug.split('#')[0]))?.slug ?? section.key,
+      code,
     ),
     groups: section.groups.map((g) => ({
       ...g,
+      label: label(g),
       items: g.items.map((it) => {
         const page = it.slug.split('#')[0];
-        return { ...it, href: exists.has(page) ? hrefFor(it.slug) : null, current: it.slug === currentId };
+        const title = it.name ? t(code, it.name) : it.slug.includes('#') ? it.title : (titles.get(page) ?? it.title);
+        return { ...it, title, href: exists.has(page) ? hrefFor(it.slug, code) : null, current: it.slug === currentId };
       }),
     })),
   }));

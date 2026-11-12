@@ -6,6 +6,7 @@ import { PlaygroundPreview, PlaygroundProject } from '@semantic-ui/playground';
 import { createEditor } from '@semantic-ui/playground/editor';
 
 import { IMPORT_MAP } from './playground-imports.js';
+import { ui } from './strings.js';
 
 // the editor in the site's code colors: the same tokens the code blocks and shiki use, so a live
 // example reads like every other sample, in both themes
@@ -39,6 +40,38 @@ const EDITOR_THEME = `
     .tok-variableName.tok-definition, .tok-function, .tok-variableName2 { color: var(--c-violet); }
     .tok-typeName, .tok-className, .tok-tagName { color: var(--c-green); }
     .tok-punctuation, .tok-operator, .tok-bracket { color: var(--text-2); }
+
+    /* find and replace (ctrl/cmd+f): the panel on the code header's surface, fields in the code's
+       face, quiet buttons, the find and replace rows kept on lines of their own. scoped as
+       codemirror scopes its own search styles, so these win by coming later */
+    .cm-panels { background: var(--code-head); color: var(--text-2); }
+    .cm-panels-top { border-bottom: 1px solid var(--line); }
+    .cm-panel.cm-search {
+      position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+      padding: 10px 44px 10px 12px; font: 400 var(--fs-xs)/var(--lh-xs) var(--font-sans);
+    }
+    .cm-panel.cm-search br { display: block; flex-basis: 100%; height: 0; content: ''; }
+    .cm-panel.cm-search .cm-textfield {
+      width: 220px; height: 28px; margin: 0; padding: 0 10px;
+      border: 1px solid var(--line-2); border-radius: var(--r-2); background: var(--bg); color: var(--text);
+      font: 400 var(--code-fs)/1 var(--font-mono);
+    }
+    .cm-panel.cm-search .cm-textfield:focus { outline: none; border-color: var(--accent); }
+    .cm-panel.cm-search .cm-button {
+      height: 28px; margin: 0; padding: 0 10px;
+      border: 1px solid var(--line-2); border-radius: var(--r-2); background: var(--surface-2); background-image: none;
+      color: var(--text-2); font: 500 var(--fs-xs)/1 var(--font-sans); cursor: pointer;
+    }
+    .cm-panel.cm-search .cm-button:hover { color: var(--text); background: var(--surface-3); }
+    .cm-panel.cm-search label { display: inline-flex; align-items: center; gap: 6px; color: var(--text-3); font-size: var(--fs-xs); }
+    .cm-panel.cm-search input[type=checkbox] { margin: 0; accent-color: var(--accent); }
+    .cm-panel.cm-search button[name=close] {
+      position: absolute; top: 10px; right: 10px; display: grid; place-items: center; width: 28px; height: 28px;
+      border: 0; border-radius: var(--r-2); background: none; color: var(--text-3); font-size: 18px; line-height: 1; cursor: pointer;
+    }
+    .cm-panel.cm-search button[name=close]:hover { color: var(--text); background: var(--surface-3); }
+    .cm-searchMatch { background: color-mix(in oklab, var(--accent) 22%, transparent); outline: 1px solid var(--accent-line); }
+    .cm-searchMatch.cm-searchMatch-selected { background: color-mix(in oklab, var(--accent) 45%, transparent); }
   }
 `;
 
@@ -58,7 +91,7 @@ export function mountPlayground(root) {
   // url on reload and back/forward, which would be a dead session's deep path
   const frame = document.createElement('iframe');
   frame.className = 'pg-frame';
-  frame.title = 'Live preview';
+  frame.title = ui('playground.preview');
   $('[data-pg-frame]').replaceWith(frame);
 
   // the app owns its urls, so any path without a file serves index.html: reloads and deep links land
@@ -69,10 +102,10 @@ export function mountPlayground(root) {
   let started = 0;
   project.on('buildStart', () => {
     started = performance.now();
-    say('Building…');
+    say(ui('playground.building'));
   });
-  project.on('buildError', (error) => say(`Build error: ${error.message}`, true));
-  project.on('buildDone', () => say(`Built in ${Math.round(performance.now() - started)} ms`));
+  project.on('buildError', (error) => say(ui('playground.buildError', { message: error.message }), true));
+  project.on('buildDone', () => say(ui('playground.built', { ms: Math.round(performance.now() - started) })));
 
   // the preview follows the app through the playground's bridge: where it is, whether it can go
   // back or forward, what it throws. it reloads in place after every build, on the same route
@@ -85,17 +118,20 @@ export function mountPlayground(root) {
     back.disabled = !canGoBack;
     forward.disabled = !canGoForward;
   });
-  preview.on('error', ({ message }) => say(`Runtime error: ${message}`, true));
+  preview.on('error', ({ message }) => say(ui('playground.runtimeError', { message }), true));
   back.addEventListener('click', () => preview.back());
   forward.addEventListener('click', () => preview.forward());
   $('[data-pg-reload]').addEventListener('click', () => preview.reload());
+
+  // the static copy of the first file stands in only until the editor is here
+  root.querySelector('[data-pg-static]')?.remove();
 
   // the editor: one tab per file, edits rebuild the preview
   const tabs = $('[data-pg-tabs]');
   const editor = createEditor({
     parent: $('[data-pg-editor]'),
     // hidden setup lines don't leave a gap in the numbering
-    lineNumbers: 'continuous',
+    lineNumbers: root.dataset.lineNumbers === 'off' ? false : 'continuous',
     theme: EDITOR_THEME,
     onChange: (name, content) => {
       project.editFile(name, content);

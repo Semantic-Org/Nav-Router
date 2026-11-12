@@ -6,7 +6,7 @@ try:
   - 'Open **Fast**. The URL and the page change together: the data was ready inside `holdCommit`.'
   - 'Open **Medium**. The URL moves at 300ms while the old page stays up, then the new page arrives with no loading view.'
   - 'Open **Slow**. The URL moves, then the loading view takes over until the data lands.'
-  - "Add `loadingDelay: '0ms'` to `routes` in `routes.js` and open **Medium** again."
+  - "Add `loadingDelay: '0ms'` to `router({ … })` in `app.js` and open **Medium** again."
 related:
   - { title: Router settings, href: /api/router/#settings }
 ---

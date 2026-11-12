@@ -3,6 +3,8 @@
 // and use the arrow keys; double-click or Enter puts it back. the reader's split is remembered for
 // every example, as a share of the width (side by side) or a height in px (stacked).
 
+import { ui } from './strings.js';
+
 const KEY = 'nr:pg-split';
 const STACKED = matchMedia('(max-width: 900px)');
 const SIDE = { min: 280, fallback: 7 / 12 }; // each side keeps at least this many px
@@ -44,7 +46,7 @@ export function mountSplit(root) {
       handle.setAttribute('aria-valuemin', STACK.min);
       handle.setAttribute('aria-valuemax', STACK.max);
       handle.setAttribute('aria-valuenow', height);
-      handle.setAttribute('aria-valuetext', `Editor ${height} pixels tall`);
+      handle.setAttribute('aria-valuetext', ui('playground.split.tall', { height }));
       return;
     }
     const width = root.clientWidth;
@@ -58,7 +60,7 @@ export function mountSplit(root) {
     handle.setAttribute('aria-valuemin', Math.round((SIDE.min / width) * 100));
     handle.setAttribute('aria-valuemax', Math.round((max / width) * 100));
     handle.setAttribute('aria-valuenow', pct);
-    handle.setAttribute('aria-valuetext', `Editor ${pct}% of the width`);
+    handle.setAttribute('aria-valuetext', ui('playground.split.wide', { percent: pct }));
   }
 
   function setFrom(px) {

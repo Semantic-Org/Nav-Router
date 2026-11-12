@@ -5,6 +5,7 @@
 import { sampleFor } from '../lib/plugins.js';
 import { formatSizeBytes } from './format.js';
 import { highlight } from './site.js';
+import { ui } from './strings.js';
 
 export function mountPlugins() {
   const list = document.getElementById('plugin-list');
@@ -28,7 +29,7 @@ export function mountPlugins() {
     });
     all.hidden = !!q;
     some.hidden = !q;
-    some.textContent = `${shown} of ${items.length}`;
+    some.textContent = ui('plugins.count.shown', { shown, total: items.length });
     empty.hidden = shown > 0;
     emptyQuery.textContent = q;
     setParam('q', q);
@@ -94,7 +95,7 @@ export function mountPlugins() {
     const chosen = picks.filter((p) => p.checked);
     const names = chosen.map((p) => p.value);
     const bytes = chosen.reduce((sum, p) => sum + Number(p.closest('.plugin').dataset.bytes), 0);
-    const code = sampleFor(names);
+    const code = sampleFor(names, ui('plugins.sample.empty'));
     sample.dataset.raw = code;
     sample.innerHTML = highlight(code);
     pickedCount.textContent = names.length;

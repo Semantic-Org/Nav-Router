@@ -2,6 +2,7 @@
 // /search-index.json, generated from the same pages. both are normalized to one result shape:
 //   { section, title, url, crumb, symbol, subs: [{ heading, url, excerpt (html), symbol }] }
 
+import { ui } from './strings.js';
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const terms = (q) => q.toLowerCase().split(/\s+/).filter(Boolean);
 const looksLikeSymbol = (t) => /^[\w.-]+\(\)$|^[a-z]+(-[a-z]+)+$/.test(t);
@@ -98,20 +99,20 @@ const ICONS = {
 export function mountSearch() {
   const dialog = document.createElement('dialog');
   dialog.className = 'search';
-  dialog.setAttribute('aria-label', 'Search docs');
+  dialog.setAttribute('aria-label', ui('search.label'));
   dialog.innerHTML = `
     <div class="search-panel">
       <div class="search-field">
         ${ICONS.search}
-        <input type="search" placeholder="Search docs" autocomplete="off" spellcheck="false"
+        <input type="search" placeholder="${ui('search.label')}" autocomplete="off" spellcheck="false"
           role="combobox" aria-expanded="true" aria-controls="search-results" aria-autocomplete="list">
         <kbd>esc</kbd>
       </div>
-      <div class="search-results" id="search-results" role="listbox" aria-label="Results"></div>
+      <div class="search-results" id="search-results" role="listbox" aria-label="${ui('search.results')}"></div>
       <div class="search-foot">
-        <span><kbd>↑</kbd><kbd>↓</kbd> to move</span>
-        <span><kbd>↵</kbd> to open</span>
-        <span class="search-by">Search by Pagefind</span>
+        <span><kbd>↑</kbd><kbd>↓</kbd> ${ui('search.move')}</span>
+        <span><kbd>↵</kbd> ${ui('search.open')}</span>
+        <span class="search-by">${ui('search.by')}</span>
       </div>
     </div>`;
   document.body.append(dialog);
@@ -128,7 +129,7 @@ export function mountSearch() {
     const opt = (cls, href, inner) =>
       `<a class="search-opt ${cls}" id="so-${n}" data-i="${n++}" href="${href}" role="option">${inner}</a>`;
     if (!q) {
-      html = `<p class="search-group">Suggested</p>${
+      html = `<p class="search-group">${ui('search.suggested')}</p>${
         SUGGESTED.map((s) =>
           opt(
             'is-page',
@@ -141,9 +142,9 @@ export function mountSearch() {
       }`;
     }
     else if (!results.length) {
-      html = `<div class="search-empty"><p class="search-empty-title">No results for &ldquo;${
-        esc(q)
-      }&rdquo;</p><p>Try a function name like <code>navigate</code>, or a setting like <code>holdCommit</code>.</p></div>`;
+      html = `<div class="search-empty"><p class="search-empty-title">${esc(ui('search.none', { query: q }))}</p><p>${
+        ui('search.hint', { function: '<code>navigate</code>', setting: '<code>holdCommit</code>' })
+      }</p></div>`;
     }
     else {
       let section = null;

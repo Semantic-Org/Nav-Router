@@ -1,0 +1,51 @@
+---
+// the examples landing: every example as a card, grouped as the sidebar groups them
+import { getCollection } from 'astro:content';
+
+import LocaleNotice from '../components/LocaleNotice.astro';
+import DocsChrome from '../layouts/DocsChrome.astro';
+import { englishIn, inLanguage, draftStrings, languagesWith, localePath, t } from '../lib/i18n.js';
+import { inline } from '../lib/markdown/inline.js';
+import { SECTIONS } from '../lib/nav.js';
+
+const entries = new Map((await getCollection('examples')).map((e) => [`examples/${e.id}`, e]));
+const groups = SECTIONS.find((s) => s.key === 'examples').groups
+  .map((g) => ({ name: g.name, items: g.items.filter((it) => entries.has(it.slug)).map((it) => ({ ...it, entry: entries.get(it.slug) })) }))
+  .filter((g) => g.items.length);
+// the page is its words (examples.… in content/strings.json): a language that has them has the
+// page. each card is its example in the language, where the example has been translated
+const locale = Astro.currentLocale;
+const writtenIn = languagesWith('examples.');
+const translated = writtenIn.includes(locale);
+const translatedIn = languagesWith('examples.', { reviewed: true });
+const english = translated ? {} : englishIn(locale);
+for (const g of groups) { for (const it of g.items) { it.entry = (await inLanguage(it.entry, locale)).page; } }
+const lede = t(locale, 'examples.lede');
+---
+<DocsChrome title={t(locale, 'examples.title')} description={lede} currentId="examples" wide writtenIn={writtenIn} translatedIn={translatedIn}>
+  <main class="doc is-wide" id="content" data-pagefind-body {...english}>
+    <LocaleNotice translated={translated} draft={translated && draftStrings(locale)} />
+    <span hidden data-pagefind-meta={`title:${t(locale, 'nav.examples')}`}></span>
+    <span hidden data-pagefind-meta={`section:${t(locale, 'nav.examples')}`}></span>
+    <span hidden data-pagefind-meta={`crumb:${t(locale, 'nav.examples')}`}></span>
+    <h1>{t(locale, 'nav.examples')}</h1>
+    <p class="doc-lede">{lede}</p>
+
+    {groups.map((g) => (
+      <section class="example-group">
+        <h2 class="example-group-label">{t(locale, g.name)}</h2>
+        <ul class="example-cards" role="list">
+          {g.items.map((it) => (
+            <li>
+              <a class="example-card" href={localePath(`/${it.slug}/`, locale)}>
+                <h3>{it.entry.data.title}</h3>
+                <p set:html={inline(it.entry.data.description)} />
+                <p class="example-card-try"><span>{t(locale, 'examples.try')}</span> <span set:html={inline(it.entry.data.try[0])} /></p>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    ))}
+  </main>
+</DocsChrome>

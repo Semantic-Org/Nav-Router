@@ -1,14 +1,6 @@
-import { href } from 'nav-router';
+import { Layout } from './layout.js';
 
 const PEOPLE = { ada: 'Ada Park', mo: 'Mo Reyes' };
-
-const Layout = () => `
-  <header>
-    <a href="${href('home')}">Team</a>
-    <a href="${href('member', { userId: 'ada' })}">Ada</a>
-    <a href="${href('member', { userId: 'mo' })}">Mo</a>
-  </header>
-  <slot></slot>`;
 
 export const routes = {
   name: 'home',
@@ -17,7 +9,8 @@ export const routes = {
     path: '/',
     view: () => `
       <h1>Team</h1>
-      <p>Two people. Each link above is built by <code>href()</code> from a route name.</p>`,
+      <p>Two people. Each link above is built by
+        <code>href()</code> from a route name.</p>`,
   },
   routes: {
     member: {

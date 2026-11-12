@@ -10,7 +10,9 @@
   --surface-1: #05070b;
   --surface-2: #0a0d14;
   --surface-3: #111522;
-  --code-bg: #080c10;
+  /* code is neutral black, so the cool tones (the info callout, the accent) stand apart from it */
+  --code-bg: oklch(0.155 0 0);
+  --code-head: oklch(0.12 0 0);
 
   /* text: white at stepped opacity, as SUI does it */
   --text: oklch(1 0 0 / 0.92);
@@ -25,6 +27,12 @@
 
   /* one action color */
   --accent: oklch(0.74 0.15 249.95);
+  /* a card's surface: light from the upper left on a cool dark, in the accent's hue */
+  --sheen: linear-gradient(140deg, oklch(0.17 0.025 250), oklch(0 0 0) 55%, oklch(0.13 0.02 250));
+  --sheen-hover: linear-gradient(140deg, oklch(0.21 0.03 250), oklch(0.05 0.008 250) 55%, oklch(0.16 0.025 250));
+  /* a small raised mark (a step number, a logo tile), lit from the same corner; laid over its fill */
+  --bevel: linear-gradient(140deg, oklch(1 0 0 / 0.1), oklch(0 0 0 / 0.2));
+  --bevel-soft: linear-gradient(140deg, oklch(1 0 0 / 0.06), oklch(0 0 0 / 0.1));  /* inline code */
   --accent-strong: oklch(0.80 0.13 249.95);
   --accent-wash: oklch(0.74 0.15 249.95 / 0.12);
   --accent-line: oklch(0.74 0.15 249.95 / 0.35);
@@ -82,10 +90,18 @@
   --r-3: 10px;
   --r-4: 14px;
 
-  --container: 1200px;
-  --gutter: 40px;
+  --container: 1440px;
+  /* the page's side margin grows with the window, so a laptop gets a frame too: 32px where the
+     narrower layout hands over (1080), 86px at 1440, and 96px from 1507. past 1632 the container's
+     own centering takes over. whole pixels at every width */
+  --gutter: clamp(32px, round(down, 15vw - 130px, 1px), 96px);
 
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* the wide homepage container gives the hero headline room to grow */
+@media (min-width: 1280px) {
+  :root { --display: 64px; --display-lh: 68px; }
 }
 
 @media (max-width: 1080px) {
@@ -97,9 +113,11 @@
 }
 @media (max-width: 600px) {
   :root {
-    --display: 44px; --display-lh: 48px; --display-track: -1px;
+    /* a phone's usable height is the screen less the browser's bars: the pitch has to finish
+       well inside it, so the type steps down to the scale other tool homepages use there */
+    --display: 32px; --display-lh: 36px; --display-track: -1px;
     --heading: var(--fs-2xl); --heading-lh: var(--lh-2xl); --heading-track: 0px;
-    --section-y: 72px; --hero-top: 48px; --hero-bottom: 64px;
+    --section-y: 72px; --hero-top: 28px; --hero-bottom: 64px;
     --gutter: 16px;
   }
 }
@@ -111,6 +129,7 @@
   --surface-2: #f2f4f8;
   --surface-3: #e9ecf3;
   --code-bg: #f6f7f9;
+  --code-head: var(--surface-1);
   --text: oklch(0.18 0.02 265 / 0.95);
   --text-2: oklch(0.18 0.02 265 / 0.72);
   --text-3: oklch(0.18 0.02 265 / 0.55);
@@ -119,6 +138,10 @@
   --line-2: oklch(0.3 0.03 279 / 0.15);
   --line-3: oklch(0.3 0.03 279 / 0.26);
   --accent: oklch(0.52 0.17 254);
+  --sheen: linear-gradient(140deg, oklch(1 0 0), oklch(0.985 0.004 254) 55%, oklch(0.955 0.012 254));
+  --sheen-hover: linear-gradient(140deg, oklch(1 0 0), oklch(0.975 0.006 254) 55%, oklch(0.94 0.016 254));
+  --bevel: linear-gradient(140deg, oklch(1 0 0 / 0.9), oklch(0 0 0 / 0.05));
+  --bevel-soft: linear-gradient(140deg, oklch(1 0 0 / 0.7), oklch(0 0 0 / 0.03));
   --accent-strong: oklch(0.45 0.18 254);
   --accent-wash: oklch(0.52 0.17 254 / 0.08);
   --accent-line: oklch(0.52 0.17 254 / 0.3);
@@ -172,7 +195,7 @@ abbr[title] { text-decoration: underline dotted var(--line-3); text-underline-of
   padding: 4px 6px;
   margin: 0 3px;
   border-radius: var(--r-3);
-  background: var(--surface-2);
+  background: var(--bevel-soft), var(--surface-2);
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--text);
   white-space: nowrap;
@@ -182,8 +205,8 @@ abbr[title] { text-decoration: underline dotted var(--line-3); text-underline-of
 :root[data-theme='light'] :where(p, li, dd, td, figcaption) code.setting { box-shadow: inset 0 0 0 1px var(--accent-line); }
 /* a chip joined with the punctuation that touches it: kept on one line, the touching side unpadded */
 .code-join { white-space: nowrap; }
-code.joined-start { margin-left: 0; }
-code.joined-end { margin-right: 0; }
+code.joined-start { margin-inline-start: 0; }
+code.joined-end { margin-inline-end: 0; }
 /* inside a link, the link color carries through */
 :where(a) > code { color: inherit; }
 a { color: inherit; }
@@ -221,6 +244,14 @@ code, kbd, pre { font-family: var(--font-mono); font-variant-ligatures: none; fo
 }
 /* stand-in mark: two route nodes joined by a path */
 .wordmark svg { width: 22px; height: 22px; flex: none; }
+/* the mark's pulse (scripts/mark-pulse.js): a bright length running along its line, and the ring lit */
+.wordmark svg { overflow: visible; }
+.mark-pulse {
+  fill: none; stroke: oklch(0.95 0.03 250); stroke-width: 2; stroke-linecap: round;
+  stroke-dasharray: 16 200; opacity: 0; filter: drop-shadow(0 0 2px var(--accent));
+}
+.mark-glow { fill: var(--accent); opacity: 0; }
+:root[data-theme='light'] .mark-pulse { stroke: oklch(0.42 0.17 254); }
 
 .btn {
   --h: 40px;
@@ -252,14 +283,14 @@ kbd {
 
 .search-trigger {
   display: flex; align-items: center; gap: 10px;
-  height: 34px; padding: 0 6px 0 10px; min-width: 220px;
+  height: 34px; padding-block: 0; padding-inline: 10px 6px; min-width: 220px;
   border: 1px solid var(--line-2); border-radius: var(--r-2);
   background: var(--surface-1); color: var(--text-3);
   font: 400 var(--fs-sm)/1 var(--font-sans); cursor: pointer;
 }
 .search-trigger:hover { border-color: var(--line-3); color: var(--text-2); }
 .search-trigger svg { width: 15px; height: 15px; }
-.search-trigger .keys { margin-left: auto; display: flex; gap: 3px; }
+.search-trigger .keys { margin-inline-start: auto; display: flex; gap: 3px; }
 
 .icon-btn {
   display: inline-grid; place-items: center;
@@ -281,8 +312,8 @@ kbd {
 
 .dropdown { position: relative; display: inline-block; }
 .dd-button {
-  display: inline-flex; align-items: center; gap: 8px; text-align: left;
-  height: 30px; padding: 0 10px 0 12px;
+  display: inline-flex; align-items: center; gap: 8px; text-align: start;
+  height: 30px; padding-block: 0; padding-inline: 12px 10px;
   border: 1px solid var(--line-2); border-radius: 999px;
   background: var(--surface-1); color: var(--text);
   font: 500 var(--fs-xs)/1 var(--font-sans); cursor: pointer;
@@ -293,7 +324,7 @@ kbd {
 .dd-button[aria-expanded='true'] .dd-chevron { rotate: 180deg; }
 
 .dd-menu {
-  position: absolute; z-index: 30; top: calc(100% + 6px); left: 0;
+  position: absolute; z-index: 30; top: calc(100% + 6px); inset-inline-start: 0;
   min-width: 100%; max-height: 320px; overflow-y: auto;
   margin: 0; padding: 4px; list-style: none;
   border: 1px solid var(--line-2); border-radius: var(--r-3);
@@ -307,7 +338,7 @@ kbd {
 @keyframes dd-in { from { opacity: 0; scale: 0.98; translate: 0 -4px; } }
 .dd-menu [role=option] {
   display: grid; grid-template-columns: 16px auto 1fr; align-items: center; gap: 8px;
-  height: 32px; padding: 0 10px 0 8px;
+  height: 32px; padding-block: 0; padding-inline: 8px 10px;
   border-radius: var(--r-2);
   color: var(--text-2); font-size: var(--fs-xs); line-height: var(--lh-xs);
   white-space: nowrap; cursor: pointer;
@@ -316,7 +347,7 @@ kbd {
 .dd-menu [role=option][aria-selected='true'] { color: var(--text); }
 .dd-check { width: 14px; height: 14px; color: var(--accent); visibility: hidden; }
 [aria-selected='true'] > .dd-check { visibility: visible; }
-.dd-hint { justify-self: end; padding-left: 24px; color: var(--text-4); font: 400 var(--fs-3xs)/1 var(--font-mono); }
+.dd-hint { justify-self: end; padding-inline-start: 24px; color: var(--text-4); font: 400 var(--fs-3xs)/1 var(--font-mono); }
 .dd-menu [role=option].is-active .dd-hint { color: var(--text-3); }
 
 /* ---------- search (⌘K) ---------- */
@@ -358,13 +389,13 @@ dialog.search::backdrop { background: oklch(0 0 0 / 0.6); backdrop-filter: blur(
   border-radius: var(--r-2); color: var(--text-2); text-decoration: none;
 }
 .search-opt > svg { width: 16px; height: 16px; flex: none; color: var(--text-4); }
-.search-opt.is-sub { margin-left: 18px; align-items: flex-start; }
+.search-opt.is-sub { margin-inline-start: 18px; align-items: flex-start; }
 .search-opt.is-sub > svg { margin-top: 2px; width: 14px; height: 14px; }
 .search-opt[aria-selected='true'] { background: var(--surface-3); color: var(--text); }
 .search-opt[aria-selected='true'] > svg { color: var(--accent); }
 .so-title { color: var(--text); font-size: var(--fs-sm); line-height: var(--lh-sm); font-weight: 500; }
 .so-title code { font-size: var(--fs-xs); }
-.so-crumb { margin-left: auto; color: var(--text-4); font-size: var(--fs-2xs); line-height: var(--lh-2xs); }
+.so-crumb { margin-inline-start: auto; color: var(--text-4); font-size: var(--fs-2xs); line-height: var(--lh-2xs); }
 .so-body { display: flex; flex-direction: column; min-width: 0; }
 .so-excerpt {
   color: var(--text-3); font-size: var(--fs-xs); line-height: var(--lh-xs);
@@ -380,7 +411,7 @@ dialog.search::backdrop { background: oklch(0 0 0 / 0.6); backdrop-filter: blur(
   color: var(--text-4); font-size: var(--fs-2xs); line-height: var(--lh-2xs);
 }
 .search-foot span { display: inline-flex; align-items: center; gap: 4px; }
-.search-by { margin-left: auto; }
+.search-by { margin-inline-start: auto; }
 @media (max-width: 600px) {
   dialog.search { margin-top: 16px; }
   .search-foot span:not(.search-by) { display: none; }
@@ -391,24 +422,24 @@ dialog.search::backdrop { background: oklch(0 0 0 / 0.6); backdrop-filter: blur(
 .dd-icon svg { width: 100%; height: 100%; }
 .dropdown.dd-lg { display: block; }
 .dd-lg .dd-button {
-  width: 100%; height: 52px; padding: 0 12px 0 8px; gap: 10px;
+  width: 100%; height: 52px; padding-block: 0; padding-inline: 8px 12px; gap: 10px;
   border-radius: var(--r-3); background: var(--surface-1);
 }
 .dd-lg .dd-current { flex: 1; min-width: 0; }
 .dd-lg .dd-face { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .dd-lg .dd-icon {
   width: 34px; height: 34px; padding: 8px;
-  border: 1px solid var(--line-2); border-radius: var(--r-2); background: var(--surface-2); color: var(--text);
+  border: 1px solid var(--line-2); border-radius: var(--r-2); background: var(--bevel), var(--surface-2); color: var(--text);
 }
 .dd-text { display: flex; flex-direction: column; min-width: 0; }
 .dd-name { color: var(--text); font: 600 var(--fs-sm)/var(--lh-sm) var(--font-sans); }
 .dd-sub { color: var(--text-3); font: 400 var(--fs-3xs)/var(--lh-3xs) var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dd-lg .dd-chevron { width: 16px; height: 16px; }
 .dd-lg .dd-button[aria-expanded='true'] .dd-chevron { rotate: none; }
-.dd-lg .dd-menu { right: 0; max-height: min(420px, 60vh); padding: 4px; }
+.dd-lg .dd-menu { inset-inline-end: 0; max-height: min(420px, 60vh); padding: 4px; }
 .dd-lg .dd-menu [role=option] {
   grid-template-columns: auto minmax(0, 1fr) 14px; gap: 8px;
-  height: 48px; padding: 0 8px 0 6px;
+  height: 48px; padding-block: 0; padding-inline: 6px 8px;
 }
 .dd-lg .dd-menu .dd-icon { width: 30px; height: 30px; padding: 7px; }
 .dd-lg [role=option][aria-selected='true'] .dd-icon { border-color: var(--accent-line); color: var(--accent-strong); }
@@ -434,11 +465,12 @@ dialog.search::backdrop { background: oklch(0 0 0 / 0.6); backdrop-filter: blur(
   color: var(--text);
   tab-size: 2;
 }
+.code pre.is-line { padding-block: 10px; }
 .code-head {
   display: flex; align-items: center; gap: 2px;
-  min-height: 43px;  /* 42 inside the 1px border: tabs center on a whole pixel */ padding: 0 8px 0 6px;
+  min-height: 43px;  /* 42 inside the 1px border: tabs center on a whole pixel */ padding-block: 0; padding-inline: 6px 8px;
   border-bottom: 1px solid var(--line);
-  background: var(--surface-1);
+  background: var(--code-head);
 }
 /* a header's tabs keep their size; anything beside them gives way first */
 .code-head [role=tablist] { display: flex; flex: none; gap: 2px; }
@@ -450,7 +482,7 @@ dialog.search::backdrop { background: oklch(0 0 0 / 0.6); backdrop-filter: blur(
 .code-tab:hover { color: var(--text-2); }
 .code-tab[aria-selected='true'] { color: var(--text); background: var(--surface-3); }
 .code-file { padding: 0 8px; color: var(--text-3); font: 400 var(--fs-xs)/1 var(--font-mono); }
-.code-head .copy { margin-left: auto; }
+.code-head .copy { margin-inline-start: auto; }
 
 .copy {
   display: inline-grid; place-items: center;
@@ -463,13 +495,13 @@ dialog.search::backdrop { background: oklch(0 0 0 / 0.6); backdrop-filter: blur(
 
 /* which framework a shared code variant stands for */
 .code-note {
-  margin-left: auto; padding: 0 8px; min-width: 0;
+  margin-inline-start: auto; padding: 0 8px; min-width: 0;
   color: var(--text-3); font-size: var(--fs-2xs); line-height: var(--lh-2xs);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .code-note:empty { display: none; }
 .code-note code { color: var(--text-2); font-size: var(--fs-2xs); }
-.code-head .code-note + .copy { margin-left: auto; }
+.code-head .code-note + .copy { margin-inline-start: auto; }
 @media (max-width: 600px) { .code-note { display: none; } }
 
 /* shiki (build-time highlighting) writes these variables; they map onto the same syntax colors as
@@ -491,7 +523,7 @@ pre.astro-code { background: transparent; color: var(--shiki-foreground); }
 pre.astro-code:focus-visible { outline-offset: -2px; }
 pre.astro-code .line.highlighted {
   display: inline-block; width: calc(100% + 40px); margin: 0 -20px; padding: 0 17px;
-  border-left: 3px solid var(--accent); background: var(--accent-wash);
+  border-inline-start: 3px solid var(--accent); background: var(--accent-wash);
 }
 
 /* syntax */
@@ -503,8 +535,109 @@ pre.astro-code .line.highlighted {
 .tk-p { color: var(--c-blue); }
 .tk-t { color: var(--c-green); }
 .tk-o { color: var(--text-3); }
-.line-hl { display: inline-block; width: calc(100% + 40px); margin: 0 -20px; padding: 0 17px; border-left: 3px solid var(--accent); background: var(--accent-wash); }
+.line-hl { display: inline-block; width: calc(100% + 40px); margin: 0 -20px; padding: 0 17px; border-inline-start: 3px solid var(--accent); background: var(--accent-wash); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* ---------- pop menu (page actions, versions) ----------
+   a small menu that drops under its trigger, aligned to the trigger's right edge */
+.pop-menu {
+  position: absolute; z-index: 20; inset-inline-end: 0; top: calc(100% + 6px); width: 288px; padding: 6px;
+  background: var(--bg); border: 1px solid var(--line-2); border-radius: var(--r-3);
+  box-shadow: 0 16px 40px -12px oklch(0 0 0 / 0.6);
+}
+:root[data-theme='light'] .pop-menu { box-shadow: 0 12px 32px -12px oklch(0.3 0.03 265 / 0.25); }
+.pop-menu[hidden] { display: none; }
+.pop-menu :is([role=menuitem], [role=menuitemradio]) {
+  display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 10px;
+  border: 0; border-radius: var(--r-2); background: none; cursor: pointer;
+  color: var(--text); text-align: start; text-decoration: none; font: inherit;
+}
+.pop-menu :is([role=menuitem], [role=menuitemradio]):hover, .pop-menu :is([role=menuitem], [role=menuitemradio]):focus-visible { background: var(--surface-2); outline: none; }
+.pop-menu :is([role=menuitem], [role=menuitemradio]) > svg:first-child { flex: none; width: 16px; height: 16px; color: var(--text-3); }
+.pop-menu :is([role=menuitem], [role=menuitemradio]) > svg:last-child:not(:first-child) { flex: none; width: 14px; height: 14px; margin-inline-start: auto; color: var(--text-4); }
+.pop-menu [aria-checked='true'] > svg { color: var(--accent); }
+.pop-menu span { display: flex; flex-direction: column; min-width: 0; font-size: var(--fs-sm); line-height: var(--lh-sm); font-weight: 500; }
+.pop-menu small { color: var(--text-3); font-size: var(--fs-2xs); line-height: var(--lh-2xs); font-weight: 400; }
+
+.pop-menu a.pop-item { color: var(--text); text-decoration: none; }
+.pop-archived { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
+.pop-archived[hidden] { display: none; }
+
+/* the version and its menu, in either topbar */
+.version-menu { position: relative; }
+.version-button {
+  display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 8px;
+  border: 0; border-radius: var(--r-2); background: none; cursor: pointer;
+  color: var(--text-3); font: 400 var(--fs-2xs)/1 var(--font-mono);
+}
+.version-button:hover, .version-button[aria-expanded='true'] { color: var(--text); background: var(--surface-2); }
+.version-button svg { width: 12px; height: 12px; transition: rotate 0.15s var(--ease); }
+.version-button[aria-expanded='true'] svg { rotate: 180deg; }
+.version-menu .pop-menu { width: 220px; }
+
+/* on a frozen vN site, once newer docs exist */
+.archive-banner {
+  display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; padding: 8px 16px;
+  background: var(--surface-2); border-bottom: 1px solid var(--line-2);
+  color: var(--text-2); font-size: var(--fs-sm); line-height: var(--lh-sm); text-align: center;
+}
+.archive-banner a { color: var(--accent-strong); }
+
+/* the offer of a reader's language, and the question after a switch: a bar that floats at the foot of
+   the window, so nothing on the page moves for it */
+.language-toast {
+  position: fixed; z-index: 60; inset-inline: 16px; bottom: 16px; margin-inline: auto; width: fit-content; max-width: calc(100% - 32px);
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 10px 12px; padding-inline-start: 16px;
+  border: 1px solid var(--line-2); border-radius: var(--r-3); background: var(--bg);
+  box-shadow: 0 16px 40px -12px oklch(0 0 0 / 0.6);
+  color: var(--text); font-size: var(--fs-sm); line-height: var(--lh-sm);
+}
+:root[data-theme='light'] .language-toast { box-shadow: 0 12px 32px -12px oklch(0.3 0.03 265 / 0.25); }
+.language-toast p { margin: 0; margin-inline-end: 4px; }
+.language-toast .btn { height: 32px; padding-inline: 12px; font-size: var(--fs-sm); }
+
+/* the language choice where the topbar has no room for its menu: a row in the menu drawer */
+.language-select { display: none; }
+@media (max-width: 900px) {
+  .language-select {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    height: 40px; margin-bottom: 24px; padding-inline: 12px 6px;
+    border: 1px solid var(--line-2); border-radius: var(--r-3);
+    color: var(--text-2); font-size: var(--fs-sm); line-height: var(--lh-sm);
+  }
+  .language-select select {
+    min-width: 0; height: 28px; padding-inline: 6px; border: 0; border-radius: var(--r-2);
+    background: transparent; color: var(--text); font: inherit; font-weight: 500; text-align: end; cursor: pointer;
+  }
+  /* the list a browser opens takes its colors from here: left to itself it can pair the page's light
+     text with its own white list */
+  .language-select option { background: var(--bg); color: var(--text); }
+  .home-menu .language-select { margin: 8px 0 0; }
+}
+
+/* ---------- right-to-left ----------
+   layout runs on logical properties, so a page in a right-to-left language mirrors on its own. code,
+   and the graphics that read as code or as time, keep reading left to right inside it */
+:where(pre, code, kbd, .keys, .code, .pg, .instrument, .pj, .cohort, .xr) { direction: ltr; }
+:where(code, kbd) { unicode-bidi: isolate; }
+:dir(rtl) .dd-menu { transform-origin: top right; }
+/* inside those graphics, a sentence and a mock app's own interface still read as the page does */
+:dir(rtl) :is(.trace-caption, .xr-note, .xr-count, .pg-status, .app-tabs, .app-page) { direction: rtl; }
+/* the slots graphic keeps its regions in place, so its wires stay clear of them; what's in a region
+   reads as the page does */
+:dir(rtl) .pj-r { direction: rtl; }
+/* a slot's tag sits in the corner its region's text leaves free, which is now the left one */
+:dir(rtl) .pj-r .pj-tag { direction: ltr; inset-inline: 2px auto; }
+:dir(rtl) .pj-ctl svg { scale: -1 1; }
+/* a number with its unit, or anything else that must keep its order inside a sentence */
+.ltr { direction: ltr; unicode-bidi: isolate; }
+
+/* ---------- arabic ----------
+   its letters join, so tracking would pull words apart; and words set in the mono face (labels, not
+   code) take the sans's arabic, since the mono has none and a system mono's arabic reads as typed */
+:root:lang(ar) { --font-mono: 'Fragment Mono', ui-sans-serif, system-ui, sans-serif; }
+:root:lang(ar) :is(pre, code, kbd) { --font-mono: 'Fragment Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+:root:lang(ar) * { letter-spacing: 0 !important; }

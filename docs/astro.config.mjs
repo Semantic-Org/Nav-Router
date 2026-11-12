@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import remarkDirective from 'remark-directive';
 import { createCssVariablesTheme } from 'shiki';
 
+import { astroI18n } from './src/lib/locales.js';
 import { rehypeDocs } from './src/lib/markdown/rehype-docs.js';
 import { remarkDocs } from './src/lib/markdown/remark-docs.js';
 import { transformerFenceMeta } from './src/lib/markdown/shiki-meta.js';
@@ -34,8 +35,12 @@ const hasCert = existsSync(CERT.key) && existsSync(CERT.cert);
 if (!hasCert) { console.warn('[site] no cert in cert/: dev runs over http on :4321. Run `npm run cert`.'); }
 
 export default defineConfig({
-  site: 'https://navrouter.dev',
+  // where the site is served: share cards and canonical links are absolute, so a staging build
+  // sets SITE_URL=https://staging.navrouter.dev
+  site: process.env.SITE_URL ?? 'https://navrouter.dev',
   trailingSlash: 'always',
+  // the languages (lib/locales.js); english at the root, the rest under their path
+  i18n: astroI18n,
   // the dev origin: https://local.navrouter.dev on :443, every interface, one site up at a time (the
   // house pattern). without the cert (npm run cert, see cert/README.md), plain http on :4321
   server: { host: true, port: hasCert ? 443 : 4321 },

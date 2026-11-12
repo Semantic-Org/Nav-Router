@@ -1,0 +1,70 @@
+/* a live example's frame: editor and preview side by side, stacked on narrow screens. imported by
+   the Playground component, so it comes along wherever one is used */
+
+
+.pg {
+  /* the code is what an example shows, so the editor gets the larger share */
+  display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  border: 1px solid var(--line-2); border-radius: var(--r-4); overflow: hidden;
+  height: 600px; position: relative;
+}
+/* the divider: a 12px grab area centered on the line between the panes. the line itself is the
+   editor pane's border; while hovered, focused or dragged it lights up */
+.pg-split {
+  position: absolute; z-index: 2; top: 0; bottom: 0; inset-inline-start: calc(var(--pg-at, 58.333%) - 6px); width: 12px;
+  cursor: col-resize; touch-action: none; outline: none;
+}
+.pg-split::after {
+  content: ''; position: absolute; top: 0; bottom: 0; inset-inline-start: 5px; width: 2px;
+  background: var(--accent); opacity: 0; transition: opacity 0.12s var(--ease);
+}
+/* the lit line is the focus indicator, so the usual ring would only box the grab area */
+.pg-split:focus-visible { outline: none; }
+.pg-split:hover::after, .pg-split:focus-visible::after, .pg.is-resizing .pg-split::after { opacity: 1; }
+.pg.is-resizing { cursor: col-resize; user-select: none; }
+.pg.is-resizing .pg-frame { pointer-events: none; }
+.pg-editor-pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-inline-end: 1px solid var(--line-2); background: var(--code-bg); }
+.pg-tabs { flex: none; }
+/* more files than the bar is wide: the tabs scroll sideways under the finger, with no scrollbar */
+.pg-tabs { overflow-x: auto; scrollbar-width: none; }
+.pg-tabs::-webkit-scrollbar { display: none; }
+.pg-editor { flex: 1; min-height: 0; overflow: auto; }
+.pg-preview-pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--surface-2); }
+.pg-bar { flex: none; display: flex; align-items: center; gap: 4px; height: 43px; padding: 0 8px; border-bottom: 1px solid var(--line); }
+.pg-nav {
+  display: grid; place-items: center; width: 28px; height: 28px;
+  border: 0; border-radius: var(--r-2); background: transparent; color: var(--text-3); cursor: pointer;
+}
+.pg-nav:hover:not(:disabled) { color: var(--text); background: var(--surface-3); }
+.pg-nav:disabled { opacity: 0.35; cursor: default; }
+.pg-nav svg { width: 16px; height: 16px; }
+.pg-url {
+  flex: 1; min-width: 0; margin-inline-start: 4px; height: 28px; display: flex; align-items: center; padding: 0 10px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--bg);
+  font: 400 var(--fs-xs)/1 var(--font-mono); color: var(--text); white-space: nowrap; overflow: hidden;
+}
+.pg-host { color: var(--text-3); }
+.pg-frame { flex: 1; width: 100%; min-height: 0; border: 0; background: #0a0d14; }
+.pg-status { flex: none; margin: 0; padding: 8px 12px; border-top: 1px solid var(--line); color: var(--text-3); font: 400 var(--fs-2xs)/var(--lh-2xs) var(--font-mono); }
+.pg-status.is-error { color: var(--danger); }
+@media (max-width: 900px) {
+  .pg { grid-template-columns: minmax(0, 1fr); height: auto; }
+  .pg-editor-pane { border-inline-end: 0; border-bottom: 1px solid var(--line-2); height: var(--pg-editor-h, 340px); }
+  .pg-split { top: calc(var(--pg-at, 340px) - 6px); bottom: auto; inset-inline-start: 0; inset-inline-end: 0; width: auto; height: 12px; cursor: row-resize; }
+  .pg-split::after { top: 5px; bottom: auto; inset-inline-start: 0; inset-inline-end: 0; width: auto; height: 2px; }
+  .pg.is-resizing { cursor: row-resize; }
+  .pg-preview-pane { height: 420px; }
+}
+
+
+/* the first file as text, until the editor loads: set as the editor sets it, line numbers aside */
+.pg-static {
+  margin: 0; padding-block: 12px; padding-inline: 56px 20px;
+  font-family: var(--font-mono); font-size: var(--code-fs); line-height: var(--code-lh);
+  color: var(--text-2); white-space: pre; tab-size: 2;
+}
+.no-line-numbers .pg-static { padding-inline-start: 20px; }
+.pg-run {
+  margin-inline-start: 6px; padding: 2px 8px; border: 1px solid var(--line-2); border-radius: var(--r-2);
+  background: var(--surface-2); color: var(--text); font: inherit; cursor: pointer;
+}

@@ -1,7 +1,7 @@
 ---
 title: Your first router
 description: A layout, two named routes and a param. Every link is built from a route name, not a pasted path.
-tabs: [routes.js, app.js, index.html]
+tabs: [routes.js, layout.js, app.js, index.html]
 try:
   - 'Click **Ada**, then **Mo**. The URL bar follows: `/people/ada`, then `/people/mo`.'
   - 'Press back in the preview’s bar. Ada’s page comes back from history.'

@@ -20,6 +20,8 @@ export function transformerFenceMeta() {
       if (meta.for) { node.properties['data-for'] = meta.for; }
       if (meta.label) { node.properties['data-label'] = meta.label; }
       if (meta.signature) { this.addClassToHast(node, 'signature'); }
+      // a single line sits tighter: the padding that lets a long block breathe swamps one line
+      if (!this.source.trim().includes('\n')) { this.addClassToHast(node, 'is-line'); }
       // the theme sets colors through variables; the inline style would pin the dark background
       delete node.properties.style;
       // the raw source, for the copy button

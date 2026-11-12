@@ -1,0 +1,97 @@
+---
+// a docs page: its header from frontmatter, its body, its footer and pager, in the docs frame
+import { getCollection, render } from 'astro:content';
+
+import LocaleNotice from '../components/LocaleNotice.astro';
+import DocsChrome from '../layouts/DocsChrome.astro';
+import { englishIn, formatDate, inLanguage, languagesOf, localePath, t, titlesIn } from '../lib/i18n.js';
+import { inline } from '../lib/markdown/inline.js';
+import { navFor, pagerFor } from '../lib/nav.js';
+import { markdownFor } from '../lib/page-markdown.js';
+import { formatSize, sizeOf } from '../lib/sizes.js';
+
+// entry is the english page, which gives the page its place in the docs. page is it in the reader's
+// language: the translation if there is one (stale when the english has moved past it), else english
+const { entry } = Astro.props;
+const locale = Astro.currentLocale;
+const { page, translated, stale, draft } = await inLanguage(entry, locale);
+const { Content, headings } = await render(page);
+// an untranslated page shows the english, which reads left to right even in a right-to-left language
+const english = translated ? {} : englishIn(locale);
+// the languages the page is written in, for search engines
+const { writtenIn, translatedIn } = await languagesOf(entry);
+// section landing pages that live outside the collection
+const ids = [...(await getCollection('docs')).map((e) => e.id), 'plugins'];
+const titles = await titlesIn(locale);
+const section = navFor(ids, entry.id, { code: locale, titles }).find((s) => s.key === entry.id.split('/')[0]);
+const group = section.groups.find((g) => g.items.some((it) => it.slug === entry.id));
+const { prev, next } = pagerFor(ids, entry.id);
+const { title, lede, kind, import: importLine, size, updated } = page.data;
+const sizeLabel = size ? formatSize(await sizeOf(size)) : null;
+// a heading that is a symbol on its own (navigate()), not prose that mentions one
+const isSymbol = (t) => /^[\w.$-]+\(\)$/.test(t) || (kind === 'plugin' && t === title);
+const toc = headings.filter((h) => h.depth === 2 || h.depth === 3)
+  .map((h) => ({ depth: h.depth, slug: h.slug, text: h.text.trim(), symbol: isSymbol(h.text.trim()) }));
+const minutes = Math.max(1, Math.round(page.body.split(/\s+/).length / 220));
+const updatedLabel = formatDate(locale, updated);
+// the markdown source, for copy page; < is escaped so the text can never close its script
+const source = JSON.stringify(markdownFor(page)).replace(/</g, '\\u003c');
+// the page handed to an assistant: its markdown, which it reads more cleanly than the html, and a
+// prompt that has it summarize the page and then ask what the reader is building
+// in another language, the page's markdown in that language, and the prompt in it
+const markdownPath = localePath(`/${entry.id}.md`, locale);
+const markdownUrl = new URL(markdownPath, Astro.site).href;
+const prompt = t(locale, 'page.prompt', { url: markdownUrl });
+const q = encodeURIComponent(prompt);
+const ICON = {
+  copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
+  markdown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>',
+  ask: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></svg>',
+  out: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"/></svg>',
+  chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>',
+};
+---
+<DocsChrome title={`${title} · nav-router`} description={lede} currentId={entry.id} toc={toc} extraIds={['plugins']} writtenIn={writtenIn} translatedIn={translatedIn}>
+  <main class="doc" id="content" data-pagefind-body {...english}>
+    <span hidden data-pagefind-meta={`title:${title}`}></span>
+    <span hidden data-pagefind-meta={`section:${section.label}`}></span>
+    <span hidden data-pagefind-meta={`crumb:${group?.label ?? section.label}`}></span>
+    {kind && <span hidden data-pagefind-meta="symbol:true"></span>}
+
+    <LocaleNotice translated={translated} stale={stale} draft={draft} />
+    <p class="doc-crumb" data-pagefind-ignore>
+      <a class="crumb" href={section.href}>{section.label}</a>{group && group.label !== section.label && <> / {group.label}</>}
+    </p>
+    <h1>{kind ? <><code>{title}</code> <span class="kind" data-pagefind-ignore>{kind}</span></> : title}</h1>
+    <p class="doc-lede" set:html={inline(lede)} />
+
+    <div class="doc-meta" data-pagefind-ignore>
+      {importLine && <span class="import-chip"><code id="import-line">{importLine}</code><button class="copy" type="button" data-copy="#import-line" aria-label={t(locale, 'page.copyImport')}></button></span>}
+      {sizeLabel && <span class="meta-badge"><bdi>{size === 'core' && 'core '}<b>{sizeLabel}</b> <abbr title={t(locale, 'page.minBr')}>min+br</abbr></bdi></span>}
+      {!kind && <span class="meta-badge">{t(locale, 'page.readTime', { minutes })}</span>}
+      <div class="page-actions" data-page-actions>
+        <button class="btn ghost page-copy" type="button" data-copy-page><span class="swap"><span data-copy-label>{t(locale, 'page.copy')}</span><span data-copy-done hidden>{t(locale, 'page.copied')}</span></span></button>
+        <button class="btn ghost page-more" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="page-menu" aria-label={t(locale, 'page.more')} set:html={ICON.chevron} />
+        <div class="page-menu pop-menu" id="page-menu" role="menu" aria-label={t(locale, 'page.menu')} hidden>
+          <button type="button" role="menuitem" data-copy-page><Fragment set:html={ICON.copy} /><span>{t(locale, 'page.copy')}<small>{t(locale, 'page.copyHint')}</small></span></button>
+          <a class="pop-item" role="menuitem" href={markdownPath} target="_blank"><Fragment set:html={ICON.markdown} /><span>{t(locale, 'page.markdown')}<small>{t(locale, 'page.markdownHint')}</small></span><Fragment set:html={ICON.out} /></a>
+          <a class="pop-item" role="menuitem" href={`https://claude.ai/new?q=${q}`} target="_blank" rel="noopener"><Fragment set:html={ICON.ask} /><span>{t(locale, 'page.ask', { assistant: 'Claude' })}<small>{t(locale, 'page.askHint')}</small></span><Fragment set:html={ICON.out} /></a>
+          <a class="pop-item" role="menuitem" href={`https://chatgpt.com/?q=${q}`} target="_blank" rel="noopener"><Fragment set:html={ICON.ask} /><span>{t(locale, 'page.ask', { assistant: 'ChatGPT' })}<small>{t(locale, 'page.askHint')}</small></span><Fragment set:html={ICON.out} /></a>
+          <a class="pop-item" role="menuitem" href="https://gemini.google.com/app" target="_blank" rel="noopener" data-copy-prompt={prompt}><Fragment set:html={ICON.ask} /><span>{t(locale, 'page.ask', { assistant: 'Gemini' })}<small>{t(locale, 'page.askCopyHint')}</small></span><Fragment set:html={ICON.out} /></a>
+        </div>
+      </div>
+    </div>
+
+    <Content />
+
+    <div class="doc-foot" data-pagefind-ignore>
+      <a href={`https://github.com/Semantic-Org/Nav-Router/edit/main/docs/src/content/${page.filePath.replace('src/content/', '')}`}>{t(locale, 'page.edit')}</a>
+      <span>{t(locale, 'page.updated', { date: updatedLabel })}</span>
+    </div>
+    <nav class="pager" aria-label={t(locale, 'page.pages')} data-pagefind-ignore>
+      {prev ? <a class:list={['pager-link', 'is-prev', { 'is-symbol': prev.symbol }]} href={localePath(`/${prev.slug}/`, locale)}><span class="pager-dir">{t(locale, 'page.previous')}</span><span class="pager-title">{titles.get(prev.slug) ?? prev.title}</span></a> : <span></span>}
+      {next ? <a class:list={['pager-link', 'is-next', { 'is-symbol': next.symbol }]} href={localePath(`/${next.slug}/`, locale)}><span class="pager-dir">{t(locale, 'page.next')}</span><span class="pager-title">{titles.get(next.slug) ?? next.title}</span></a> : <span></span>}
+    </nav>
+  </main>
+  <script is:inline slot="after" type="application/json" id="page-source" set:html={source}></script>
+</DocsChrome>

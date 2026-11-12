@@ -1,4 +1,5 @@
 import { highlightInline } from './site.js';
+import { ui } from './strings.js';
 
 // the hero instrument: one navigation, traced against the router's own timing defaults.
 // semantics follow Router#beforeCommit / #afterCommit: holdCommit 300ms, loadingDelay 200ms after commit,
@@ -9,39 +10,56 @@ const SPAN = 1100; // ms shown on the axis
 const HOLD = 300, DELAY = 200, MIN = 500;
 
 const LANES = [
-  { key: 'guards', label: 'guards', color: 'var(--c-violet)' },
-  { key: 'data', label: 'data', color: 'var(--c-cyan)' },
-  { key: 'commit', label: 'url commit', color: 'var(--c-blue)' },
-  { key: 'loading', label: 'loading view', color: 'var(--c-amber)' },
-  { key: 'render', label: 'render', color: 'var(--c-green)' },
+  { key: 'guards', label: ui('home.trace.lane.guards'), color: 'var(--c-violet)' },
+  { key: 'data', label: ui('home.trace.lane.data'), color: 'var(--c-cyan)' },
+  { key: 'commit', label: ui('home.trace.lane.commit'), color: 'var(--c-blue)' },
+  { key: 'loading', label: ui('home.trace.lane.loading'), color: 'var(--c-amber)' },
+  { key: 'render', label: ui('home.trace.lane.render'), color: 'var(--c-green)' },
 ];
 
 const PAGES = {
   overview: {
     path: '/team/acme',
-    html: `<p class="app-title">Acme</p><p class="sub">Team overview</p>
-      <div class="stat"><div><b>24</b><span>members</span></div><div><b>8</b><span>projects</span></div><div><b>99.9%</b><span>uptime</span></div></div>
-      <div class="rows"><div class="row"><i></i>Deploy pipeline<em>2m ago</em></div><div class="row"><i></i>Billing review<em>1h ago</em></div></div>`,
+    html: `<p class="app-title">Acme</p><p class="sub">${ui('home.app.overview.sub')}</p>
+      <div class="stat"><div><b>24</b><span>${ui('home.app.stat.members')}</span></div><div><b>8</b><span>${
+      ui('home.app.stat.projects')
+    }</span></div><div><b>99.9%</b><span>${ui('home.app.stat.uptime')}</span></div></div>
+      <div class="rows"><div class="row"><i></i>${ui('home.app.row.deploy')}<em>${
+      ui('home.app.time.2m')
+    }</em></div><div class="row"><i></i>${ui('home.app.row.billing')}<em>${ui('home.app.time.1h')}</em></div></div>`,
   },
   members: {
     path: '/team/acme/members',
-    html: `<p class="app-title">Members</p><p class="sub">24 people</p>
-      <div class="rows"><div class="row"><i></i>Ada Park<em>owner</em></div><div class="row"><i></i>Mo Reyes<em>admin</em></div><div class="row"><i></i>Lee Chen<em>member</em></div><div class="row"><i></i>Sam Ito<em>member</em></div></div>`,
+    html: `<p class="app-title">${ui('home.app.members')}</p><p class="sub">${ui('home.app.members.people')}</p>
+      <div class="rows"><div class="row"><i></i>${ui('home.app.name.ada')}<em>${
+      ui('home.app.role.owner')
+    }</em></div><div class="row"><i></i>${ui('home.app.name.mo')}<em>${
+      ui('home.app.role.admin')
+    }</em></div><div class="row"><i></i>${ui('home.app.name.lee')}<em>${
+      ui('home.app.role.member')
+    }</em></div><div class="row"><i></i>${ui('home.app.name.sam')}<em>${ui('home.app.role.member')}</em></div></div>`,
   },
   activity: {
     path: '/team/acme/activity',
-    html: `<p class="app-title">Activity</p><p class="sub">Last 7 days</p>
-      <div class="rows"><div class="row"><i></i>Mo merged #482<em>09:14</em></div><div class="row"><i></i>Ada deployed v2.3<em>08:52</em></div><div class="row"><i></i>Lee opened #483<em>yesterday</em></div><div class="row"><i></i>Sam joined<em>Mon</em></div></div>`,
+    html: `<p class="app-title">${ui('home.app.activity')}</p><p class="sub">${ui('home.app.activity.sub')}</p>
+      <div class="rows"><div class="row"><i></i>${
+      ui('home.app.log.merged')
+    }<em>09:14</em></div><div class="row"><i></i>${
+      ui('home.app.log.deployed')
+    }<em>08:52</em></div><div class="row"><i></i>${ui('home.app.log.opened')}<em>${
+      ui('home.app.time.yesterday')
+    }</em></div><div class="row"><i></i>${ui('home.app.log.joined')}<em>${ui('home.app.time.mon')}</em></div></div>`,
   },
   signIn: {
     path: '/sign-in?next=/team/acme/settings',
-    html: `<p class="app-title">Sign in</p><p class="sub">Settings needs an admin account</p>
-      <div class="field"><label>Email</label><span></span></div><div class="field"><label>Password</label><span></span></div><span class="fake-btn">Sign in</span>`,
+    html: `<p class="app-title">${ui('home.app.signin')}</p><p class="sub">${ui('home.app.signin.note')}</p>
+      <div class="field"><label>${ui('home.app.email')}</label><span></span></div><div class="field"><label>${
+      ui('home.app.password')
+    }</label><span></span></div><span class="fake-btn">${ui('home.app.signin')}</span>`,
   },
 };
 
-const LOADING_HTML =
-  `<span class="status-tag">statusViews.loading</span><div class="skeleton"><span></span><span></span><span></span><span></span></div>`;
+const LOADING_HTML = `<div class="skeleton"><span></span><span></span><span></span><span></span></div>`;
 
 // each scenario: bars [start, end] in ms, commit ms, optional loading [start, end], render [start, end]
 const SCENARIOS = {
@@ -52,8 +70,7 @@ const SCENARIOS = {
     commit: 72,
     render: [72, 84],
     labels: { data: '66ms' },
-    caption:
-      `Data was ready in 72ms, inside <code class="setting">holdCommit</code>. The URL and the page changed together, and no loading state was shown.`,
+    caption: ui('home.trace.caption.overview'),
   },
   members: {
     page: 'members',
@@ -62,8 +79,7 @@ const SCENARIOS = {
     commit: HOLD,
     render: [430, 442],
     labels: { data: '422ms' },
-    caption:
-      `Still loading at 300ms, so <code class="setting">holdCommit</code> let the URL move while the old page stayed up. Data landed before <code class="setting">loadingDelay</code> ran out, so no loading view flashed.`,
+    caption: ui('home.trace.caption.members'),
   },
   activity: {
     page: 'activity',
@@ -73,8 +89,7 @@ const SCENARIOS = {
     loading: [HOLD + DELAY, 1000],
     render: [1000, 1012],
     labels: { data: '872ms' },
-    caption:
-      `Slow data. The URL moved at 300ms, the loading view took over after <code class="setting">loadingDelay</code>, and <code class="setting">loadingMin</code> kept it up for 500ms so it never flickers.`,
+    caption: ui('home.trace.caption.activity'),
   },
   settings: {
     page: 'signIn',
@@ -83,18 +98,16 @@ const SCENARIOS = {
     data: [40, 62],
     commit: 62,
     render: [62, 74],
-    labels: { guards: 'redirect → signIn', data: 'signIn' },
-    caption:
-      `A <code>permission</code> guard refused, and the redirect happened before commit. The URL went straight to <code>/sign-in</code>, so <code>/settings</code> never entered history.`,
+    labels: { guards: ui('home.trace.label.redirect'), data: 'signIn' },
+    caption: ui('home.trace.caption.settings'),
   },
   back: {
     guards: [0, 4],
     data: [4, 6],
     commit: 6,
     render: [6, 14],
-    labels: { data: 'from entry' },
-    caption:
-      `A traverse back. The result was stored on the history entry, so nothing was fetched and the page came back in 14ms.`,
+    labels: { data: ui('home.trace.label.entry') },
+    caption: ui('home.trace.caption.back'),
   },
 };
 
@@ -191,7 +204,10 @@ export function mountTrace(root) {
   backBtn.disabled = true;
 
   // captions share one cell so the panel never changes height between navigations
-  const CAPTIONS = { intro: caption.innerHTML.trim(), pending: '<span style="color:var(--text-4)">Navigating…</span>' };
+  const CAPTIONS = {
+    intro: caption.innerHTML.trim(),
+    pending: `<span style="color:var(--text-4)">${ui('home.trace.pending')}</span>`,
+  };
   Object.entries(SCENARIOS).forEach(([k, sc]) => {
     CAPTIONS[k] = sc.caption;
   });
@@ -258,8 +274,8 @@ export function mountTrace(root) {
     const targetPath = PAGES[target].path;
     reset(sc);
     title.textContent = key === 'back'
-      ? `traverse ← ${targetPath.split('?')[0]}`
-      : `navigate → ${key === 'settings' ? '/team/acme/settings' : targetPath}`;
+      ? ui('home.trace.title.traverse', { path: targetPath.split('?')[0] })
+      : ui('home.trace.title.navigate', { path: key === 'settings' ? '/team/acme/settings' : targetPath });
     showCaption('pending');
     setTabs(target);
 

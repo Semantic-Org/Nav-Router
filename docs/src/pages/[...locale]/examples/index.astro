@@ -1,0 +1,9 @@
+---
+// the examples landing, in every language: english at the root and each other language under its path
+import { ENABLED, DEFAULT_LOCALE } from '../../../lib/i18n.js';
+import Examples from '../../../views/Examples.astro';
+
+export const getStaticPaths = () =>
+  ENABLED.map((l) => ({ params: { locale: l.code === DEFAULT_LOCALE ? undefined : l.path } }));
+---
+<Examples />

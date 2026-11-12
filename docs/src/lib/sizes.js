@@ -1,4 +1,4 @@
-// min+br sizes, measured at build from the nav-router source above these docs, so the site's numbers
+// min+br sizes, measured at build from the nav-router package, so the site's numbers
 // are the package's: esbuild minifies, brotli at quality 11 compresses, as browsers receive it.
 
 import { build } from 'esbuild';
@@ -6,8 +6,11 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { brotliCompressSync, constants } from 'node:zlib';
 
-// from the working directory (docs/), not this file: the build bundles this module elsewhere
-const ROOT = resolve('..');
+// from the working directory, not this file: the build bundles this module elsewhere. the repo
+// root above these docs in the monorepo (docs/), else the sibling checkout (nav-router-docs/site/)
+export const PACKAGE_DIR = [resolve('..'), resolve('../../nav-router')]
+  .find((dir) => existsSync(resolve(dir, 'src/index.js'))) ?? resolve('..');
+const ROOT = PACKAGE_DIR;
 const cache = new Map();
 
 async function measure(options) {
@@ -23,8 +26,8 @@ async function measure(options) {
     .length;
 }
 
-// 'core' is the router with everything it imports; a plugin is its own file, the router and
-// utils external because the core already carries them
+// 'core' is the router with everything it imports; a plugin is its own file, with the utils and
+// the router it patches external, because the core already carries them
 function measureFromSource(name) {
   return name === 'core'
     ? measure({
@@ -39,7 +42,9 @@ function measureFromSource(name) {
 // a size that can't be measured fails the build: a stale or missing number is worse than none
 export function sizeOf(name) {
   if (!existsSync(resolve(ROOT, 'src/index.js'))) {
-    throw new Error(`nav-router source not found at ${ROOT}. Run the docs from docs/ in the nav-router repo.`);
+    throw new Error(
+      `nav-router source not found at ${ROOT}. Check out nav-router beside these docs, or run them from docs/ in that repo.`,
+    );
   }
   if (!cache.has(name)) {
     cache.set(name, measureFromSource(name));
