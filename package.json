@@ -35,6 +35,7 @@
     "docs": "npm -w docs run dev",
     "flat": "npm -w examples/flat run dev",
     "nested": "npm -w examples/nested run dev",
+    "preact": "npm -w examples/preact run dev",
     "solid": "npm -w examples/solid run dev",
     "format": "npx dprint fmt",
     "setup": "npx simple-git-hooks"
