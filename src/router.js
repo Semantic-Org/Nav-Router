@@ -103,7 +103,7 @@ export class Router {
 
     this.routesByName = new Map();
     this.leaves = [];
-    this.root = new Route(routeOptions, null, this);
+    this.root = new Route({ ...routeOptions, isSection: true }, null, this);
 
     this.current = null;
     this.page = null;
