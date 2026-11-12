@@ -4,6 +4,7 @@
 import { getCollection } from 'astro:content';
 
 import '../styles/docs.css';
+import { frameworkPickerHtml } from '../lib/dropdown.js';
 import { FRAMEWORKS, frameworkOf, fwById, swapFramework } from '../lib/frameworks.js';
 import { languageSelect, localePath, t, titlesIn } from '../lib/i18n.js';
 import { navFor } from '../lib/nav.js';
@@ -29,13 +30,8 @@ const written = new Set(ids);
 const equivalents = pageFramework
   ? Object.fromEntries(FRAMEWORKS.map((f) => [f.id, written.has(swapFramework(currentId, f.id)) ? localePath(`/${swapFramework(currentId, f.id)}/`, locale) : null]))
   : null;
-// a framework's slots show only while it's the reader's pick; data-framework is set before paint
-const fwCss = FRAMEWORKS.map((f) =>
-  `:root[data-framework="${f.id}"] [data-fw-slot]:not([data-fw-slot~="${f.id}"]) { display: none; }`
-).join('\n') + `\n:root:not([data-framework]) [data-fw-slot]:not([data-fw-slot~="${FRAMEWORKS[0].id}"]) { display: none; }`;
 ---
 <Base title={title} description={description} pageFramework={pageFramework} writtenIn={writtenIn} translatedIn={translatedIn} bodyAttrs={{ 'data-section': sectionKey }}>
-  <Fragment set:html={`<style>${fwCss}</style>`} />
   <DocsTopbar nav={nav} sectionKey={sectionKey} />
 
   <div class:list={['docs-shell', { 'is-wide': wide }]}>
@@ -49,7 +45,7 @@ const fwCss = FRAMEWORKS.map((f) =>
         {sectionKey !== 'examples' && (
           <div class="framework-panel">
             <p class="framework-label" id="framework-label">{t(locale, 'framework.label')}</p>
-            <div class="framework-select" data-framework-picker="lg"></div>
+            <Fragment set:html={frameworkPickerHtml({ id: 'docs-fw-picker', label: t(locale, 'framework.picker'), size: 'lg', className: 'framework-select' })} />
           </div>
         )}
         {section.groups.map((g) => (

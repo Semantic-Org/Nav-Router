@@ -18,6 +18,15 @@ const locale = localeOf(Astro.currentLocale);
 // the words the scripts ask for, in this language; < escaped so the text can't close its script
 const strings = JSON.stringify(scriptStrings(locale.code, { home: unlocalized(Astro.url.pathname) === '/' })).replace(/</g, '\\u003c');
 const frameworkIds = FRAMEWORKS.map((f) => f.id);
+// framework slots, pre-rendered picker faces, and install commands follow data-framework before first paint
+const fwHeadCss = FRAMEWORKS.map((f) =>
+  `:root[data-framework="${f.id}"] [data-fw-slot]:not([data-fw-slot~="${f.id}"]) { display: none; }\n`
+  + `:root[data-framework="${f.id}"] [data-framework-picker]:not([data-hydrated]) .dd-face:not([data-v="${f.id}"]) { visibility: hidden; }\n`
+  + `:root[data-framework="${f.id}"] [data-install-cmds]:not([data-hydrated]) code:not([data-fw="${f.id}"]) { visibility: hidden; }`
+).join('\n')
+  + `\n:root:not([data-framework]) [data-fw-slot]:not([data-fw-slot~="${FRAMEWORKS[0].id}"]) { display: none; }`
+  + `\n:root:not([data-framework]) [data-framework-picker]:not([data-hydrated]) .dd-face:not([data-v="${FRAMEWORKS[0].id}"]) { visibility: hidden; }`
+  + `\n:root:not([data-framework]) [data-install-cmds]:not([data-hydrated]) code:not([data-fw="${FRAMEWORKS[0].id}"]) { visibility: hidden; }`;
 // the page's share card, rendered at build by pages/og/[...slug].png.js; a translated page uses the
 // english page's card until cards are made per language
 const path = unlocalized(Astro.url.pathname);
@@ -163,6 +172,7 @@ const offer = JSON.stringify(languageOffer(Astro.url.pathname, locale.code, writ
     } catch {}
     document.documentElement.dataset.framework = frameworkIds.includes(fw) ? fw : frameworkIds[0];
   </script>
+  <Fragment set:html={`<style>${fwHeadCss}</style>`} />
   <script is:inline type="application/json" id="ui-strings" set:html={strings}></script>
   <slot name="head" />
 </head>

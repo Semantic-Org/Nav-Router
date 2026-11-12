@@ -1,6 +1,6 @@
+import { dropdownInnerHtml, frameworkOptions } from '../lib/dropdown.js';
 import { FALLBACK, FRAMEWORKS, fwById } from '../lib/frameworks.js';
 import { animateFavicon } from './favicon.js';
-import { logoFor } from './framework-logos.js';
 import { wireMarkPulse } from './mark-pulse.js';
 import { mountSearch } from './search.js';
 import { ui } from './strings.js';
@@ -259,48 +259,16 @@ export function wireTheme() {
    grid cell, as .swap does). keyboard: arrows/home/end move, typing jumps, enter/space pick,
    escape and tab close; a click outside closes. options: [{ value, label, hint? }] */
 
-const CHEVRON =
-  '<svg class="dd-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>';
-const CHEVRONS =
-  '<svg class="dd-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></svg>';
-const CHECK =
-  '<svg class="dd-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
-
 // the button is named by its own text, a hidden "label: " before the visible value, so what is heard
 // is what is seen. size 'lg' is the chunky form (the docs sidebar): icon, label and hint in the button as in the menu
 export function createDropdown(host, { options, value, label, onChange, size = 'md' }) {
-  const id = `dd-${++uid}`;
-  host.classList.add('dropdown');
-  if (size === 'lg') { host.classList.add('dd-lg'); }
-  const icon = (o) => (o.icon ? `<span class="dd-icon" aria-hidden="true">${o.icon}</span>` : '');
-  const lgFace = (o) =>
-    `${icon(o)}<span class="dd-text"><span class="dd-name">${o.label}</span>${
-      o.hint ? `<span class="dd-sub">${o.hint}</span>` : ''
-    }</span>`;
-  host.innerHTML = `
-    <button type="button" class="dd-button" aria-haspopup="listbox" aria-expanded="false" aria-controls="${id}">
-      <span class="visually-hidden">${label}: </span>
-      <span class="swap dd-current">${
-    options.map((o) =>
-      `<span class="dd-face" data-v="${o.value}" hidden>${size === 'lg' ? lgFace(o) : `${icon(o)}${o.label}`}</span>`
-    ).join('')
-  }</span>
-      ${size === 'lg' ? CHEVRONS : CHEVRON}
-    </button>
-    <ul class="dd-menu" id="${id}" role="listbox" aria-label="${label}" tabindex="-1" hidden>
-      ${
-    options.map((o, i) =>
-      `<li role="option" id="${id}-${i}" data-v="${o.value}" aria-selected="false">
-        ${
-        size === 'lg'
-          ? `${lgFace(o)}${CHECK}`
-          : `${CHECK}${icon(o)}<span class="dd-label">${o.label}</span>${
-            o.hint ? `<span class="dd-hint">${o.hint}</span>` : ''
-          }`
-      }</li>`
-    ).join('')
+  if (!host.querySelector('.dd-button')) {
+    const id = `dd-${++uid}`;
+    host.classList.add('dropdown');
+    if (size === 'lg') { host.classList.add('dd-lg'); }
+    host.innerHTML = dropdownInnerHtml({ id, options, label, size });
   }
-    </ul>`;
+  host.dataset.hydrated = '';
   const button = host.querySelector('.dd-button');
   const menu = host.querySelector('.dd-menu');
   const items = [...menu.children];
@@ -488,24 +456,23 @@ export function wireVariants(root = document) {
 // the picker, and every install command built from the framework's package
 export function wireFramework(root = document) {
   root.querySelectorAll('[data-install-cmds]').forEach((swap) => {
-    swap.innerHTML = FRAMEWORKS.map((f) =>
-      `<code data-shell data-fw="${f.id}" hidden>npm i nav-router${f.pkg ? ` ${f.pkg}` : ''}</code>`
-    ).join('');
+    if (!swap.querySelector('[data-fw]')) {
+      swap.innerHTML = FRAMEWORKS.map((f) =>
+        `<code data-shell data-fw="${f.id}" hidden>npm i nav-router${f.pkg ? ` ${f.pkg}` : ''}</code>`
+      ).join('');
+    }
+    swap.dataset.hydrated = '';
   });
-  const pickers = [...root.querySelectorAll('[data-framework-picker]')].map((host) =>
-    createDropdown(host, {
+  const pickers = [...root.querySelectorAll('[data-framework-picker]')].map((host) => {
+    const size = host.dataset.frameworkPicker || 'md';
+    return createDropdown(host, {
       label: ui('framework.picker'),
-      size: host.dataset.frameworkPicker || 'md',
-      options: FRAMEWORKS.map((f) => ({
-        value: f.id,
-        label: f.label,
-        hint: f.pkg ?? 'nav-router',
-        icon: host.dataset.frameworkPicker === 'lg' ? logoFor(f.id) : null,
-      })),
+      size,
+      options: frameworkOptions(size),
       value: getFramework(),
       onChange: setFramework,
-    })
-  );
+    });
+  });
   const apply = (fw) => {
     pickers.forEach((dd) => {
       dd.value = fw;
