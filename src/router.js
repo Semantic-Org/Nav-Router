@@ -1005,7 +1005,10 @@ export class Router {
           ancestor.redirect,
           this.contextFor(ancestor, matched, { signal }),
         );
-        return { status: 'redirect', redirect: this.href(target, this.paramsFor(target, params)) };
+        // a redirect that answers nothing leaves the navigation on its way, as it does on the standing page
+        if (target) {
+          return { status: 'redirect', redirect: this.href(target, this.paramsFor(target, params)) };
+        }
       }
     }
 
