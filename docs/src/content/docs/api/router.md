@@ -1,82 +1,185 @@
 ---
 title: Router
 kind: class
-lede: Holds the route tree, runs each navigation from the `navigate` event to the rendered page, and keeps the current page. An app has one.
-import: import { Router } from 'nav-router'
+lede: Matches URLs against your routes and renders the active page.
+import: import { router, Router } from 'nav-router'
 size: core
-updated: 2026-11-11
+updated: 2026-11-12
 ---
 
-## Create a router
+:::entry
+### `router()` :kind[function]
 
-Pass one options object. Keys the router declares are its settings; every other key belongs to the root [route](/api/route-options/), so a small app reads as a single tree.
+```js signature
+router(options?)
+new Router(options?)
+```
 
-```js for="core" label="routes.js"
+Creates a router. `options` includes both the root node's [route options](/api/route-options/) and the router [settings](#settings) below.
+
+With React or Solid, import `router` from `@nav-router/react` or `@nav-router/solid` instead.
+
+**Example**
+
+```js for="core" label="app.js"
 import { router } from 'nav-router';
 
-export const app = router({
-  // settings
-  holdCommit: '300ms',
-  signInRoute: 'signIn',
-  // the root route
-  layout: RootLayout,
-  index: { path: '/', view: HomePage },
+const app = router({
+  mount: '#app',
+  signInRoute: 'sign-in',
+  layout: () => '<nav><a href="/">Home</a></nav><main><slot></slot></main>',
+  index: { view: () => '<h1>Home</h1>' },
+  routes: [
+    { name: 'sign-in', path: '/sign-in', view: () => '<h1>Sign in</h1>' },
+  ],
 });
+
+await app.start();
 ```
+
+```jsx for="react" label="app.jsx"
+import { router } from '@nav-router/react';
+
+function AppLayout({ children }) {
+  return (
+    <>
+      <nav><a href="/">Home</a></nav>
+      <main>{children}</main>
+    </>
+  );
+}
+
+const app = router({
+  mount: '#app',
+  signInRoute: 'sign-in',
+  layout: AppLayout,
+  index: { view: () => <h1>Home</h1> },
+  routes: [
+    { name: 'sign-in', path: '/sign-in', view: () => <h1>Sign in</h1> },
+  ],
+});
+
+await app.start();
+```
+
+```tsx for="solid" label="app.tsx"
+import { router } from '@nav-router/solid';
+
+function AppLayout() {
+  return (
+    <>
+      <nav><a href="/">Home</a></nav>
+      <main><slot /></main>
+    </>
+  );
+}
+
+const app = router({
+  mount: '#app',
+  signInRoute: 'sign-in',
+  layout: AppLayout,
+  index: { view: () => <h1>Home</h1> },
+  routes: [
+    { name: 'sign-in', path: '/sign-in', view: () => <h1>Sign in</h1> },
+  ],
+});
+
+await app.start();
+```
+:::
 
 ## Settings
 
-Every setting and its default. The resolved values are on `router.config`.
+Pass any of these to `router(options)`:
 
-| Setting | Type | Default | Description |
-|---|---|---|---|
-| `mount` | `string \| Element` | `'body'` | Selector or element the app renders into. |
-| `base` | `string` | `''` | Path prefix the app is served under. |
-| `holdCommit` | `duration` | `'300ms'` | How long the URL waits for `data` before committing. A fast load settles before the URL moves. |
-| `loadingDelay` | `duration` | `'200ms'` | Time after commit before the loading view shows. |
-| `loadingMin` | `duration` | `'500ms'` | Once shown, how long the loading view stays, so it never flickers. |
-| `signInRoute` | `string \| Route` | `null` | Where a refused `permission` guard sends a signed-out user, with `returnTo` in the query. |
-| `identity` | `value \| function` | `null` | The user guards read: a value, or a function of the navigation returning one or a promise of one. |
-| `user` | `any` | `null` | Initial value of `router.user` when `identity` is not used. |
-| `restoreScroll` | `string \| string[]` | `null` | Selector of an inner scroller whose position is restored on back and forward. |
-| `attachGlobal` | `string \| null` | `'router'` | Name the router is exposed under on `window`, for the console. |
-| `onChange` | `function` | `null` | Called when the page or pending state changes. |
-| `onRender` | `function` | `null` | Called after each render. |
-| `onError` | `function` | `console.error` | Called with `(error, context)` when a navigation, `data` function or view throws. |
-| `dataChanged` | `function` | `!isEqual(next, prev)` | Compares previous and next values when checking whether `data` or `user` changed. |
+```params
+- name: base
+  type: string
+  default: "''"
+  description: Subpath prefix when your app isn't served at `'/'` (for example, `'/docs'`).
+- name: mount
+  type: "string | Element"
+  default: "'body'"
+  description: Selector or element where the app renders.
+- name: signInRoute
+  type: "string | Route | null"
+  default: "null"
+  description: Route to redirect signed-out users to (with `?returnTo=...`) when a `permission` guard denies access.
+- name: identity
+  type: "unknown | ((navigation) => unknown | Promise<unknown>)"
+  default: "null"
+  description: Value or async function that resolves `router.user` before guards run.
+- name: user
+  type: unknown
+  default: "null"
+  description: Initial value for `router.user`.
+- name: holdCommit
+  type: "string | number"
+  default: "'300ms'"
+  description: How long to wait for fast `data` before committing the new URL. Set `0` to commit immediately.
+- name: loadingDelay
+  type: "string | number"
+  default: "'200ms'"
+  description: Delay after URL commit before showing `statusViews.loading`.
+- name: loadingMin
+  type: "string | number"
+  default: "'500ms'"
+  description: Minimum time `statusViews.loading` stays visible once shown, preventing flicker.
+- name: restoreScroll
+  type: "string | string[] | null"
+  default: "null"
+  description: Selector (or array of selectors) for inner scroll containers to restore on Back/Forward. Window scroll is automatic.
+- name: attachGlobal
+  type: "string | false"
+  default: "'router'"
+  description: Window property name for the started router (`window.router`), or `false` to disable.
+- name: onRender
+  type: "(page, event) => void | Promise<void>"
+  default: "null"
+  description: Called after each page or loading view renders.
+- name: onChange
+  type: "(router) => void"
+  default: "null"
+  description: Called whenever router state changes.
+- name: onError
+  type: "(error, context?) => void"
+  default: "console.error"
+  description: Called on uncaught errors in `data` or views.
+- name: dataChanged
+  type: "(previous, next) => boolean"
+  default: "!isEqual(next, previous)"
+  description: Custom equality check for `user` and reactive `data` updates.
+```
 
-Plugins add their own settings when imported: `formatTitle` ([`head`](/plugins/head/)), `viewTransitions` ([`view-transitions`](/plugins/view-transitions/)), `announcer` ([`announcer`](/plugins/announcer/)), `confirm` ([`confirm-leave`](/plugins/confirm-leave/)), `chunkReload` ([`chunk-reload`](/plugins/chunk-reload/)) and `timelineGroup` ([`timeline`](/plugins/timeline/)).
+## Properties
 
-:::tip[See the timing settings run]
-The trace on the [homepage](/) plays one navigation against `holdCommit`, `loadingDelay` and `loadingMin`.
-:::
+| Property | Type | Description |
+| --- | --- | --- |
+| `page` | `object \| null` | Rendered page (`url`, `params`, `query`, `data`, `status`, `title`, `route`, `error`), or `null` before first render. |
+| `current` | `object \| null` | Committed URL match (`route`, `url`, `params`, `query`, `entry`, `state`). Moves ahead of `page` while slow `data` loads. |
+| `pending` | `object \| null` | In-flight navigation (`route`, `url`, `navigationType`, `loading`, `committed`), or `null` when idle. |
+| `error` | `object \| null` | Last navigation error (`error`, `from`, `url`), cleared once a later navigation succeeds. |
+| `user` | `unknown` | Current user read by guards, `data`, and views. |
+| `canGoBack` | `boolean` | `true` when the previous history entry matches a route on this router. |
+| `canGoForward` | `boolean` | `true` when a forward history entry exists. |
+| `entry` | `NavigationHistoryEntry \| null` | Current browser history entry. |
+| `entries` | `NavigationHistoryEntry[]` | All session history entries. |
+| `activation` | `NavigationActivation \| null` | How the document was initially opened. |
+| `transition` | `object \| null` | Active platform navigation while one is in flight. |
+| `root` | `Route` | Root [`Route`](/api/route/) of the route tree. |
+| `config` | `object` | Resolved router settings. |
+| `navigator` | `Navigator` | Underlying [`Navigator`](/api/navigator/) wrapper around `window.navigation`. |
 
-## Methods
-
-Each method is also exported as a function that acts on the page’s router, so a view can call `navigate()` without holding it.
+## Lifecycle
 
 :::entry
 ### `start()` :kind[method]
 
 ```js signature
-router.start(): Promise<Router>
+await router.start()
 ```
 
-Starts listening on `window.navigation` and runs the initial navigation for the current URL.
-
-**Returns**
-
-```returns
-type: Promise<Router>
-description: Resolves to the router once the first page has settled.
-```
-
-```js for="core" label="app.js"
-import { router } from 'nav-router';
-import { routes } from './routes.js';
-
-export const app = await router(routes).start();
-```
+Renders the current URL and begins intercepting links and history navigation. Resolves once the initial page renders.
 :::
 
 :::entry
@@ -86,134 +189,225 @@ export const app = await router(routes).start();
 router.stop()
 ```
 
-Stops listening on `window.navigation` and tears down the active routes on the page.
+Unmounts rendered views and stops listening for navigation. Useful in tests or embedded apps.
 :::
 
-::::entry
+:::entry
+### `subscribe()` :kind[method]
+
+```js signature
+const unsubscribe = router.subscribe(listener)
+```
+
+Calls `listener(router)` whenever router state changes, and returns an `unsubscribe` function.
+:::
+
+## Defining routes
+
+Pass routes up front in `router({ index, routes })`, or add them with the methods below (before or after `start()`).
+
+:::entry
+### `index()` :kind[method]
+
+```js signature
+router.index(options)
+```
+
+Defines the `'/'` page from [route options](/api/route-options/). Returns the new index [`Route`](/api/route/).
+:::
+
+:::entry
+### `section()` :kind[method]
+
+```js signature
+router.section(options)
+```
+
+Groups child routes under a shared path prefix, layout, guard, or `data` loader. Returns the new section [`Route`](/api/route/) so you can add child routes to it:
+
+```js
+const settings = app.section({ path: '/settings', layout: SettingsLayout });
+settings.route({ name: 'profile', path: '/settings/profile', view: ProfileView });
+settings.route({ name: 'billing', path: '/settings/billing', view: BillingView });
+```
+:::
+
+:::entry
+### `route()` :kind[method]
+
+```js signature
+router.route(options)
+```
+
+Adds a child route from [route options](/api/route-options/). Returns the new [`Route`](/api/route/).
+:::
+
+## Navigation
+
+Each method below can also be imported directly from `nav-router` (`navigate`, `replace`, `reload`, `back`, `forward`, `traverseTo`) without passing your router around.
+
+:::entry
 ### `navigate()` :kind[method]
 
 ```js signature
-router.navigate(target, args?, options?): { committed, finished }
-navigate(target, args?, options?): { committed, finished }
+router.navigate(target, args?, options?)
+navigate(target, args?, options?)
 ```
 
-Goes to a route by name, a `Route`, or a literal path. `args` is one flat object: keys the route declares as params fill the path, every other key becomes the query.
+Navigates to a route name, `Route`, or path. Keys in `args` matching `:params` fill the path; remaining keys become query parameters.
+
+Returns `{ committed, finished }` promises if you need to wait for the URL or data to settle.
 
 **Parameters**
 
 ```params
 - name: target
-  type: string | Route
+  type: "string | Route"
   required: true
-  description: A route name, a `Route`, or a path such as `'/team/acme'`.
+  description: Route name, `Route` instance, or path.
 - name: args
   type: object
-  default: '{}'
-  description: Params and query in one object.
+  default: "{}"
+  description: Path parameters and query values.
 - name: options
   type: object
-  default: '{}'
-  description: How the entry is written and what the page does after.
+  default: "{}"
+  description: Navigation options.
   options:
     - name: history
       type: "'auto' | 'push' | 'replace'"
       default: "'auto'"
-      description: Push a new entry, or replace the current one. `'auto'` replaces when the URL is unchanged.
+      description: "'auto' pushes on a new URL and replaces on the current URL."
     - name: state
-      type: any
-      description: Stored on the history entry.
+      type: unknown
+      description: Structured-cloneable history entry state.
     - name: info
-      type: any
-      description: Passed to this navigation only.
-    - name: resetScroll
-      type: boolean
-      default: 'true'
-      description: Scroll to the top after render.
-    - name: resetFocus
-      type: boolean
-      default: 'true'
-      description: Move focus to the page after render.
+      type: unknown
+      description: Ephemeral value passed on `NavigateEvent.info` for this navigation.
     - name: hash
       type: string
-      description: Fragment to append.
+      description: URL fragment (without `#`).
     - name: keepQuery
       type: boolean
-      default: 'false'
-      description: Carry the current query into the new URL.
+      default: "false"
+      description: Keeps current query parameters unless overridden in `args`.
     - name: absolute
       type: boolean
-      default: 'false'
-      description: Build the URL with its origin.
-```
-
-**Returns**
-
-```returns
-type: '{ committed: Promise, finished: Promise }'
-description: The Navigation API’s two promises, `committed` when the URL changes and `finished` when the page has rendered.
+      default: "false"
+      description: Prepends `location.origin`.
+    - name: resetScroll
+      type: boolean
+      default: "true"
+      description: Scrolls to top (or `#hash`) on settle. Automatically `false` on query-only updates.
+    - name: resetFocus
+      type: boolean
+      default: "true"
+      description: Resets focus on settle. Automatically `false` on query-only updates.
 ```
 
 **Example**
 
-```js title="members.js"
+```js
 import { navigate } from 'nav-router';
 
-// params fill the path, the rest is query
-await navigate('member', {
-  org: 'acme',
-  userId: 'ada',
-  section: 'commits',
-}).finished;
-// /team/acme/ada?section=commits
+navigate('member', { org: 'acme', id: 42, tab: 'activity' });
+await navigate('/settings/profile', {}, { history: 'replace' }).finished;
 ```
-
-:::warning[Without the Navigation API, this is a page load]
-In a browser without `window.navigation`, `navigate()` falls back to `location.assign()` and the page reloads.
 :::
-::::
 
 :::entry
 ### `replace()` :kind[function]
 
 ```js signature
-replace(target, args?, options?): { committed, finished }
+replace(target, args?, options?)
 ```
 
-Calls `navigate()` with `history: 'replace'`, replacing the current history entry instead of pushing a new one. Exported as a function only.
+Navigates like `navigate()`, replacing the current history entry instead of pushing a new one. To update params or query on the current route without resetting scroll or focus, use [`update()`](/api/update/).
 :::
+
+:::entry
+### `reload()` :kind[method]
+
+```js signature
+router.reload(options?)
+reload(options?)
+```
+
+Re-runs guards and `data` for the current URL without a full browser reload, keeping scroll and focus in place.
+:::
+
+:::entry
+### `back()` :kind[method]
+
+```js signature
+router.back(fallback?, args?)
+back(fallback?, args?)
+```
+
+Steps back when the previous history entry belongs to this router; otherwise navigates to `fallback` (defaults to `'/'`) so in-app Back buttons never leave your site.
+:::
+
+:::entry
+### `forward()` :kind[method]
+
+```js signature
+router.forward()
+forward()
+```
+
+Steps forward one history entry when `canGoForward` is `true`.
+:::
+
+:::entry
+### `traverseTo()` :kind[method]
+
+```js signature
+router.traverseTo(key, options?)
+traverseTo(key, options?)
+```
+
+Jumps to a history entry in `router.entries` by its `key`.
+:::
+
+## URLs and matching
 
 :::entry
 ### `href()` :kind[method]
 
 ```js signature
-router.href(target, args?, options?): string
-href(target, args?, options?): string
+router.href(target, args?, options?)
+href(target, args?, options?)
 ```
 
-Builds the URL `navigate()` would go to, without going. Use it for `<a href>`, so links stay plain anchors. Also exported as `url()` and `urlFor()`.
+Builds a URL from a route name, `Route`, or path, prepending `base` and omitting query values equal to their `default`. Boolean query params serialize as bare flags (`?archived`). Also exported as `url()` and `urlFor()`.
 
 **Parameters**
 
 ```params
 - name: target
-  type: string | Route
+  type: "string | Route"
   required: true
-  description: As in `navigate()`.
+  description: Route name, `Route` instance, or path.
 - name: args
   type: object
-  default: '{}'
-  description: As in `navigate()`.
+  default: "{}"
+  description: Path parameters and query values.
 - name: options
-  type: '{ hash, absolute, keepQuery }'
-  default: '{}'
-  description: The URL options of `navigate()`.
+  type: "{ hash?: string, keepQuery?: boolean, absolute?: boolean }"
+  default: "{}"
+  description: Optional `#hash`, `keepQuery`, or `absolute` URL formatting.
 ```
 
-**Returns**
+**Example**
 
-```returns
-type: string
-description: The URL, with the router’s `base` applied. A path outside the app is returned unchanged.
+```js
+import { href } from 'nav-router';
+
+href('member', { org: 'acme', id: 42 });
+// => '/teams/acme/members/42'
+
+href('issues', { org: 'acme', status: 'closed', archived: true });
+// => '/projects/acme/issues?status=closed&archived'
 ```
 :::
 
@@ -221,190 +415,22 @@ description: The URL, with the router’s `base` applied. A path outside the app
 ### `match()` :kind[method]
 
 ```js signature
-router.match(url): Match | null
-match(url): Match | null
+router.match(url)
+match(url)
 ```
 
-Matches a path or URL against the route tree without navigating, and returns the winning route with its coerced `params` and `query`.
-
-**Parameters**
-
-```params
-- name: url
-  type: string | URL
-  required: true
-  description: A path or URL to test.
-```
-
-**Returns**
-
-```returns
-type: Match | null
-description: '`{ route, url, pathname, search, hash, params, query, routes, redirect }`, or `null` when no route matches.'
-```
-
-```js
-const matched = app.match('/team/acme/ada?section=commits');
-// matched.route.name → 'member'
-// matched.params     → { org: 'acme', userId: 'ada' }
-// matched.query      → { section: 'commits' }
-```
+Matches a URL against your routes without navigating. Returns `{ route, url, params, query, routes }` or `null`.
 :::
+
+## Active instance
 
 :::entry
-### `back()` :kind[method]
+### `getRouter()` :kind[function]
 
 ```js signature
-router.back(fallback?, args?): { committed, finished }
-back(fallback?, args?): { committed, finished }
+getRouter()
+setRouter(instance)
 ```
 
-Goes back one entry. When there is no earlier entry in this app, such as a page opened from a shared link, it navigates to `fallback` instead.
-
-**Parameters**
-
-```params
-- name: fallback
-  type: string | Route
-  description: Where to go when there is nothing to go back to. The root route when left out.
-- name: args
-  type: object
-  default: '{}'
-  description: Params and query for `fallback`.
-```
+Returns the active router registered by `start()`. Call `setRouter(instance)` in unit tests or when running multiple routers.
 :::
-
-:::entry
-### `forward()` :kind[method]
-
-```js signature
-router.forward(): { committed, finished }
-forward(): { committed, finished }
-```
-
-Goes forward one entry when `router.canGoForward` is `true`.
-:::
-
-:::entry
-### `traverseTo()` :kind[method]
-
-```js signature
-router.traverseTo(key, options?): { committed, finished }
-traverseTo(key, options?): { committed, finished }
-```
-
-Jumps to a history entry by its `key` (from `router.entries` or `router.current.key`).
-
-**Parameters**
-
-```params
-- name: key
-  type: string
-  required: true
-  description: The history entry `key` to jump to.
-- name: options
-  type: '{ info }'
-  default: '{}'
-  description: Passed to this navigation only.
-```
-:::
-
-:::entry
-### `reload()` :kind[method]
-
-```js signature
-router.reload(options?): { committed, finished }
-reload(options?): { committed, finished }
-```
-
-Re-runs the current page’s `identity`, guards and `data` in place without resetting scroll or focus.
-
-**Parameters**
-
-```params
-- name: options
-  type: '{ state, info }'
-  default: '{}'
-  description: Entry `state` and navigation `info`.
-```
-:::
-
-:::entry
-### `subscribe()` :kind[method]
-
-```js signature
-router.subscribe(listener): function
-```
-
-Calls `listener(router)` whenever the router’s state changes, and returns an unsubscribe function.
-:::
-
-## Properties
-
-| Property | Type | Description |
-|---|---|---|
-| `current` | `Match \| null` | The committed match: route, params, query, chain and history entry. |
-| `page` | `Page \| null` | What is on screen, including its `status`, merged `data` and `titles`. |
-| `pending` | `Pending \| null` | The navigation in flight, with `committed` and `loading` flags. |
-| `error` | `{ error, from, url } \| null` | The last navigation error. |
-| `user` | `any` | The user read by guards, `data`, `title` and views. |
-| `canGoBack` | `boolean` | Whether there is an earlier entry in this app. |
-| `canGoForward` | `boolean` | Whether there is a later entry. |
-| `entry` | `NavigationHistoryEntry \| null` | The browser’s current history entry. |
-| `entries` | `NavigationHistoryEntry[]` | The browser’s history entries. |
-| `activation` | `NavigationActivation \| null` | How the document was opened. |
-| `config` | `object` | The resolved settings. |
-
-### `router.current`
-
-Updated as soon as the URL commits.
-
-| Key | Type | Description |
-|---|---|---|
-| `route` | `Route` | Matched [`Route`](/api/route/). |
-| `url` | `string` | Full URL. |
-| `pathname` | `string` | Pathname with `base` stripped. |
-| `search` | `string` | Query string (`'?...'` or `''`). |
-| `hash` | `string` | Fragment (`'#...'` or `''`). |
-| `params` | `object` | Coerced path params with defaults filled in. |
-| `query` | `object` | Coerced query values with defaults filled in. |
-| `routes` | `Route[]` | Matched route chain from the root down to `route`. |
-| `entry` | `NavigationHistoryEntry \| null` | Browser history entry. |
-| `key` | `string \| null` | History slot key, for `traverseTo(key)`. |
-| `id` | `string \| null` | History entry revision ID. |
-| `state` | `any` | Value from `entry.getState()`. |
-
-### `router.page`
-
-Updated when guards, `data` and views have settled and rendered.
-
-| Key | Type | Description |
-|---|---|---|
-| `status` | `'ok' \| 'notFound' \| 'forbidden' \| 'error'` | Outcome of the page load. |
-| `route` | `Route` | Matched `Route`. |
-| `url` | `string` | Page URL. |
-| `params` | `object` | Coerced path params. |
-| `query` | `object` | Coerced query values. |
-| `data` | `object` | Data from every active route, merged from root down to leaf. |
-| `title` | `string` | Page title (`titles[0] ?? ''`), also written to `document.title`. |
-| `titles` | `string[]` | Non-empty titles from active routes, nearest first. |
-| `view` | `any` | Resolved page view, or the status view when `status` is not `'ok'`. |
-| `activeRoutes` | `Array<{ route, data, title }>` | Routes mounted on the page, from root down. |
-| `error` | `any` | The thrown error when `status` is `'error'`. |
-| `key` | `string \| null` | History entry `key` when the page settled. |
-| `user` | `any` | `router.user` when the page settled. |
-
-### `router.pending`
-
-Set when a navigation starts, and cleared to `null` when it settles or fails.
-
-| Key | Type | Description |
-|---|---|---|
-| `route` | `Route` | Target `Route`. |
-| `url` | `string` | Target URL. |
-| `params` | `object` | Target coerced path params. |
-| `query` | `object` | Target coerced query values. |
-| `routes` | `Route[]` | Target route chain from root to leaf. |
-| `navigationType` | `'push' \| 'replace' \| 'reload' \| 'traverse'` | How the navigation was started. |
-| `committed` | `boolean` | `true` once the URL has committed. |
-| `loading` | `boolean` | `true` once `loadingDelay` has elapsed and the loading view is up. |

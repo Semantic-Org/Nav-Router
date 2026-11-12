@@ -1,75 +1,98 @@
 ---
 title: canAccess()
 kind: function
-lede: Whether the current user may open a route. Runs the route’s `permission` guards from the root down, so a menu can hide links the router would refuse.
+lede: Evaluates a route's permission guards to decide whether to show or enable navigation links.
 import: import { canAccess } from 'nav-router'
-updated: 2026-11-11
+updated: 2026-11-12
 ---
 
-## Signature
+:::entry
+### `canAccess()` :kind[function]
 
 ```js signature
-canAccess(target, args?): boolean | Promise<boolean>
+canAccess(target, args?)
 ```
 
-<p class="entry-label">Parameters</p>
+Runs every `permission` guard from the root route down to `target` against the current `router.user` without navigating. Returns `true` when every guard allows entry (or when no `permission` guard is defined along the route).
+
+- **Ancestor chain** — Checks parent section `permission` guards before the target route's own `permission`, matching the guard order used during navigation.
+- **Permissions only** — Evaluates `permission` guards, not `redirect` rules.
+
+**Parameters**
 
 ```params
 - name: target
-  type: string | Route
+  type: "string | Route"
   required: true
-  description: A route name or a `Route`. A section’s name means its index page.
+  description: Route `name` or [`Route`](/api/route/) instance to test. Returns `false` if `target` does not match a registered route.
 - name: args
   type: object
-  default: '{}'
-  description: Params and query passed to each `permission` function. Declared param defaults are filled in when left out.
+  default: "{}"
+  description: Path parameters and query values passed to each `permission` guard (merged over any parameter `default` values on the route).
 ```
 
-<p class="entry-label">Returns</p>
+**Returns**
 
 ```returns
-type: boolean | Promise<boolean>
-description: '`true` when every `permission` guard from the root down to the route passes for `router.user`. Returns a boolean when every guard is synchronous, or a promise when any guard is async.'
+type: "boolean | Promise<boolean>"
+description: Synchronous `boolean` when every `permission` guard along the route is synchronous; `Promise<boolean>` if any guard returns a promise.
 ```
 
-## Hide links the user cannot open
-
-A `permission` guard on a section covers every route under it, and a route with no `permission` on itself or its sections returns `true`.
-
-```js title="routes.js"
-team: {
-  path: '/team/:org',
-  layout: TeamLayout,
-  routes: {
-    members: { path: '/team/:org/members', view: MembersPage },
-    settings: {
-      path: '/team/:org/settings',
-      permission: ({ user }) => user?.role === 'admin',
-      view: SettingsPage,
-    },
-  },
-},
-```
+**Example**
 
 ```js for="core" label="nav.js"
 import { canAccess, href } from 'nav-router';
 
-export const TeamNav = ({ params }) => `
-  <nav>
-    <a href="${href('members', { org: params.org })}">Members</a>
-    ${canAccess('settings', { org: params.org })
-      ? `<a href="${href('settings', { org: params.org })}">Settings</a>`
-      : ''}
-  </nav>`;
+// Given a `billing` route with:
+// permission: ({ user, params }) => user?.roles?.[params.org] === 'owner'
+export function SettingsNav({ org }) {
+  return `
+    <nav>
+      <a href="${href('profile', { org })}">Profile</a>
+      ${canAccess('billing', { org })
+        ? `<a href="${href('billing', { org })}">Billing</a>`
+        : ''}
+    </nav>
+  `;
+}
 ```
 
-:::note[Sync menus need sync guards]
-A menu that renders synchronously can’t wait for a promise. Load the user in the router’s `identity` setting so `permission` can read `user` synchronously.
+```jsx for="react" label="nav.jsx"
+import { canAccess, href, useRouter } from '@nav-router/react';
+
+// Given a `billing` route with:
+// permission: ({ user, params }) => user?.roles?.[params.org] === 'owner'
+export function SettingsNav({ org }) {
+  const showBilling = useRouter(() => canAccess('billing', { org }));
+
+  return (
+    <nav>
+      <a href={href('profile', { org })}>Profile</a>
+      {showBilling && <a href={href('billing', { org })}>Billing</a>}
+    </nav>
+  );
+}
+```
+
+```tsx for="solid" label="nav.tsx"
+import { canAccess, href } from '@nav-router/solid';
+import { Show } from 'solid-js';
+
+// Given a `billing` route with:
+// permission: ({ user, params }) => user?.roles?.[params.org] === 'owner'
+export function SettingsNav(props: { org: string }) {
+  return (
+    <nav>
+      <a href={href('profile', { org: props.org })}>Profile</a>
+      <Show when={canAccess('billing', { org: props.org })}>
+        <a href={href('billing', { org: props.org })}>Billing</a>
+      </Show>
+    </nav>
+  );
+}
+```
 :::
 
-## Related
-
-- [Route options](/api/route-options/): declaring `permission` on a route or section.
-- [`isActive()`](/api/is-active/): whether a route is on the current page’s path.
-- [`href()`](/api/router/#href): the URL for a route.
-- [Guards and sign-in](/examples/guards/): `permission` and `signInRoute` in the playground.
+:::warning[Async permission guards]
+If any `permission` guard on the route or its parents is `async`, `canAccess()` returns a `Promise<boolean>` — which is always truthy in an `if` check. Resolve the user asynchronously in [`identity`](/api/router/#settings) so `permission` guards remain synchronous for menu rendering.
+:::

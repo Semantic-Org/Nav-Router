@@ -29,7 +29,7 @@ const content = resolve(here, '../src/content');
 const NAV_ROUTER = [resolve(here, '../..'), resolve(here, '../../../nav-router')]
   .find((dir) => existsSync(resolve(dir, 'src/index.js')));
 
-const DIRECTIVES = ['note', 'tip', 'warning', 'danger', 'steps', 'entry', 'truth'];
+const DIRECTIVES = ['note', 'tip', 'warning', 'danger', 'for', 'steps', 'entry', 'truth'];
 const KINDS = ['class', 'function', 'plugin'];
 const parser = unified().use(remarkParse).use(remarkDirective);
 

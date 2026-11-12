@@ -1,123 +1,112 @@
 ---
 title: Routes and params
-lede: Declare your routes as one tree, give the dynamic parts of a path a type, and link by name so a path can change without breaking a link.
-updated: 2026-11-05
+lede: This guide covers path patterns, nested route sections, typed URL and query parameters, and match priority.
+updated: 2026-11-12
 ---
 
-## Declare the tree
+## Path patterns
 
-Each route has a name, which is its key, and a path. A route with `routes` of its own is a section: its layout and data stay mounted while the pages under it change.
+Route paths start with `/` and match slash-separated URL segments (trailing slashes are normalized automatically):
 
-```js for="core vue svelte semantic" label="routes.js" {10}
-import { router } from 'nav-router';
+```js title="routes.js"
+routes: {
+  pricing: { path: '/pricing', view: Pricing },
+  post: { path: '/blog/:slug', view: Post },
+  archive: { path: '/blog/archive/:year?', view: Archive },
+  files: { path: '/files/*', view: FileViewer },
+}
+```
 
-export const app = router({
-  index: { path: '/', view: HomePage },
-  routes: {
-    team: {
-      path: '/team/:org',
-      layout: TeamLayout,
-      routes: {
-        member: { path: '/team/:org/:userId', view: MemberPage },
+- **Static segments** (`/pricing`) match that exact segment text.
+- **Dynamic `:param` segments** (`/blog/:slug`) match any single segment, decode URI escapes, and pass the value on `params.slug`.
+- **Optional `:param?` segments** (`/blog/archive/:year?`) match whether present or omitted (including multiple trailing `:param?` segments). When omitted, `params.year` is `undefined` unless a `default` is declared, and [`href()`](/api/router/#href) leaves trailing unset optional segments out of the URL.
+- **Trailing wildcard `*`** (`/files/*`) appears only as the final segment and captures zero or more remaining segments joined by `'/'` on `params['*']` (`'docs/setup.md'` at `/files/docs/setup.md`, or `''` at `/files`).
+
+## Grouping routes and index pages
+
+`routes` accepts either an object `{ [name]: options }` (where each key sets the route's `name`) or an array of route objects.
+
+To share a layout, access guard, `data` loader, or parameter spec across related pages, nest child routes under `routes` or call [`section()`](/api/router/#section). Add an `index` route when the section's own URL should also render a page:
+
+```js title="routes.js"
+routes: {
+  team: {
+    path: '/teams/:org',
+    layout: TeamLayout,
+    index: {
+      view: TeamOverview,
+    },
+    routes: {
+      members: {
+        path: '/teams/:org/members',
+        view: TeamMembers,
+      },
+      member: {
+        path: '/teams/:org/members/:id',
+        view: MemberDetail,
       },
     },
   },
-});
+}
 ```
 
-```jsx for="react preact" label="routes.jsx" {10}
-import { router } from '@nav-router/react';
+- **Full child paths** — child routes always write their complete path starting with the parent's `path` (`'/teams/:org/members/:id'`, not `'members/:id'`). Every URL in your app stays greppable from a single string without piecing parent prefixes together, and `Route` throws an error if a child path omits its parent prefix.
+- **`index` routes** — a section with child `routes` is not a leaf page on its own. Defining `index` renders `TeamOverview` at `/teams/:org` inside `TeamLayout`, and `href('team', { org: 'acme' })` links directly to `'/teams/acme'`.
+- **Imperative routes** — you can also register routes imperatively with [`route()`](/api/router/#route) and [`section()`](/api/router/#section), or define the `'/'` page with [`index()`](/api/router/#index).
 
-export const app = router({
-  index: { path: '/', view: HomePage },
-  routes: {
-    team: {
-      path: '/team/:org',
-      layout: TeamLayout,
-      routes: {
-        member: { path: '/team/:org/:userId', view: MemberPage },
-      },
-    },
+## Typed params and query specs
+
+URL segments and query strings start as raw text. Declare `params` and `query` on a route to coerce values and apply defaults before your route hooks and views read them:
+
+```js title="routes.js"
+{
+  name: 'issues',
+  path: '/projects/:projectId/issues',
+  params: {
+    projectId: Number,
   },
-});
-```
-
-```tsx for="solid" label="routes.tsx" {10}
-import { router } from '@nav-router/solid';
-
-export const app = router({
-  index: { path: '/', view: HomePage },
-  routes: {
-    team: {
-      path: '/team/:org',
-      layout: TeamLayout,
-      routes: {
-        member: { path: '/team/:org/:userId', view: MemberPage },
-      },
-    },
-  },
-});
-```
-
-:::note[Child paths are written in full]
-A child route repeats its parent’s path, as `'/team/:org/:userId'` does. You can read any route’s URL without walking up the tree.
-:::
-
-## Type the params
-
-A `:name` in a path is a param. Declare it under `params` to give it a type, a default, or a fixed set of values. Your views only ever see values that passed.
-
-| Declaration | Means |
-|---|---|
-| `userId: String` | Any string. |
-| `org: 'acme'` | A string, `'acme'` when the URL leaves it out. |
-| `tab: { default: 'overview' }` | The same, written out. |
-| `tab: { allowed: ['overview', 'members'] }` | Only these values match the route. |
-
-### Query works the same way
-
-Declare `query` keys the same way. A value is read as the type of its default, so `compact: false` arrives in your view as a boolean, not the string `'false'`.
-
-```js
-member: {
-  path: '/team/:org/:userId',
   query: {
-    compact: false,
-    section: { default: 'profile', allowed: ['profile', 'commits'] },
+    status: { default: 'open', allowed: ['open', 'closed', 'all'] },
+    page: { type: Number, default: 1, validator: (n) => Number.isInteger(n) && n >= 1 },
+    archived: false,
+    since: Date,
   },
-},
+  view: IssuesList,
+}
 ```
 
-## Add a page in three steps
+Each key in `params` or `query` accepts any of these forms:
 
-:::steps
-1. **Declare the route**
+- **Type constructor** — `String`, `Number`, `Boolean`, or `Date` converts the raw value (`'42'` becomes `42`; ISO-8601 dates become `Date` instances).
+- **Default shorthand** — passing a literal value such as `archived: false` or `page: 1` sets `default` and infers its type automatically.
+- **Spec object** — an object with `type`, `default`, `allowed`, and `validator(value)`. When `type` is omitted, it is inferred from `default` or `allowed[0]`.
 
-   Give it a name and a path, and the view it shows.
+Child routes inherit `params` and `query` specs from their parent sections. Boolean query parameters accept bare flags (`?archived` parses as `true`), and [`href()`](/api/router/#href) omits query values equal to their `default` so URLs stay clean. Undeclared query keys in the URL still pass through on `query` as strings — try it live in the [Query params](/examples/query-params/) example.
 
-   ```js
-   settings: { path: '/team/:org/settings', view: SettingsPage },
-   ```
-
-2. **Link to it by name**
-
-   `href()` builds the URL, so the link is a plain anchor the browser already knows how to follow.
-
-   ```js
-   const link = `<a href="${href('settings', { org })}">Settings</a>`;
-   ```
-
-3. **Read its params in the view**
-
-   The view receives the matched `params` and `query`, already typed.
+:::note[Invalid params vs. invalid query values]
+A `:param` that fails conversion or validation **rejects the route match** so a fallback route or `notFound` view can handle the URL. A `query` value that fails those checks keeps the route matched and **falls back to `default`** (`undefined` when no default is set).
 :::
 
-:::tip[Rename a path without touching a link]
-Links name the route, not the path. Change `'/team/:org/settings'` to `'/org/:org/settings'` and every `href('settings')` follows.
-:::
+## Match priority
 
-## Next
+When multiple routes could match a URL, candidates are compared segment by segment from left to right rather than by registration order. At the first segment where two routes differ, the more specific segment wins:
 
-- [Layouts and slots](/guides/layouts-and-slots/): what a section keeps mounted.
-- [Loading data](/guides/loading-data/): data per route, and what back and forward reuse.
-- [`navigate()` reference](/api/router/#navigate): every option.
+1. **Static segment** (`/teams/new`)
+2. **`allowed` parameter** (`:tab` with `allowed: ['members', 'billing']`)
+3. **Typed or validated parameter** (`:id` with `Number` or `validator`)
+4. **Plain `:param` segment** (`:slug`)
+5. **Wildcard `*`** (`/files/*`), with an omitted `:param?` or empty `*` ranking last
+
+Because constrained parameters outrank plain `:param` segments, sibling routes can share the same path depth cleanly:
+
+```js title="routes.js"
+routes: {
+  createTeam: { path: '/teams/new', view: CreateTeam },
+  teamById: { path: '/teams/:id', params: { id: Number }, view: TeamById },
+  teamBySlug: { path: '/teams/:slug', view: TeamBySlug },
+}
+```
+
+Here `/teams/new` matches `createTeam`, `/teams/42` matches `teamById` with `params.id` set to `42`, and `/teams/acme` skips `teamById` to match `teamBySlug`. When two routes have identical specificity at every segment, the route registered first wins.
+
+Continue to [Loading data](/guides/loading-data/) to fetch records using parsed `params` and `query`.

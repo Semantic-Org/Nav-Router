@@ -1,156 +1,38 @@
 ---
 title: Navigator
 kind: class
-lede: Listens on `window.navigation`, decides which navigations the router takes and which stay with the browser, runs the navigation verbs, and remembers inner scroll positions.
+lede: Connects a router to the browser Navigation API for link interception and history traversal.
 import: import { Navigator, createNavigator } from 'nav-router'
-updated: 2026-11-11
+updated: 2026-11-12
 ---
-
-## How it connects to the router
-
-Every [`Router`](/api/router/) creates its own `Navigator` as `router.navigator`. `router.start()` attaches its listeners, `router.stop()` detaches them, and the router’s navigation verbs (`router.navigate()`, `router.back()`, `router.reload()`) build the URL and call through to `router.navigator`.
-
-To construct one directly in a custom setup or test, call `createNavigator(router)` or `new Navigator(router)`.
 
 :::entry
 ### `createNavigator()` :kind[function]
 
 ```js signature
-createNavigator(router): Navigator
+new Navigator(router)
+createNavigator(router)
 ```
 
-Creates a `Navigator` bound to `router`.
+Wraps `window.navigation` for a [`Router`](/api/router/) instance, intercepting same-origin navigations that match a route and tracking session history entries. Every router creates its own adapter on `router.navigator`; in application code, call navigation methods on [`Router`](/api/router/#navigation) instead.
+
+When `window.navigation` is unavailable, `navigate()` and `reload()` fall back to `window.location`.
 :::
 
-## Which navigations it takes
+## Properties
 
-When a link click, back/forward button or router call fires `navigate` on `window.navigation`, the navigator intercepts it only when it belongs to the app. It leaves the navigation to the browser when:
+| Property | Type | Description |
+| --- | --- | --- |
+| `router` | `Router` | Owning [`Router`](/api/router/) instance. |
+| `attached` | `boolean` | `true` while listening to `window.navigation` and `pageshow` events. |
+| `entry` | `NavigationHistoryEntry \| null` | Current browser history entry (`navigation.currentEntry`). |
+| `entries` | `NavigationHistoryEntry[]` | Session history entries from `navigation.entries()`. |
+| `activation` | `NavigationActivation \| null` | How the document was initially opened (`navigation.activation`). |
+| `transition` | `object \| null` | Active intercepted navigation (`navigationType`, `from`, `destination`, `url`), or `null` when idle. |
+| `canGoBack` | `boolean` | `true` when the previous history entry is same-document and matches a route on `router`. |
+| `canGoForward` | `boolean` | `true` when a forward history entry exists. |
 
-| Navigation | Why the browser handles it |
-|---|---|
-| `!event.canIntercept` | Cross-document history step or unrewritable URL. |
-| `event.downloadRequest` | An `<a download>` link. |
-| `event.formData` | A `POST` form submission. |
-| Another origin, or outside `base` | External link or another app on the same domain. |
-| Unmatched path | `router.match()` returned `null`. |
-| Browser reload button | Full document reload. |
-| Same-page `#hash` jump | Route, params and query are unchanged, so the browser scrolls to the anchor. |
-
-When only `query` changes on the current route and params, the navigator tells the browser to leave scroll and focus where they are so filter and search inputs don’t jump.
-
-## Scroll memory
-
-The browser restores window scroll on back and forward (`traverse`). To also restore scrollable containers inside your layout, pass their CSS selector (or an array of selectors) to the router’s `restoreScroll` setting:
-
-```js for="core" label="routes.js"
-import { router } from 'nav-router';
-
-export const app = router({
-  restoreScroll: ['#sidebar-scroll', '#feed-scroll'],
-  layout: TeamLayout,
-  routes: {
-    members: { path: '/team/:org/members', view: MembersPage },
-    member: { path: '/team/:org/:userId', view: MemberPage },
-  },
-});
-```
-
-Before leaving an entry, the navigator saves each container’s `{ top, left }` scroll offset onto the history entry’s state, and restores it after a `traverse` navigation renders.
-
-## Methods
-
-:::entry
-### `navigate()` :kind[method]
-
-```js signature
-navigator.navigate(url, options?): { committed, finished }
-```
-
-Navigates to a URL string via `window.navigation.navigate()`. Use [`router.navigate()`](/api/router/#navigate) to navigate by route name and params; use `navigator.navigate()` in a plugin when you already have a resolved URL.
-
-**Parameters**
-
-```params
-- name: url
-  type: string
-  required: true
-  description: The URL to navigate to.
-- name: options
-  type: '{ history, state, info, resetScroll, resetFocus }'
-  default: '{}'
-  description: History and scroll/focus options, as in [`router.navigate()`](/api/router/#navigate).
-```
-:::
-
-:::entry
-### `reload()` :kind[method]
-
-```js signature
-navigator.reload(options?): { committed, finished }
-```
-
-Reloads the current entry in-app without resetting scroll or focus.
-:::
-
-:::entry
-### `back()` :kind[method]
-
-```js signature
-navigator.back(fallbackUrl?): { committed, finished }
-```
-
-Goes back one entry when `canGoBack` is `true`, or pushes `fallbackUrl` (`router.config.base || '/'` by default) when there is no earlier entry in this app.
-:::
-
-:::entry
-### `forward()` :kind[method]
-
-```js signature
-navigator.forward(): { committed, finished }
-```
-
-Goes forward one entry when `canGoForward` is `true`.
-:::
-
-:::entry
-### `traverseTo()` :kind[method]
-
-```js signature
-navigator.traverseTo(key, options?): { committed, finished }
-```
-
-Jumps to the history entry with the given `key`.
-:::
-
-:::entry
-### `shouldIntercept()` :kind[method]
-
-```js signature
-navigator.shouldIntercept(event): boolean
-```
-
-Whether a `NavigateEvent` is eligible for interception before route matching runs.
-:::
-
-:::entry
-### `saveScroll()` :kind[method]
-
-```js signature
-navigator.saveScroll()
-```
-
-Writes the current scroll offsets for `router.config.restoreScroll` onto the current history entry.
-:::
-
-:::entry
-### `restoreScroll()` :kind[method]
-
-```js signature
-navigator.restoreScroll(entry)
-```
-
-Restores the scroll offsets stored on `entry` to the elements matching `router.config.restoreScroll`.
-:::
+## Lifecycle
 
 :::entry
 ### `attach()` :kind[method]
@@ -159,7 +41,7 @@ Restores the scroll offsets stored on `entry` to the elements matching `router.c
 navigator.attach()
 ```
 
-Attaches the `window.navigation` and `pageshow` listeners. Called by `router.start()`.
+Subscribes to `window.navigation` and `pageshow` events and syncs initial history entries. Called automatically by [`router.start()`](/api/router/#start).
 :::
 
 :::entry
@@ -169,26 +51,111 @@ Attaches the `window.navigation` and `pageshow` listeners. Called by `router.sta
 navigator.detach()
 ```
 
-Removes the listeners attached by `attach()`. Called by `router.stop()`.
+Removes the `window.navigation` and `window` listeners registered by `attach()`. Called automatically by [`router.stop()`](/api/router/#stop).
 :::
 
-## Properties
+## Navigation
 
-`entry`, `entries`, `activation`, `transition`, `canGoBack` and `canGoForward` are also exposed on [`Router`](/api/router/).
+:::entry
+### `navigate()` :kind[method]
 
-| Property | Type | Description |
-|---|---|---|
-| `router` | `Router` | The router this navigator belongs to. |
-| `attached` | `boolean` | Whether the navigator is listening on `window.navigation`. |
-| `entry` | `NavigationHistoryEntry \| null` | The browser’s `navigation.currentEntry`. |
-| `entries` | `NavigationHistoryEntry[]` | The browser’s `navigation.entries()` list. |
-| `activation` | `NavigationActivation \| null` | The document’s `navigation.activation`. |
-| `transition` | `{ navigationType, from, destination, url } \| null` | The intercepted navigation in flight, or `null`. |
-| `canGoBack` | `boolean` | Whether the previous history entry is same-document and matches a route in this router. |
-| `canGoForward` | `boolean` | Whether `navigation.canGoForward` is `true`. |
+```js signature
+navigator.navigate(url, options?)
+```
 
-## Related
+Navigates to a resolved URL string via `navigation.navigate()` and returns `{ committed, finished }` promises. Unlike [`router.navigate()`](/api/router/#navigate), `url` must already be formatted with [`router.href()`](/api/router/#href).
 
-- [`Router`](/api/router/): route-based navigation verbs and settings.
-- [Moments](/api/moments/): wrapping `Navigator.prototype` and `Router.prototype` methods in a plugin.
-- [Back and forward](/examples/back-and-forward/): `entries`, `traverseTo()`, `canGoBack` and `restoreScroll` in the playground.
+**Parameters**
+
+```params
+- name: url
+  type: string
+  required: true
+  description: Destination URL or pathname.
+- name: options
+  type: object
+  default: "{}"
+  description: Platform navigation options.
+  options:
+    - name: history
+      type: "'auto' | 'push' | 'replace'"
+      default: "'auto'"
+      description: "'auto' replaces on the current URL and pushes otherwise; 'replace' keeps existing entry state unless `state` is set."
+    - name: state
+      type: unknown
+      description: Structured-cloneable history entry state.
+    - name: info
+      type: unknown
+      description: Ephemeral value exposed on `NavigateEvent.info`.
+    - name: resetScroll
+      type: boolean
+      default: "true"
+      description: Scrolls to top (or `#hash`) after the navigation settles.
+    - name: resetFocus
+      type: boolean
+      default: "true"
+      description: Resets focus after the navigation settles.
+```
+:::
+
+:::entry
+### `reload()` :kind[method]
+
+```js signature
+navigator.reload(options?)
+```
+
+Triggers an intercepted same-document reload via `navigation.reload()`, keeping scroll and focus in place and preserving entry `state` unless overridden via `options` (`state`, `info`). Returns `{ committed, finished }`.
+:::
+
+:::entry
+### `back()` :kind[method]
+
+```js signature
+navigator.back(fallbackUrl?)
+```
+
+Steps back one history entry when `canGoBack` is `true`; otherwise pushes `fallbackUrl` (defaults to `router.config.base || '/'`). Returns `{ committed, finished }`.
+:::
+
+:::entry
+### `forward()` :kind[method]
+
+```js signature
+navigator.forward()
+```
+
+Steps forward one history entry when `canGoForward` is `true`. Returns `{ committed, finished }`.
+:::
+
+:::entry
+### `traverseTo()` :kind[method]
+
+```js signature
+navigator.traverseTo(key, options?)
+```
+
+Jumps to the history entry matching `key` via `navigation.traverseTo()`, accepting optional `info` in `options`. Returns `{ committed, finished }`.
+:::
+
+## Interception
+
+:::entry
+### `shouldIntercept()` :kind[method]
+
+```js signature
+navigator.shouldIntercept(event)
+```
+
+Returns `true` when `NavigateEvent` is eligible for router interception: `event.canIntercept` is `true`, the navigation is not a download, form submission, [`isExternalLink()`](#isexternallink) click, cross-origin URL, browser-initiated reload, or foreign same-URL `event.info` write.
+:::
+
+:::entry
+### `isExternalLink()` :kind[method]
+
+```js signature
+navigator.isExternalLink(event)
+```
+
+Returns `true` when `event.sourceElement` carries `rel="external"`, allowing a same-origin link whose URL matches a route to leave the router for a full browser navigation.
+:::

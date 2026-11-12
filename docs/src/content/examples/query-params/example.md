@@ -7,7 +7,7 @@ try:
   - 'Click **Compact**. `update()` adds `&compact` in place and the view gets a real `true`.'
   - 'Click **Show details** to remove it again.'
 related:
-  - { title: Routes and params, href: /guides/routes-and-params/#query-works-the-same-way }
+  - { title: Routes and params, href: /guides/routes-and-params/#typed-params-and-query-specs }
 ---
 
 `query` declares each key the route reads. `status` has a default and a fixed set of values, and

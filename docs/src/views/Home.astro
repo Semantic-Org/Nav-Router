@@ -7,6 +7,7 @@ import { getCollection } from 'astro:content';
 import Cohort from '../components/Cohort.astro';
 import Playground from '../components/Playground.astro';
 import Projection from '../components/Projection.astro';
+import { frameworkPickerHtml, installCmdsHtml } from '../lib/dropdown.js';
 import { filesFor } from '../lib/examples.js';
 import { PLUGINS } from '../lib/plugins.js';
 import { formatSize, sizeOf } from '../lib/sizes.js';
@@ -43,7 +44,13 @@ const worded = body
 const notice = draft
   ? `<p class="archive-banner" lang="${locale}" dir="${localeOf(locale).dir}">${t(locale, 'language.draft')} <a href="/" hreflang="en" lang="en" data-language-pick="en">${t(locale, 'language.readEnglish')}</a></p>`
   : '';
-const html = worded.replace('</header>', `</header>${notice}`).replace('{{language-select}}', languageSelect(Astro.url.pathname, locale)).replace('<span class="version">v0.1.0</span>', versionMenu(Astro.site, locale) + languageMenu(Astro.url.pathname, locale)).replace('{{plugin-rows}}', rows.join('\n        '));
+const html = worded
+  .replace('</header>', `</header>${notice}`)
+  .replace('{{language-select}}', languageSelect(Astro.url.pathname, locale))
+  .replace('<div class="fw-picker" data-framework-picker></div>', frameworkPickerHtml({ id: 'home-fw-picker', label: t(locale, 'framework.picker'), size: 'md', className: 'fw-picker' }))
+  .replace('<code data-shell>npm i nav-router</code>', installCmdsHtml())
+  .replace('<span class="version">v0.1.0</span>', versionMenu(Astro.site, locale) + languageMenu(Astro.url.pathname, locale))
+  .replace('{{plugin-rows}}', rows.join('\n        '));
 const SPLIT = '  <!-- ============ ribbon: plugins ============ -->';
 const [beforeTry, afterTry] = html.split(SPLIT);
 // the projection stands where the three platform cards stood

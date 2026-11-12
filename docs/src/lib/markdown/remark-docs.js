@@ -1,6 +1,7 @@
 // the docs' markdown conventions, so pages stay plain .md:
 //
-//   :::note[Title] … :::        callouts: note, tip, warning, danger
+//   :::note[Title] … :::        callouts: note, tip, warning, danger (optional {for="solid"})
+//   :::for[solid] … :::         prose/blocks shown only when that framework is selected
 //   :::steps  1. … :::          a numbered sequence
 //   :::entry  ### `fn()` :::    a reference entry (method or function)
 //   :::truth  | table | :::     a table of answers; true/false cells are tinted
@@ -123,22 +124,28 @@ function transformChildren(parent) {
 function transformNode(node) {
   if (node.type === 'containerDirective') {
     const label = node.children[0]?.data?.directiveLabel ? node.children.shift() : null;
+    const fw = node.attributes?.for;
+    const fwProp = fw ? { dataFwSlot: fw } : {};
     transformChildren(node);
+    if (node.name === 'for') {
+      const slot = fw ?? (label ? label.children.map((c) => c.value ?? '').join('').trim() : '');
+      return el('div', { className: ['fw-slot'], dataFwSlot: slot }, node.children);
+    }
     if (CALLOUTS.has(node.name)) {
       if (label) { label.data = { hName: 'p', hProperties: { className: ['callout-title'] } }; }
-      return el('div', { className: ['callout'], dataKind: node.name }, [
+      return el('div', { className: ['callout'], dataKind: node.name, ...fwProp }, [
         html(ICONS[node.name]),
         el('div', {}, label ? [label, ...node.children] : node.children),
       ]);
     }
     if (node.name === 'steps') {
       const list = node.children.find((c) => c.type === 'list');
-      if (list) { list.data = { hProperties: { className: ['steps'] } }; }
-      return list ?? el('div', {}, node.children);
+      if (list) { list.data = { hProperties: { className: ['steps'], ...fwProp } }; }
+      return list ?? el('div', { ...fwProp }, node.children);
     }
-    if (node.name === 'entry') { return el('section', { className: ['entry'] }, node.children); }
-    if (node.name === 'truth') { return el('div', { className: ['truth'] }, node.children); }
-    return el('div', { className: [node.name] }, node.children);
+    if (node.name === 'entry') { return el('section', { className: ['entry'], ...fwProp }, node.children); }
+    if (node.name === 'truth') { return el('div', { className: ['truth'], ...fwProp }, node.children); }
+    return el('div', { className: [node.name], ...fwProp }, node.children);
   }
   if (node.type === 'textDirective' && node.name === 'kind') {
     // the pill's text lives in an attribute, so headings collect only the symbol for the toc

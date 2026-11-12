@@ -90,6 +90,6 @@ const NavLink = (props) => (
 
 ## 相关内容
 
-- [`isCurrent()`](/api/is-current/)：页面本身，不包括它所在的分区。
+- [`isCurrent()`](/api/is-active/#iscurrent)：页面本身，不包括它所在的分区。
 - [`canAccess()`](/api/can-access/)：用户是否有权打开某条路由，可用于隐藏链接。
 - [`href()`](/api/router/#href)：某条路由对应的 URL。

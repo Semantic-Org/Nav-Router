@@ -1,96 +1,152 @@
 ---
 title: isActive()
 kind: function
-lede: Whether a route is on the current page’s path. A section stays active while any page under it shows, which is what a menu needs to mark where you are.
-import: import { isActive } from 'nav-router'
-updated: 2026-11-05
+lede: Checks whether a route matches the committed URL or one of its active parent sections.
+import: import { isActive, isCurrent } from 'nav-router'
+updated: 2026-11-12
 ---
 
-## Signature
+:::entry
+### `isActive()` :kind[function]
 
 ```js signature
-isActive(target, args?): boolean
+isActive(target, args?)
 ```
 
-<p class="entry-label">Parameters</p>
+Returns `true` when `target` is anywhere in the committed URL's active route chain — either the leaf page itself or a parent section wrapping it. Use `isActive()` for top-level or section links that stay highlighted while browsing child pages.
+
+**Parameters**
 
 ```params
 - name: target
-  type: string | Route
+  type: "string | Route"
   required: true
-  description: A route name or a `Route`. A section’s name means the section, not its index page.
+  description: Route `name` or [`Route`](/api/route/) instance. Pass a named route or `Route` object rather than a URL path string.
 - name: args
-  type: object
-  default: 'null'
-  description: Params and query the page must also have. Only the keys you pass are compared.
+  type: "object | null"
+  default: "null"
+  description: Subset of path parameters or query values that must match `router.current`. Keys omitted from `args` are ignored.
 ```
 
-<p class="entry-label">Returns</p>
+**Returns**
 
 ```returns
 type: boolean
-description: '`true` when the route is on the committed page’s path and every key in `args` matches.'
+description: "`true` when `target` is active on `router.current` and every key in `args` matches."
+```
+:::
+
+:::entry
+### `isCurrent()` :kind[function]
+
+```js signature
+isCurrent(target, args?)
 ```
 
-## Compared with `isCurrent()`
+Returns `true` only when `target` is the exact leaf route for the committed URL (if `target` names a section with an `index` route, checks that index route). Use `isCurrent()` for `aria-current="page"` or sub-navigation links that should not highlight on deeper child routes.
 
-`isCurrent()` asks whether a route is the page itself. On `/team/acme/members`:
+Accepts the same `target` and `args` arguments as [`isActive()`](#isactive).
+:::
+
+## Comparing `isActive()` and `isCurrent()`
+
+Given a `team` section (`path: '/teams/:org'`, with an `index` page) and a nested `members` route (`path: '/teams/:org/members'`), here is what each helper returns when the committed URL is `/teams/acme/members`:
 
 :::truth
-| Call | `isActive` | `isCurrent` |
-|---|---|---|
-| `('team')` | true | false |
-| `('members')` | true | true |
-| `('team', { org: 'acme' })` | true | false |
-| `('team', { org: 'globex' })` | false | false |
-| `('settings')` | false | false |
+| Target | `args` | `isActive` | `isCurrent` |
+| --- | --- | --- | --- |
+| `'team'` | — | true | false |
+| `'team'` | `{ org: 'acme' }` | true | false |
+| `'team'` | `{ org: 'globex' }` | false | false |
+| `'members'` | — | true | true |
+| `'members'` | `{ org: 'acme' }` | true | true |
+| `'members'` | `{ org: 'globex' }` | false | false |
 :::
 
-## Mark the current link
+## Highlighting navigation links
 
-Set `aria-current` from it, so the active state is announced and you can style it from CSS.
+Both helpers read `router.current`, so active states update as soon as a URL commits — even while slow `data` is still loading.
 
-```js for="core vue svelte semantic" label="nav.js"
-import { href, isActive } from 'nav-router';
+```js for="core" label="nav.js"
+import { href, isActive, isCurrent } from 'nav-router';
 
-const link = (name, label) => `
-  <a href="${href(name)}" ${isActive(name) ? 'aria-current="page"' : ''}>
-    ${label}
-  </a>`;
+export function TeamNav({ org }) {
+  return `
+    <nav>
+      <a
+        href="${href('team', { org })}"
+        class="${isActive('team', { org }) ? 'active' : ''}"
+        ${isCurrent('team', { org }) ? 'aria-current="page"' : ''}
+      >
+        Overview
+      </a>
+      <a
+        href="${href('members', { org })}"
+        ${isCurrent('members', { org }) ? 'aria-current="page"' : ''}
+      >
+        Members
+      </a>
+    </nav>
+  `;
+}
 ```
 
-```jsx for="react preact" label="Nav.jsx"
-import { href, isActive } from 'nav-router';
+```jsx for="react" label="nav.jsx"
+import { href, isActive, isCurrent, useRouter } from '@nav-router/react';
 
-const NavLink = ({ name, children }) => (
-  <a
-    href={href(name)}
-    aria-current={isActive(name) ? 'page' : undefined}
-  >
-    {children}
-  </a>
-);
+export function TeamNav({ org }) {
+  const inTeam = useRouter(() => isActive('team', { org }));
+  const onOverview = useRouter(() => isCurrent('team', { org }));
+  const onMembers = useRouter(() => isCurrent('members', { org }));
+
+  return (
+    <nav>
+      <a
+        href={href('team', { org })}
+        className={inTeam ? 'active' : undefined}
+        aria-current={onOverview ? 'page' : undefined}
+      >
+        Overview
+      </a>
+      <a
+        href={href('members', { org })}
+        aria-current={onMembers ? 'page' : undefined}
+      >
+        Members
+      </a>
+    </nav>
+  );
+}
 ```
 
-```tsx for="solid" label="Nav.tsx"
-import { href, isActive } from 'nav-router';
+```tsx for="solid" label="nav.tsx"
+import { href, isActive, isCurrent } from '@nav-router/solid';
 
-const NavLink = (props) => (
-  <a
-    href={href(props.name)}
-    aria-current={isActive(props.name) ? 'page' : undefined}
-  >
-    {props.children}
-  </a>
-);
+export function TeamNav(props: { org: string }) {
+  return (
+    <nav>
+      <a
+        href={href('team', { org: props.org })}
+        classList={{ active: isActive('team', { org: props.org }) }}
+        aria-current={isCurrent('team', { org: props.org }) ? 'page' : undefined}
+      >
+        Overview
+      </a>
+      <a
+        href={href('members', { org: props.org })}
+        aria-current={isCurrent('members', { org: props.org }) ? 'page' : undefined}
+      >
+        Members
+      </a>
+    </nav>
+  );
+}
 ```
 
-:::note[It reads the committed page]
-During a navigation that hasn’t committed yet, `isActive()` still answers for the page on screen. To light the link being opened, read `router.pending`.
+:::for[react]
+Persistent React layouts do not re-render when child routes change inside their slots. Wrap `isActive()` and `isCurrent()` in [`useRouter()`](/api/react/#userouter) so links subscribe to URL updates.
 :::
 
-## Related
-
-- [`isCurrent()`](/api/is-current/): the page itself, not its sections.
-- [`canAccess()`](/api/can-access/): whether the user may open a route, for hiding links.
-- [`href()`](/api/router/#href): the URL for a route.
+:::for[solid]
+In `@nav-router/solid`, `router.current` is backed by a Solid signal, so calling `isActive()` or `isCurrent()` inside JSX updates the link automatically on navigation.
+:::

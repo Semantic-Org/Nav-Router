@@ -1,69 +1,70 @@
 ---
 title: preload-intent
 kind: plugin
-lede: Warms a link’s lazy view code on hover, focus or touch, and adds `router.preload()` for warming a route by hand.
+lede: "Preloads lazy route views on pointer or keyboard link intent and adds `preload()`."
 import: import '@nav-router/plugins/preload-intent'
 size: preload-intent
-updated: 2026-11-11
+updated: 2026-11-12
 ---
 
-## Install
+## Usage
 
-Import the plugin once. While the router is running, hovering, focusing or touching an `<a href>` that matches a route loads its [`lazy()`](/api/lazy/) views in the background, so the module is already in memory when the user clicks.
+Pair `@nav-router/plugins/preload-intent` with [`lazy()`](/api/lazy/) so code-split views start downloading before the user finishes clicking a link:
 
 ```js title="app.js"
 import '@nav-router/plugins/preload-intent';
 import { lazy, router } from 'nav-router';
 
 const app = router({
-  routes: {
-    settings: {
-      path: '/team/:org/settings',
-      view: lazy(() => import('./settings-page.js')),
+  mount: '#app',
+  routes: [
+    {
+      name: 'analytics',
+      path: '/teams/:org/analytics',
+      view: lazy(() => import('./views/analytics.js')),
     },
-  },
+  ],
 });
+
+await app.start();
 ```
 
-Preloading warms the route’s `layout`, `view` and `slots` — guards and `data` still run when the user navigates.
+- **Listens for `pointerover`, `focusin`, and `touchstart`** on same-origin `<a>` and `<area>` links matching a route on your router.
+- **Warms view chunks only** — loads `lazy()` views, layouts, and named slots along the matched route chain. Route guards and `data` still run when the user navigates.
+- **Honors Data Saver** — skips automatic preloading when `navigator.connection.saveData` is enabled.
+- **Ignores non-router links** — skips external origins, `rel="external"` or `download` links, and links targeting another window or frame.
 
-## `preload()`
+## Methods
 
 :::entry
 ### `preload()` :kind[method]
 
 ```js signature
-router.preload(target, args?): Promise<void>
-preload(target, args?): Promise<void>
+await router.preload(target, args?)
+await preload(target, args?)
 ```
 
-Warms the `layout`, `view` and `slots` of a route and its sections by hand.
+Loads any `lazy()` views or layouts on the matched route chain without navigating. Also exported directly from `nav-router` (as well as `@nav-router/react` and `@nav-router/solid`).
 
 **Parameters**
 
 ```params
 - name: target
-  type: string | Route
+  type: "string | Route"
   required: true
-  description: A route name, a `Route`, or a path such as `'/team/acme/settings'`.
+  description: Route name, `Route` instance, or path.
 - name: args
   type: object
-  default: '{}'
-  description: Params needed to build the route’s path when `target` is a route with `:param` segments.
-```
-
-**Returns**
-
-```returns
-type: Promise<void>
-description: Resolves when every `layout`, `view` and `slots` chunk on the route chain has loaded.
+  default: "{}"
+  description: Path parameters when `target` is a parameterized route.
 ```
 
 **Example**
 
-```js title="team-layout.js"
+```js title="dashboard.js"
 import { preload } from 'nav-router';
 
-await preload('settings', { org: 'acme' });
+// Warm the editor chunk while the user reads the overview
+preload('project-editor', { org: 'acme', id: 42 });
 ```
 :::
