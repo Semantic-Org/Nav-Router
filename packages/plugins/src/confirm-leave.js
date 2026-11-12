@@ -95,16 +95,17 @@ routerProto.confirmLeave = function(guard, { signal } = {}) {
 
 navProto.onNavigate = function(event) {
   const router = this.router;
-  // a leave the modal already approved comes back as a plain document load of the same url
-  if (
-    event?.info?.[bypassKey] || event?.downloadRequest != null
-    || (router.leaveApproved && router.leaveApproved === event?.destination?.url)
-  ) {
+  // a leave the modal already approved comes back as a plain document load of the same url, the browser's alone
+  if (router.leaveApproved && router.leaveApproved === event?.destination?.url) {
     router.leaveApproved = null;
+    return;
+  }
+  if (event?.info?.[bypassKey] || event?.downloadRequest != null) {
     return onNavigate.call(this, event);
   }
 
-  const matched = router.match(event.destination?.url);
+  // an external link takes the whole document, so every route leaves, whatever its url would match
+  const matched = this.isExternalLink(event) ? null : router.match(event.destination?.url);
   const { current } = router;
   if (
     event.hashChange && current?.route === matched?.route && isEqual(current?.params, matched?.params)
