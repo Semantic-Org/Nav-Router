@@ -12,13 +12,10 @@ import { PLUGINS } from './plugins.js';
 // what changes from one view layer to the next: how views are written and how they read the route.
 // the shape is a sketch until the integrations settle
 const FRAMEWORK_GUIDES = {
-  core: [['Strings and elements as views', 'views'], ['Web components', 'web-components']],
-  react: [['Quickstart', 'quickstart'], ['Components and hooks', 'components'], [
-    'Suspense and transitions',
-    'suspense',
-  ]],
+  core: [['Views and slots', 'dom-views'], ['Web components', 'web-components']],
+  react: [['Quickstart', 'quickstart'], ['Components and hooks', 'components']],
   preact: [['Quickstart', 'quickstart'], ['Components and hooks', 'components']],
-  solid: [['Quickstart', 'quickstart'], ['Views and props', 'views'], ['Shared state', 'state']],
+  solid: [['Quickstart', 'quickstart'], ['Views and props', 'views'], ['Reactive state', 'state']],
   vue: [['Quickstart', 'quickstart'], ['Components and composables', 'components']],
   svelte: [['Quickstart', 'quickstart'], ['Components and runes', 'components']],
   semantic: [['Quickstart', 'quickstart'], ['Templates and signals', 'templates']],
@@ -26,7 +23,12 @@ const FRAMEWORK_GUIDES = {
 
 // an integration's own exports, listed only where the package exists
 const FRAMEWORK_API = {
-  solid: [['SolidRouter', 'solid-router', true], ['solidRouter()', 'solid-router-fn', true]],
+  react: [['ReactRouter', '#reactrouter', true], ['useRouter()', '#userouter', true], [
+    'ReactView',
+    '#reactview',
+    true,
+  ]],
+  solid: [['SolidRouter', '#solidrouter', true], ['SolidView', '#solidview', true]],
 };
 
 // a section's or group's name is one of the interface's words (nav.… in content/strings.json): name
@@ -35,6 +37,11 @@ const named = (name) => ({ name, label: t(DEFAULT_LOCALE, name) });
 
 // an item that isn't a page of its own (a landing, an anchor) is named the same way
 const titled = (name) => ({ name, title: t(DEFAULT_LOCALE, name) });
+
+const joinSlug = (section, fwSlug, page) =>
+  page?.startsWith('#')
+    ? `${section}/${fwSlug}${page}`
+    : [section, fwSlug, page].filter(Boolean).join('/');
 
 const frameworkGroups = (section) =>
   FRAMEWORKS.flatMap((f) => {
@@ -49,7 +56,7 @@ const frameworkGroups = (section) =>
       framework: f.id,
       items: items.map(([title, page, symbol]) => ({
         title,
-        slug: [section, f.slug, page].filter(Boolean).join('/'),
+        slug: joinSlug(section, f.slug, page),
         ...(symbol && { symbol: true }),
       })),
     }];
@@ -76,7 +83,8 @@ export const SECTIONS = [
           { title: 'Layouts and slots', slug: 'guides/layouts-and-slots' },
           { title: 'Loading data', slug: 'guides/loading-data' },
           { title: 'Guards and redirects', slug: 'guides/guards' },
-          { title: 'Loading states', slug: 'guides/loading-states' },
+          { title: 'Navigation and links', slug: 'guides/navigation' },
+          { title: 'Loading states and errors', slug: 'guides/loading-states' },
         ],
       },
       {
@@ -100,18 +108,21 @@ export const SECTIONS = [
           { title: 'Router', slug: 'api/router', symbol: true },
           { title: 'Route', slug: 'api/route', symbol: true },
           { title: 'Navigator', slug: 'api/navigator', symbol: true },
+          { title: 'View', slug: 'api/view', symbol: true },
+          { title: 'ReactiveRouter', slug: 'api/reactive-router', symbol: true },
         ],
       },
       {
         ...named('nav.group.functions'),
         items: [
-          { title: 'router()', slug: 'api/router-fn', symbol: true },
+          { title: 'router()', slug: 'api/router#router', symbol: true },
           { title: 'navigate()', slug: 'api/router#navigate', symbol: true },
+          { title: 'replace()', slug: 'api/router#replace', symbol: true },
+          { title: 'update()', slug: 'api/update', symbol: true },
           { title: 'href()', slug: 'api/router#href', symbol: true },
           { title: 'back()', slug: 'api/router#back', symbol: true },
-          { title: 'update()', slug: 'api/update', symbol: true },
           { title: 'isActive()', slug: 'api/is-active', symbol: true },
-          { title: 'isCurrent()', slug: 'api/is-current', symbol: true },
+          { title: 'isCurrent()', slug: 'api/is-active#iscurrent', symbol: true },
           { title: 'canAccess()', slug: 'api/can-access', symbol: true },
           { title: 'lazy()', slug: 'api/lazy', symbol: true },
         ],
@@ -121,7 +132,6 @@ export const SECTIONS = [
         items: [
           { ...titled('nav.item.routerSettings'), slug: 'api/router#settings' },
           { title: 'Route options', slug: 'api/route-options' },
-          { title: 'Moments', slug: 'api/moments' },
         ],
       },
     ],

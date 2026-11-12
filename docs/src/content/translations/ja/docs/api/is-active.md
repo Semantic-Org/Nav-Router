@@ -90,6 +90,6 @@ const NavLink = (props) => (
 
 ## 関連項目
 
-- [`isCurrent()`](/api/is-current/): セクションではなく、ページそのものかどうか。
+- [`isCurrent()`](/api/is-active/#iscurrent): セクションではなく、ページそのものかどうか。
 - [`canAccess()`](/api/can-access/): ユーザーがルートを開けるかどうか。リンクを隠すときに使います。
 - [`href()`](/api/router/#href): ルートの URL。

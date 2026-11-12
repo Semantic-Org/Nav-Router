@@ -206,9 +206,11 @@
 
 /* ---------- prose ---------- */
 
-.doc > p, .doc li, .doc dd, .entry p, .callout p { font-size: var(--fs-md); line-height: var(--lh-prose); }
-.doc > p { margin: 16px 0 0; }
+.doc > p, .doc li, .doc dd, .entry p, .callout p, .fw-slot p { font-size: var(--fs-md); line-height: var(--lh-prose); }
+.doc > p, .fw-slot > p { margin: 16px 0 0; }
 .doc > p:first-of-type { margin-top: 0; }
+.fw-slot { margin-top: 16px; }
+.fw-slot > :first-child { margin-top: 0; }
 .doc h2 {
   position: relative; margin: 56px 0 0; scroll-margin-top: var(--anchor-offset);
   font-size: var(--fs-2xl); line-height: var(--lh-2xl); letter-spacing: -0.5px; font-weight: 620;

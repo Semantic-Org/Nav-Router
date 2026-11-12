@@ -1,40 +1,59 @@
 ---
 title: timeline
 kind: plugin
-lede: Draws each navigation and its steps in the browser’s DevTools Performance panel.
+lede: "Records navigation, guard, data, and render spans in the browser DevTools Performance panel."
 import: import '@nav-router/plugins/timeline'
 size: timeline
-updated: 2026-11-11
+updated: 2026-11-12
 ---
 
-## Install
+## Usage
 
-Import the plugin once. Record a profile in the DevTools Performance panel to see two custom tracks — `navigation` and `cascade` — under the router’s track group.
+Import `@nav-router/plugins/timeline` before creating your router, then record a profile in your browser's DevTools **Performance** panel while navigating through your app:
 
 ```js title="app.js"
 import '@nav-router/plugins/timeline';
 import { router } from 'nav-router';
 
 const app = router({
-  timelineGroup: 'router',
-  // the routes
+  mount: '#app',
+  // ...routes
 });
+
+await app.start();
 ```
 
-## Options
+To omit the plugin from production bundles altogether, dynamically import it before calling `router()`:
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `timelineGroup` | `string` | `'router'` | Name of the track group in the DevTools Performance panel. |
+```js title="app.js"
+import { router } from 'nav-router';
 
-## Tracks
+if (import.meta.env.DEV) {
+  await import('@nav-router/plugins/timeline');
+}
 
-| Track | Entry | Measures |
-|---|---|---|
-| `navigation` | `router:start` | Initial page load in `router.start()`. |
-| `navigation` | `router:intercepted` | Mark at the start of an intercepted navigation. |
-| `navigation` | `router:navigate <route>` | Full navigation from intercept until it settles, fails or is aborted. |
-| `cascade` | `router:guards` | `redirect` and `permission` guards. |
-| `cascade` | `router:data` | Route `data` and `lazy()` views. |
-| `cascade` | `router:render` | Rendering the page or status view. |
-| `cascade` | `router:recompute` | An active route’s `data` recomputing in place. |
+const app = router({ mount: '#app', /* ...routes */ });
+await app.start();
+```
+
+## Tracks and spans
+
+Traces appear under a dedicated DevTools track group (`router` by default) with two tracks:
+
+- **`navigation` track** — marks each intercepted navigation (`router:intercepted`) and measures `router:start` and `router:navigate <route>` through completion.
+- **`cascade` track** — breaks each navigation down by phase:
+  - **`router:guards`** — `redirect` and `permission` checks along with their outcome
+  - **`router:data`** — route `data` functions and lazy view loading
+  - **`router:render`** — DOM or component rendering
+  - **`router:recompute`** — in-place reactive `data` updates
+
+## Settings
+
+Pass `timelineGroup` to `router(options)`:
+
+```params
+- name: timelineGroup
+  type: string
+  default: "'router'"
+  description: Track group label in the DevTools Performance panel. Give each router a distinct name when running more than one on the same page.
+```

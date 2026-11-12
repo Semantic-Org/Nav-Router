@@ -1,57 +1,179 @@
 ---
 title: head
 kind: plugin
-lede: Writes each page’s title, meta tags and canonical link into `document.head`, merged down the routes that are active.
+lede: "Writes `<meta>` and canonical `<link>` tags into `document.head` from active routes and formats `document.title`."
 import: import '@nav-router/plugins/head'
 size: head
-updated: 2026-11-05
+updated: 2026-11-12
 ---
 
-## Install
+## Usage
 
-Import the plugin once. A plugin wraps one moment in the router and calls through, so importing it changes nothing else, and its options are the router's own.
+Core `nav-router` already sets `document.title` from each route's `title` option. Import `@nav-router/plugins/head` before creating your router to add `formatTitle` and per-route `meta` tags:
 
-```js title="app.js"
+```js for="core" label="app.js"
 import '@nav-router/plugins/head';
 import { router } from 'nav-router';
 
 const app = router({
-  formatTitle: (title) => `${title} · Acme`,
-  // the routes
+  mount: '#app',
+  formatTitle: (title) => (title ? `${title} · Acme` : 'Acme'),
+  meta: {
+    description: 'Product updates and engineering notes from Acme.',
+  },
+  routes: [
+    {
+      name: 'post',
+      path: '/blog/:slug',
+      async data({ params, signal }) {
+        const res = await fetch(`/api/posts/${params.slug}`, { signal });
+        return { post: await res.json() };
+      },
+      title: ({ data }) => data.post.title,
+      meta: ({ data, page }) => ({
+        description: data.post.summary,
+        'og:title': data.post.title,
+        'og:image': data.post.coverUrl,
+        canonical: page.url,
+      }),
+      view: ({ data }) => `<article><h1>${data.post.title}</h1></article>`,
+    },
+  ],
 });
+
+await app.start();
 ```
 
-## Options
+```jsx for="react" label="app.jsx"
+import '@nav-router/plugins/head';
+import { router } from '@nav-router/react';
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `formatTitle` | `function` | `null` | Turns a route’s title into the document title. |
+function Post({ data }) {
+  return (
+    <article>
+      <h1>{data.post.title}</h1>
+    </article>
+  );
+}
 
-## The `meta` route option
+const app = router({
+  mount: '#app',
+  formatTitle: (title) => (title ? `${title} · Acme` : 'Acme'),
+  meta: {
+    description: 'Product updates and engineering notes from Acme.',
+  },
+  routes: [
+    {
+      name: 'post',
+      path: '/blog/:slug',
+      async data({ params, signal }) {
+        const res = await fetch(`/api/posts/${params.slug}`, { signal });
+        return { post: await res.json() };
+      },
+      title: ({ data }) => data.post.title,
+      meta: ({ data, page }) => ({
+        description: data.post.summary,
+        'og:title': data.post.title,
+        'og:image': data.post.coverUrl,
+        canonical: page.url,
+      }),
+      view: Post,
+    },
+  ],
+});
 
-Give a route `meta`: an object, or a function of the route’s context returning one. Keys are tag names, and the plugin picks the tag for you.
-
-```js
-member: {
-  path: '/team/:org/:userId',
-  meta: ({ data }) => ({
-    description: `${data.member.name} on Acme`,
-    'og:image': data.member.avatar,
-    canonical: `https://acme.app/team/${data.member.org}/${data.member.id}`,
-  }),
-},
+await app.start();
 ```
 
-| Key | Writes |
-|---|---|
-| `description` | `<meta name="description">` |
-| `og:image` | `<meta property="og:image">`, as does any `og:`, `article:`, `profile:`, `book:` or `fb:` key |
-| `canonical` | `<link rel="canonical">` |
+```tsx for="solid" label="app.tsx"
+import '@nav-router/plugins/head';
+import { router } from '@nav-router/solid';
 
-### How tags merge
+function Post(props) {
+  return (
+    <article>
+      <h1>{props.data.post.title}</h1>
+    </article>
+  );
+}
 
-Tags merge from the root down the active routes, so a section sets what its pages share and a page overrides one key without restating the rest.
+const app = router({
+  mount: '#app',
+  formatTitle: (title) => (title ? `${title} · Acme` : 'Acme'),
+  meta: {
+    description: 'Product updates and engineering notes from Acme.',
+  },
+  routes: [
+    {
+      name: 'post',
+      path: '/blog/:slug',
+      async data({ params, signal }) {
+        const res = await fetch(`/api/posts/${params.slug}`, { signal });
+        return { post: await res.json() };
+      },
+      title: ({ data }) => data.post.title,
+      meta: ({ data, page }) => ({
+        description: data.post.summary,
+        'og:title': data.post.title,
+        'og:image': data.post.coverUrl,
+        canonical: page.url,
+      }),
+      view: Post,
+    },
+  ],
+});
 
-:::note[Your static tags are restored]
-A tag already in your HTML is updated in place, and put back as it was when a later page clears it.
+await app.start();
+```
+
+## Route options
+
+Add `meta` to any [route](/api/route-options/) or to the root options passed to `router()`:
+
+```params
+- name: meta
+  type: "object | ((context) => object | Promise<object>)"
+  description: "Tag values keyed by tag name, or a function receiving `params`, `query`, `data`, `user`, `page`, and `signal`."
+```
+
+Active routes merge their `meta` objects from the root route down to the leaf on each settled render:
+
+- **`canonical`** writes `<link rel="canonical">` with `href`.
+- **Social prefixes** (`og:`, `article:`, `profile:`, `book:`, `fb:`) write `<meta property="...">` with `content`.
+- **Every other key** (such as `description`, `robots`, or `twitter:card`) writes `<meta name="...">` with `content`.
+- **Child routes override parent keys.** Setting a key to `null` or `false` clears a tag inherited from a parent route.
+- **Static HTML tags are preserved.** Matching tags already in `<head>` are updated in place and restored to their original value when a later route omits them or `router.stop()` runs.
+
+:::for[solid]
+In `@nav-router/solid`, `meta` functions run inside a reactive computation. Reading `data` or any Solid signal updates `<head>` in place whenever that value changes.
 :::
+
+## Settings
+
+Pass `formatTitle` to `router(options)`:
+
+```params
+- name: formatTitle
+  type: "((title, titles, page) => string | null | undefined) | null"
+  default: "null"
+  description: "Formats `document.title` and `router.page.title` on each settled render. `title` is the deepest active route's title (`''` if none), `titles` lists active route titles from leaf to root, and `page` is `router.page`."
+```
+
+Use `titles` when nested sections each contribute a segment to the browser tab title:
+
+```js title="routes.js"
+const app = router({
+  title: 'Acme',
+  formatTitle: (title, titles) => titles.join(' — '),
+  routes: [
+    {
+      path: '/teams/:org',
+      title: ({ params }) => params.org,
+      routes: [
+        { name: 'billing', path: '/teams/:org/billing', title: 'Billing', view: BillingView },
+      ],
+    },
+  ],
+});
+// Visiting /teams/design/billing sets document.title to "Billing — design — Acme"
+```

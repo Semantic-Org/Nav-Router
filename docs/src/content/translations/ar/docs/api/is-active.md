@@ -90,6 +90,6 @@ const NavLink = (props) => (
 
 ## صفحات ذات صلة
 
-- [`isCurrent()`](/api/is-current/): الصفحة نفسها، لا أقسامها.
+- [`isCurrent()`](/api/is-active/#iscurrent): الصفحة نفسها، لا أقسامها.
 - [`canAccess()`](/api/can-access/): هل يحق للمستخدم فتح المسار، لإخفاء الروابط.
 - [`href()`](/api/router/#href): عنوان URL لمسار ما.

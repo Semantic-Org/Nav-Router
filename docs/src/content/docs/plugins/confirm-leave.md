@@ -1,104 +1,177 @@
 ---
 title: confirm-leave
 kind: plugin
-lede: Holds unsaved work on the page across link clicks, back and forward, and closing the tab, until the user says to go.
+lede: "Prompts before leaving a page with unsaved edits across in-app navigation and tab close."
 import: import '@nav-router/plugins/confirm-leave'
 size: confirm-leave
-updated: 2026-11-11
+updated: 2026-11-12
 ---
 
-## Install
+## Usage
 
-Import the plugin once. Nothing is asked until a route or a guard says there is something to lose.
+Import `@nav-router/plugins/confirm-leave` before creating your router, then protect unsaved edits from inside a view with [`confirmLeave()`](#confirmleave) or on a route with [`canLeave`](#route-options):
 
-```js title="app.js"
+```js for="core" label="app.js"
 import '@nav-router/plugins/confirm-leave';
-import { router } from 'nav-router';
+import { confirmLeave, router } from 'nav-router';
+
+let dirty = false;
 
 const app = router({
-  confirm: (message) => dialog.ask(message),
-  // the routes
+  mount: '#app',
+  routes: [
+    {
+      name: 'edit-post',
+      path: '/posts/:id/edit',
+      onCreated({ abortSignal }) {
+        dirty = false;
+        confirmLeave(
+          () => (dirty ? 'Discard unsaved changes?' : true),
+          { signal: abortSignal },
+        );
+      },
+      view: () => '<form><textarea name="body"></textarea></form>',
+    },
+  ],
 });
+
+await app.start();
 ```
 
-## Options
+```jsx for="react" label="app.jsx"
+import '@nav-router/plugins/confirm-leave';
+import { confirmLeave, router } from '@nav-router/react';
+import { useEffect, useState } from 'react';
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `confirm` | `function` | `window.confirm` | Asks the user a message. Return `true` to go, or a promise of it, which is how a dialog of your own answers. |
+function PostEditor() {
+  const [dirty, setDirty] = useState(false);
 
-## The `canLeave` route option
+  useEffect(() => {
+    if (!dirty) return;
+    return confirmLeave(() => 'Discard unsaved changes?');
+  }, [dirty]);
 
-A route with `canLeave` is asked before a navigation leaves it.
+  return (
+    <form onChange={() => setDirty(true)}>
+      <textarea name="body" />
+    </form>
+  );
+}
 
-```js
-settings: {
-  path: '/team/:org/settings',
-  canLeave: () => (form.isDirty ? 'Discard your changes?' : true),
-  view: SettingsPage,
-},
+const app = router({
+  mount: '#app',
+  routes: [{ name: 'edit-post', path: '/posts/:id/edit', view: PostEditor }],
+});
+
+await app.start();
 ```
 
-| Return | Means |
-|---|---|
-| `false` | Stay. Nothing is shown. |
-| A string | Ask the user, with the string as the message. |
-| A promise of either | Wait for it. |
-| Anything else | Go. |
+```tsx for="solid" label="app.tsx"
+import '@nav-router/plugins/confirm-leave';
+import { confirmLeave, router } from '@nav-router/solid';
+import { createSignal, onCleanup } from 'solid-js';
 
-Moving between the pages under a route is not leaving it. A change to one of its own params is, so going from one member to the next asks.
+function PostEditor() {
+  const [dirty, setDirty] = createSignal(false);
+  const stop = confirmLeave(() => (dirty() ? 'Discard unsaved changes?' : true));
+  onCleanup(stop);
 
-The function receives `{ from, destination, navigationType }`: the page being left, the match being opened (only its `url` when it is outside the app), and `'push'`, `'replace'`, `'traverse'`, `'reload'`, or `'unload'` when the tab is closing.
+  return (
+    <form onInput={() => setDirty(true)}>
+      <textarea name="body" />
+    </form>
+  );
+}
 
-## Guard something that isn’t a route
+const app = router({
+  mount: '#app',
+  routes: [{ name: 'edit-post', path: '/posts/:id/edit', view: PostEditor }],
+});
+
+await app.start();
+```
+
+Guards receive `from`, `destination`, `navigationType`, `event`, and `router` (plus `route` on `canLeave`) and can return:
+
+- **`true` or `undefined`** — allow leaving without prompting.
+- **A non-empty string** — pass the message to [`confirm`](#settings) (`window.confirm` by default) and cancel if declined.
+- **`false`** — block navigation silently (or trigger the browser's prompt on tab close).
+- **A `Promise`** resolving to any of the above — pauses link and history navigation until resolved.
+
+:::note[Closing or reloading the tab]
+Browsers require `beforeunload` checks to run synchronously and display their own dialog text. Return a string or `false` synchronously when work is unsaved, and use [`confirm`](#settings) if you want an async custom modal for in-app navigation.
+:::
+
+## Route options
+
+Add `canLeave` to any [route](/api/route-options/) or section:
+
+```params
+- name: canLeave
+  type: "boolean | string | ((context) => boolean | string | Promise<boolean | string>)"
+  description: "Checked when leaving this route, when its `:params` or declared `query` keys change, or when leaving the document via external links, `rel=\"external\"`, or tab close."
+```
+
+`#hash` jumps and undeclared query changes on the same route do not trigger `canLeave`:
+
+```js title="routes.js"
+{
+  name: 'draft',
+  path: '/drafts/:id',
+  canLeave: ({ destination }) => {
+    if (!hasUnsavedDraft() || destination?.route?.name === 'draft-preview') {
+      return true;
+    }
+    return 'Leave without saving this draft?';
+  },
+  view: DraftEditor,
+}
+```
+
+## Methods
 
 :::entry
-### `confirmLeave()` :kind[function]
+### `confirmLeave()` :kind[method]
 
 ```js signature
-confirmLeave(guard, options?): function
+const dispose = router.confirmLeave(guard, options?)
+const dispose = confirmLeave(guard, options?)
 ```
 
-Registers a guard that is asked on every navigation until you release it. Reach for it when the unsaved work belongs to an open editor or a dialog, not to a route. Also on the router, as `router.confirmLeave()`.
+Registers a leave guard until `dispose()` is called, `options.signal` aborts, or `router.stop()` runs. Also exported directly from `nav-router`, `@nav-router/react`, and `@nav-router/solid`.
 
 **Parameters**
 
 ```params
 - name: guard
-  type: function
+  type: "(context) => boolean | string | Promise<boolean | string>"
   required: true
-  description: Answers as `canLeave` does.
+  description: Leave check called on link clicks, Back/Forward, external links, and tab close.
 - name: options
   type: object
-  default: '{}'
+  default: "{}"
+  description: Guard lifecycle options.
   options:
     - name: signal
       type: AbortSignal
-      description: Releases the guard when it aborts.
-```
-
-**Returns**
-
-```returns
-type: function
-description: Releases the guard.
-```
-
-**Example**
-
-```js title="editor.js"
-import { confirmLeave } from 'nav-router';
-
-const release = confirmLeave(() => (editor.isDirty ? 'Discard this draft?' : true));
-
-editor.onClose(release);
+      description: Unregisters the guard automatically when aborted.
 ```
 :::
 
-## What it can and can’t hold
+## Settings
 
-A refusal stops the navigation before the URL moves, links out of the app included. Where the browser can’t hold one, as with some back and forward presses, or a promise in a browser that commits the URL at once, the URL moves and is put back when the answer is no.
+Pass `confirm` to `router(options)` to replace `window.confirm` with your own dialog:
 
-:::warning[Closing the tab asks in the browser’s words]
-When the tab closes, the browser shows its own prompt, and only `false` or a string holds it there. A promise can’t keep a tab open, so a guard that must cover closing answers without one.
-:::
+```params
+- name: confirm
+  type: "(message, context) => boolean | Promise<boolean>"
+  default: "window.confirm"
+  description: "Prompt handler called when a guard returns a non-empty string. Return `true` (or a Promise of `true`) to proceed."
+```
+
+```js title="app.js"
+const app = router({
+  confirm: (message) => openConfirmDialog({ title: 'Unsaved changes', message }),
+  // ...routes
+});
+```

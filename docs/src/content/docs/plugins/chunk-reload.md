@@ -1,35 +1,56 @@
 ---
 title: chunk-reload
 kind: plugin
-lede: Recovers once when a fresh deploy has removed the old code chunk an in-flight navigation needs.
+lede: "Recovers from missing lazy-loaded chunks after a new deploy by reloading the target URL once."
 import: import '@nav-router/plugins/chunk-reload'
 size: chunk-reload
-updated: 2026-11-11
+updated: 2026-11-12
 ---
 
-## Install
+## Usage
 
-Import the plugin once. When a [`lazy()`](/api/lazy/) view fails to load during a navigation — as happens when a deploy replaces hashed bundle files while a tab is open — the plugin reloads the document at the destination URL so the page picks up the new build.
+Bundlers stamp code-split chunks with content hashes. When a fresh deploy removes older chunks from your server, users who still have an earlier tab open can hit a failed module import the next time they navigate to a [`lazy()`](/api/lazy/) route.
+
+Import `@nav-router/plugins/chunk-reload` before creating your router to recover automatically with a full document load:
 
 ```js title="app.js"
 import '@nav-router/plugins/chunk-reload';
 import { lazy, router } from 'nav-router';
 
 const app = router({
-  routes: {
-    settings: {
-      path: '/team/:org/settings',
-      view: lazy(() => import('./settings-page.js')),
+  mount: '#app',
+  routes: [
+    {
+      name: 'reports',
+      path: '/reports',
+      view: lazy(() => import('./views/reports.js')),
     },
-  },
+  ],
 });
+
+await app.start();
 ```
 
-## Options
+- **Lands on the destination URL** — detaches router interception and navigates the document directly to the target URL so the user arrives on the page they clicked with fresh HTML and asset hashes.
+- **Tries at most once per URL** — records the attempted URL in `sessionStorage` and clears it once a navigation settles. If loading that URL fails again immediately, normal error handling (`onError` and `statusViews.error`) runs instead of looping.
+- **Skips offline errors** — leaves failures while `navigator.onLine` is `false` to your app's error view rather than triggering a browser offline screen.
+- **Ignores background preloads** — a failed hover preload from [`preload-intent`](/plugins/preload-intent/) does not reload the current page unless the user actually navigates to that route.
 
-Pass an object under `chunkReload` on [`router()`](/api/router/#settings).
+## Settings
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `storageKey` | `string` | `'nav-router:chunk-reload'` | `sessionStorage` key used to remember the URL that just reloaded, so a broken chunk reloads at most once. |
-| `reload` | `function` | `location.assign(url)` or `location.reload()` | `(url) => void`. Performs the full page load for `url`. |
+Pass `chunkReload` to `router(options)`:
+
+```params
+- name: chunkReload
+  type: object
+  default: "{}"
+  description: Chunk recovery options.
+  options:
+    - name: storageKey
+      type: string
+      default: "'nav-router:chunk-reload'"
+      description: "`sessionStorage` key tracking the last reloaded URL so repeated failures do not loop."
+    - name: reload
+      type: "(url) => void"
+      description: "Custom document load handler. Defaults to `location.assign(url)` (or `location.reload()` when already at `url`). Because router listeners detach before `reload` runs, custom handlers must perform a full document navigation."
+```
