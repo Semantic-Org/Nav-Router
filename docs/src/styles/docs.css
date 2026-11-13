@@ -62,7 +62,7 @@
   /* the window's edge, not the column's padding, is the far side of the space */
   .docs-main > .docs-toc {
     grid-column: 3; grid-row: 1 / span 20; justify-self: center;
-    width: fit-content; max-width: var(--toc-w); margin-inline-end: calc(-1 * var(--pad-x));
+    width: var(--toc-w); margin-inline-end: calc(-1 * var(--pad-x));
   }
 }
 /* a container, so the doc can measure the room beside it */
@@ -138,12 +138,12 @@
 /* sticks where it starts, level with the crumb, and scrolls on its own when longer than the window */
 .docs-toc {
   position: sticky; top: calc(var(--topbar-h) + var(--pad-t));
-  max-height: calc(100vh - var(--topbar-h) - var(--pad-t)); padding-bottom: 48px; overflow-y: auto;
+  max-height: calc(100vh - var(--topbar-h) - var(--pad-t)); padding-bottom: 48px; padding-inline-start: 2px; overflow-y: auto;
 }
 .toc-label { margin: 0 0 12px; color: var(--text); font-size: var(--fs-xs); line-height: var(--lh-xs); font-weight: 600; }
 .toc-list { list-style: none; margin: 0; padding: 0; border-inline-start: 1px solid var(--line); }
 .toc-list a {
-  display: block; margin-inline-start: -1px; padding-block: 5px; padding-inline: 14px 0;
+  display: block; margin-inline-start: -1px; padding-block: 5px; padding-inline: 14px 12px;
   border-inline-start: 1px solid transparent;
   color: var(--text-3); text-decoration: none;
   font-size: var(--fs-sm); line-height: var(--lh-sm); text-wrap: pretty;
