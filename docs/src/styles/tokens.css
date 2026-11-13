@@ -368,7 +368,7 @@ dialog.search::backdrop { background: oklch(0 0 0 / 0.6); backdrop-filter: blur(
   animation: dd-in 0.14s var(--ease);
 }
 .search-field {
-  display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 16px;
+  flex: none; display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 16px;
   border-bottom: 1px solid var(--line-2);
 }
 .search-field > svg { width: 18px; height: 18px; color: var(--text-3); flex: none; }
@@ -378,7 +378,7 @@ dialog.search::backdrop { background: oklch(0 0 0 / 0.6); backdrop-filter: blur(
 }
 .search-field input::placeholder { color: var(--text-4); }
 .search-field input::-webkit-search-cancel-button { display: none; }
-.search-results { flex: 1; overflow-y: auto; padding: 8px; }
+.search-results { flex: 1; min-height: 0; overflow-y: auto; padding: 8px; }
 .search-group {
   margin: 8px 0 4px; padding: 0 10px;
   color: var(--text-3); font-size: var(--fs-2xs); line-height: var(--lh-2xs); font-weight: 500;
@@ -406,7 +406,7 @@ dialog.search::backdrop { background: oklch(0 0 0 / 0.6); backdrop-filter: blur(
 .search-empty-title { color: var(--text); font-weight: 500; margin-bottom: 4px; }
 .search-empty code { font-size: var(--fs-xs); color: var(--text-2); }
 .search-foot {
-  display: flex; align-items: center; gap: 16px; height: 40px; padding: 0 16px;
+  flex: none; display: flex; align-items: center; gap: 16px; height: 40px; padding: 0 16px;
   border-top: 1px solid var(--line); background: var(--surface-1);
   color: var(--text-4); font-size: var(--fs-2xs); line-height: var(--lh-2xs);
 }
