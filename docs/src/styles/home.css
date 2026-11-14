@@ -467,6 +467,7 @@ a.pt-row:hover code { color: var(--accent-strong); }
 }
 
 /* ---------- try it: a live app ---------- */
+.ribbon-try .ribbon-head { margin-bottom: 28px; }
 .ribbon-try .pg { height: 520px; }
 @media (min-width: 1280px) { .ribbon-try .pg { height: 600px; } }
 .ribbon-try .text-link { display: inline-block; margin-top: 20px; }

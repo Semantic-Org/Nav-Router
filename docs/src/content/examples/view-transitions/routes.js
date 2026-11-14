@@ -6,6 +6,12 @@ const COLORS = {
   sky: { name: 'Sky', hex: '#79c0ff' },
 };
 
+const swatch = (id, hex) => `background:${hex}; view-transition-name:swatch-${id}`;
+
+const SwatchCard = ([id, c]) => `
+  <a class="card" href="${href('swatch', { id })}"
+     style="${swatch(id, c.hex)}">${c.name}</a>`;
+
 export const routes = {
   name: 'palette',
   index: {
@@ -13,14 +19,7 @@ export const routes = {
     view: () => `
       <h1>Palette</h1>
       <p>Pick a swatch to morph it into the detail header.</p>
-      <div class="grid">
-        ${
-      Object.entries(COLORS).map(([id, c]) => `
-          <a class="card" href="${href('swatch', { id })}"
-             style="background:${c.hex}; view-transition-name:swatch-${id}">${c.name}</a>
-        `).join('')
-    }
-      </div>`,
+      <div class="grid">${Object.entries(COLORS).map(SwatchCard).join('')}</div>`,
   },
   routes: {
     swatch: {
@@ -28,10 +27,12 @@ export const routes = {
       view: ({ params }) => {
         const c = COLORS[params.id];
         return `
-          <div class="banner" style="background:${c.hex}; view-transition-name:swatch-${params.id}">
+          <div class="banner" style="${swatch(params.id, c.hex)}">
             <h1>${c.name}</h1>
           </div>
-          <p>Hex <code>${c.hex}</code> · <a href="${href('palette')}">← All swatches</a></p>`;
+          <p>
+            <code>${c.hex}</code> · <a href="${href('palette')}">← All swatches</a>
+          </p>`;
       },
     },
   },

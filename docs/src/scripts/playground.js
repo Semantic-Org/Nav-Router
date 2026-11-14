@@ -76,7 +76,10 @@ const EDITOR_THEME = `
 `;
 
 export function mountPlayground(root) {
-  const { files: FILES, tabs: TABS } = JSON.parse(root.querySelector('[data-pg-files]').textContent);
+  const parsed = JSON.parse(root.querySelector('[data-pg-files]').textContent);
+  const items = parsed.examples ?? [{ id: 'default', files: parsed.files, tabs: parsed.tabs }];
+  let current = items.find((it) => it.id === root.dataset.initialPick) ?? items[0];
+  const picks = root.previousElementSibling?.matches('[data-pg-picks]') ? root.previousElementSibling : null;
   const $ = (s) => root.querySelector(s);
   const status = $('[data-pg-status]');
   const pathEl = $('[data-pg-path]');
@@ -96,7 +99,7 @@ export function mountPlayground(root) {
 
   // the app owns its urls, so any path without a file serves index.html: reloads and deep links land
   // in the app, and its router takes it from there
-  const project = new PlaygroundProject({ files: FILES, importMap: IMPORT_MAP, fallback: 'index.html' });
+  const project = new PlaygroundProject({ files: current.files, importMap: IMPORT_MAP, fallback: 'index.html' });
   root.project = project;
 
   let started = 0;
@@ -139,32 +142,76 @@ export function mountPlayground(root) {
     },
   });
   const open = (name) => {
-    editor.openFile(name, project.getFile(name)?.content ?? FILES[name]);
+    editor.openFile(name, project.getFile(name)?.content ?? current.files[name]);
     tabs.querySelectorAll('[role=tab]').forEach((t) => {
       const on = t.dataset.file === name;
       t.setAttribute('aria-selected', on);
       t.tabIndex = on ? 0 : -1;
     });
   };
-  tabs.innerHTML = TABS.map((name) =>
-    `<button class="code-tab" role="tab" type="button" data-file="${name}">${name}</button>`
-  ).join('');
+  const renderTabs = () => {
+    tabs.innerHTML = current.tabs.map((name) =>
+      `<button class="code-tab" role="tab" type="button" data-file="${name}">${name}</button>`
+    ).join('');
+  };
+  const syncPicks = () => {
+    if (!picks) { return; }
+    picks.querySelectorAll('[role=tab]').forEach((b) => {
+      const on = b.dataset.pgPick === current.id;
+      b.setAttribute('aria-selected', on);
+      b.tabIndex = on ? 0 : -1;
+    });
+    if (current.label) { root.setAttribute('aria-label', current.label); }
+  };
+  const selectExample = (id) => {
+    const next = items.find((it) => it.id === id);
+    if (!next || next === current) { return; }
+    for (const file of project.files) {
+      current.files[file.name] = file.content;
+    }
+    current = next;
+    syncPicks();
+    renderTabs();
+    clearTimeout(preview.loadTimer);
+    preview.path = '/';
+    preview.live = false;
+    preview.loading = false;
+    preview.queued = false;
+    pathEl.textContent = '/';
+    back.disabled = true;
+    forward.disabled = true;
+    project.setFiles(current.files);
+    editor.openFile('', '');
+    open(current.tabs[0]);
+  };
   tabs.addEventListener('click', (e) => {
     const t = e.target.closest('[data-file]');
     if (t) { open(t.dataset.file); }
   });
   // arrow keys move between files, as in any tablist
-  tabs.addEventListener('keydown', (e) => {
-    const all = [...tabs.querySelectorAll('[role=tab]')];
-    const i = all.indexOf(document.activeElement);
-    const to = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: all.length - 1 }[e.key];
-    if (i < 0 || to === undefined) { return; }
-    e.preventDefault();
-    const t = all[(to + all.length) % all.length];
-    open(t.dataset.file);
-    t.focus();
-  });
-  open(TABS[0]);
+  const wireTabKeys = (bar, activate) => {
+    bar.addEventListener('keydown', (e) => {
+      const all = [...bar.querySelectorAll('[role=tab]')];
+      const i = all.indexOf(document.activeElement);
+      const to = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: all.length - 1 }[e.key];
+      if (i < 0 || to === undefined) { return; }
+      e.preventDefault();
+      const t = all[(to + all.length) % all.length];
+      activate(t);
+      t.focus();
+    });
+  };
+  wireTabKeys(tabs, (t) => open(t.dataset.file));
+  if (picks) {
+    picks.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-pg-pick]');
+      if (b) { selectExample(b.dataset.pgPick); }
+    });
+    wireTabKeys(picks, (b) => selectExample(b.dataset.pgPick));
+  }
+  syncPicks();
+  renderTabs();
+  open(current.tabs[0]);
 
   project.build();
 }

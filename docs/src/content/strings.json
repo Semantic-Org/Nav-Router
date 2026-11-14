@@ -197,7 +197,6 @@
   "home.slots.layout": "app layout",
   "home.try.title": "Edit a running app",
   "home.try.lede": "A small nav-router app, built and served in your browser. Change a route and the preview rebuilds as you type. Nothing to install.",
-  "home.try.label": "Live example: your first router",
   "home.try.link": "See all examples",
   "home.plugins.title": "Small core, opt-in plugins",
   "home.plugins.lede": "Like day.js, the core does one job and plugins add the rest. Each one wraps a single moment in the router and calls through, so you only ship what you install.",

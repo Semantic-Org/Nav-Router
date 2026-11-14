@@ -11,7 +11,7 @@ import { frameworkPickerHtml, installCmdsHtml } from '../lib/dropdown.js';
 import { filesFor } from '../lib/examples.js';
 import { PLUGINS } from '../lib/plugins.js';
 import { formatSize, sizeOf } from '../lib/sizes.js';
-import { draftStrings, languageMenu, languageSelect, languagesWith, localeOf, localePath, t } from '../lib/i18n.js';
+import { draftStrings, inLanguage, languageMenu, languageSelect, languagesWith, localeOf, localePath, t } from '../lib/i18n.js';
 import { versionMenu } from '../lib/versions.js';
 
 const locale = Astro.currentLocale;
@@ -27,7 +27,19 @@ const rows = await Promise.all(PLUGINS.map(async (p) => {
 }));
 // a live app sits between the claims (built on the platform) and extending it (plugins): the
 // reader can check the claims before the page moves on. it loads only as it nears the screen
-const tryEntry = (await getCollection('examples')).find((e) => e.id === 'first-router');
+const allExamples = new Map((await getCollection('examples')).map((e) => [e.id, e]));
+const tryIds = ['view-transitions', 'layouts-and-slots', 'confirm-leave', 'search-and-abort'];
+const tryExamples = await Promise.all(tryIds.map(async (id) => {
+  const entry = allExamples.get(id);
+  const { page } = await inLanguage(entry, locale);
+  return {
+    id,
+    title: page.data.title,
+    label: t(locale, 'examples.live', { title: page.data.title }),
+    files: filesFor(id),
+    tabs: page.data.tabs,
+  };
+}));
 // the page's words are keys ({{t:home.…}} here, t() in its components, ui() in its scripts) from
 // content/strings.json; a language that has translated them is one the page is written in
 const translatedIn = languagesWith('home.', { reviewed: true });
@@ -74,7 +86,7 @@ const [hero, afterHero] = beforeProjection.split(TREE);
         <h2>{t(locale, 'home.try.title')}</h2>
         <p>{t(locale, 'home.try.lede')}</p>
       </div>
-      <Playground files={filesFor(tryEntry.id)} tabs={tryEntry.data.tabs} label={t(locale, 'home.try.label')} lineNumbers={false} />
+      <Playground examples={tryExamples} lineNumbers={false} />
       <a class="text-link" href="/examples/">{t(locale, 'home.try.link')}</a>
     </div>
   </section>
