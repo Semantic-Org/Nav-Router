@@ -1,0 +1,8 @@
+body { margin: 0; padding: 20px 24px; font: 15px/1.55 system-ui, sans-serif; background: #0a0d14; color: #e8e8ea; }
+form { display: flex; gap: 8px; margin-bottom: 10px; }
+input { font: inherit; padding: 4px 10px; border-radius: 6px; border: 1px solid #2a2f3a; background: #141823; color: #e8e8ea; }
+button { font: inherit; padding: 4px 10px; border-radius: 6px; border: 1px solid #2a2f3a; background: #141823; color: #e8e8ea; cursor: pointer; }
+a { color: #79c0ff; }
+p { margin: 0 0 12px; color: #b4b4ba; }
+.muted { color: #7c7c84; font-size: 13px; }
+ul { padding-left: 18px; margin: 0 0 12px; }

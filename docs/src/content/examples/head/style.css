@@ -1,0 +1,7 @@
+body { margin: 0; padding: 20px 24px; font: 15px/1.55 system-ui, sans-serif; background: #0a0d14; color: #e8e8ea; }
+header { display: flex; gap: 14px; align-items: baseline; margin-bottom: 18px; }
+a { color: #79c0ff; }
+h1 { margin: 0 0 6px; font-size: 22px; }
+p { margin: 0 0 12px; color: #b4b4ba; }
+code { font: 13px ui-monospace, monospace; color: #e8e8ea; }
+pre { margin: 14px 0 0; padding: 10px 12px; border-radius: 8px; border: 1px solid #1e2330; background: #10141f; color: #9ecbff; font: 12px/1.6 ui-monospace, monospace; overflow-x: auto; }
