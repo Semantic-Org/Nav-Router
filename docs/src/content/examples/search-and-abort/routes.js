@@ -10,7 +10,8 @@ const search = (q, signal) =>
     const ms = q.length === 1 ? 900 : 150;
     const timer = setTimeout(() => {
       log.unshift(`loaded "${q}" (${ms}ms)`);
-      resolve(PEOPLE.filter((name) => name.toLowerCase().includes(q.toLowerCase())));
+      const needle = q.toLowerCase();
+      resolve(PEOPLE.filter((name) => name.toLowerCase().includes(needle)));
     }, ms);
     signal.addEventListener('abort', () => {
       clearTimeout(timer);
@@ -25,19 +26,25 @@ export const routes = {
     people: {
       path: '/people',
       query: { q: '' },
-      data: async ({ query, signal }) => ({ matches: await search(query.q, signal) }),
-      view: ({ query, data }) => `
-        <form action="${href('people')}">
-          <input id="q" name="q" value="${query.q}" placeholder="Search people…">
-          <button type="submit">Search</button>
-        </form>
-        <p class="muted">
-          Race test: <a href="${href('people', { q: 'a' })}">"a" (900ms)</a> ·
-          <a href="${href('people', { q: 'ada' })}">"ada" (150ms)</a> ·
-          <a href="${href('people')}">Reset</a>
-        </p>
-        <ul>${data.matches.map((name) => `<li>${name}</li>`).join('') || '<li>No matches</li>'}</ul>
-        ${log.length ? `<p class="muted">${log.slice(0, 4).join(' → ')}</p>` : ''}`,
+      data: async ({ query, signal }) => ({
+        matches: await search(query.q, signal),
+      }),
+      view: ({ query, data }) => {
+        const items = data.matches.map((n) => `<li>${n}</li>`).join('');
+        const recent = log.slice(0, 4).join(' → ');
+        return `
+          <form action="${href('people')}">
+            <input id="q" name="q" value="${query.q}" placeholder="Search people…">
+            <button type="submit">Search</button>
+          </form>
+          <p class="muted">
+            Race test: <a href="${href('people', { q: 'a' })}">"a" (900ms)</a> ·
+            <a href="${href('people', { q: 'ada' })}">"ada" (150ms)</a> ·
+            <a href="${href('people')}">Reset</a>
+          </p>
+          <ul>${items || '<li>No matches</li>'}</ul>
+          ${recent ? `<p class="muted">${recent}</p>` : ''}`;
+      },
     },
   },
 };
