@@ -1,21 +1,29 @@
 ---
 // a live example: editor tabs beside a preview in a browser bar, built and served in the browser by
-// the playground engine. pass the example's files ({ name: content }) and the tabs to show
+// the playground engine. pass one example's files and tabs, or examples to switch between
 import '../styles/playground.css';
 import { t } from '../lib/i18n.js';
 
 const locale = Astro.currentLocale;
-const { files, tabs, label = t(locale, 'playground.label'), lineNumbers = true } = Astro.props;
+const { files, tabs, examples, label = t(locale, 'playground.label'), lineNumbers = true } = Astro.props;
+const first = examples?.[0] ?? { files, tabs, label };
 // until the editor loads, its pane shows the first file as text, so nothing moves when it arrives
-const preview = (files[tabs[0]] ?? '').replace(/\/\* playground-hide \*\/[\s\S]*?\/\* playground-hide-end \*\/\n?/g, '');
+const preview = (first.files[first.tabs[0]] ?? '').replace(/\/\* playground-hide \*\/[\s\S]*?\/\* playground-hide-end \*\/\n?/g, '');
 // the files ride a json script, so their braces and tags never meet astro's template
-const data = JSON.stringify({ files, tabs }).replace(/</g, '\\u003c');
+const data = JSON.stringify(examples ? { examples } : { files, tabs }).replace(/</g, '\\u003c');
 const editorId = `pg-editor-${Math.random().toString(36).slice(2, 8)}`;
 ---
-<div class:list={['pg', { 'no-line-numbers': !lineNumbers }]} data-playground data-line-numbers={lineNumbers ? undefined : 'off'} aria-label={label}>
+{examples?.length > 1 && (
+  <div class="pg-picks" role="tablist" aria-label={t(locale, 'nav.examples')} data-pg-picks>
+    {examples.map((ex, i) => (
+      <button class="pg-pick" role="tab" type="button" data-pg-pick={ex.id} aria-selected={i === 0 ? 'true' : 'false'} tabindex={i === 0 ? 0 : -1}>{ex.title}</button>
+    ))}
+  </div>
+)}
+<div class:list={['pg', { 'no-line-numbers': !lineNumbers }]} data-playground data-line-numbers={lineNumbers ? undefined : 'off'} aria-label={first.label ?? label}>
   <div class="pg-editor-pane" id={editorId}>
     <div class="code-head pg-tabs" role="tablist" aria-label={t(locale, 'playground.files')} data-own-tabs data-pg-tabs>
-      {tabs.map((name, i) => <button class="code-tab" role="tab" type="button" aria-selected={i === 0 ? 'true' : 'false'} tabindex="-1">{name}</button>)}
+      {first.tabs.map((name, i) => <button class="code-tab" role="tab" type="button" aria-selected={i === 0 ? 'true' : 'false'} tabindex="-1">{name}</button>)}
     </div>
     <div class="pg-editor" data-pg-editor><pre class="pg-static" data-pg-static>{preview}</pre></div>
   </div>
@@ -51,6 +59,18 @@ const editorId = `pg-editor-${Math.random().toString(36).slice(2, 8)}`;
   };
 
   document.querySelectorAll('[data-playground]').forEach((root) => {
+    const picks = root.previousElementSibling?.matches('[data-pg-picks]') ? root.previousElementSibling : null;
+    if (picks) {
+      picks.addEventListener('pointerenter', () => start(root), { once: true });
+      picks.addEventListener('focusin', () => start(root), { once: true });
+      picks.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-pg-pick]');
+        if (btn && !root.project) {
+          root.dataset.initialPick = btn.dataset.pgPick;
+          start(root);
+        }
+      });
+    }
     const status = root.querySelector('[data-pg-status]');
     if (navigator.connection?.saveData) {
       status.innerHTML = ui('playground.paused');

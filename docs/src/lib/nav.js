@@ -145,6 +145,7 @@ export const SECTIONS = [
         ...named('nav.group.start'),
         items: [
           { title: 'Your first router', slug: 'examples/first-router' },
+          { title: 'Layouts and slots', slug: 'examples/layouts-and-slots' },
         ],
       },
       {
@@ -153,6 +154,7 @@ export const SECTIONS = [
           { title: 'Loading states', slug: 'examples/loading-states' },
           { title: 'Back and forward', slug: 'examples/back-and-forward' },
           { title: 'Not found', slug: 'examples/not-found' },
+          { title: 'Search and cancellation', slug: 'examples/search-and-abort' },
         ],
       },
       {
@@ -160,6 +162,21 @@ export const SECTIONS = [
         items: [
           { title: 'Query params', slug: 'examples/query-params' },
           { title: 'Guards and sign-in', slug: 'examples/guards' },
+        ],
+      },
+      {
+        ...named('nav.plugins'),
+        items: [
+          { title: 'Unsaved changes', slug: 'examples/confirm-leave' },
+          { title: 'View transitions', slug: 'examples/view-transitions' },
+          { title: 'Lazy views and preload', slug: 'examples/lazy-and-preload' },
+          { title: 'Titles and meta tags', slug: 'examples/head' },
+        ],
+      },
+      {
+        ...named('nav.group.going-further'),
+        items: [
+          { title: 'Web components', slug: 'examples/web-components' },
         ],
       },
     ],

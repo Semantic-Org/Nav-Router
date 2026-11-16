@@ -2,6 +2,21 @@
    the Playground component, so it comes along wherever one is used */
 
 
+/* an example switcher above the playground when a page offers several to try */
+.pg-picks {
+  display: inline-flex; max-width: 100%; gap: 2px; margin-bottom: 12px; padding: 3px;
+  border: 1px solid var(--line-2); border-radius: var(--r-3); background: var(--surface-1);
+  overflow-x: auto; scrollbar-width: none;
+}
+.pg-picks::-webkit-scrollbar { display: none; }
+.pg-pick {
+  flex: none; height: 30px; padding: 0 12px; border: 0; border-radius: var(--r-2); background: none;
+  color: var(--text-3); font: 500 var(--fs-xs)/1 var(--font-sans); cursor: pointer; white-space: nowrap;
+  transition: color 0.12s var(--ease), background-color 0.12s var(--ease);
+}
+.pg-pick:hover { color: var(--text); }
+.pg-pick[aria-selected='true'] { color: var(--text); background: var(--surface-3); }
+
 .pg {
   /* the code is what an example shows, so the editor gets the larger share */
   display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
